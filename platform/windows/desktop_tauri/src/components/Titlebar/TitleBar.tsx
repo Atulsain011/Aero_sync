@@ -1,6 +1,7 @@
 import React from 'react';
 import { Minus, Square, X, Radio } from 'lucide-react';
 import { tauriBridge } from '../../services/tauriBridge';
+import logoImg from '../../assets/logo.png';
 
 interface TitleBarProps {
   isDaemonOnline: boolean;
@@ -14,7 +15,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ isDaemonOnline }) => {
   return (
     <header className="titlebar" data-tauri-drag-region onDoubleClick={handleDoubleClick}>
       <div className="titlebar-left" data-tauri-drag-region>
-        <img src="/assets/logo.png" alt="AeroSync" className="titlebar-logo" />
+        <img src={logoImg} alt="AeroSync" className="titlebar-logo" />
         <span className="titlebar-title" data-tauri-drag-region>AeroSync</span>
         <div className={`status-pill ${isDaemonOnline ? 'status-online' : 'status-offline'}`}>
           <Radio className="status-icon" size={12} />
