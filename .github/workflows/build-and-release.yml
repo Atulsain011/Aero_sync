@@ -2,11 +2,27 @@ name: Build and Release AeroSync
 
 on:
   push:
-    tags:
-      - 'v*'
     branches:
       - main
+    tags:
+      - 'v*'
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag (e.g. v1.0.0). Required when publishing from manual branch dispatch.'
+        required: false
+        type: string
+        default: ''
+      draft:
+        description: 'Mark release as draft'
+        required: false
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Mark release as prerelease'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -23,18 +39,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'platform/windows/desktop_tauri/package-lock.json'
 
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Setup CMake & Ninja
-        uses: seanmcbreen/setup-cmake@v1
-        with:
-          cmake-version: '3.28.x'
-
       - name: Install Frontend Dependencies
         working-directory: platform/windows/desktop_tauri
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Build Web Assets
         working-directory: platform/windows/desktop_tauri
@@ -48,13 +61,19 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts
-          Copy-Item "platform/windows/desktop_tauri/src-tauri/target/release/aerosync-desktop.exe" "artifacts/AeroSync.exe" -Force
+          $sourceExe = "platform/windows/desktop_tauri/src-tauri/target/release/aerosync-desktop.exe"
+          if (-not (Test-Path $sourceExe)) {
+            Write-Error "Executable not found at $sourceExe"
+            exit 1
+          }
+          Copy-Item $sourceExe "artifacts/AeroSync.exe" -Force
 
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
           name: AeroSync-Windows
           path: artifacts/AeroSync.exe
+          if-no-files-found: error
 
   build-android:
     name: Build Android Mobile App (.apk)
@@ -69,22 +88,30 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK & NDK
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Build Android APK
         working-directory: platform/android
         run: |
-          chmod +x gradlew || true
-          ./gradlew assembleRelease || ./gradlew assembleDebug
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon || ./gradlew assembleDebug --no-daemon
 
       - name: Prepare Android Release Binary
         run: |
           mkdir -p artifacts
           if [ -f "platform/android/app/build/outputs/apk/release/app-release-unsigned.apk" ]; then
             cp platform/android/app/build/outputs/apk/release/app-release-unsigned.apk artifacts/AeroSync.apk
+          elif [ -f "platform/android/app/build/outputs/apk/release/app-release.apk" ]; then
+            cp platform/android/app/build/outputs/apk/release/app-release.apk artifacts/AeroSync.apk
           elif [ -f "platform/android/app/build/outputs/apk/debug/app-debug.apk" ]; then
             cp platform/android/app/build/outputs/apk/debug/app-debug.apk artifacts/AeroSync.apk
+          else
+            echo "Error: No APK file generated!" >&2
+            exit 1
           fi
 
       - name: Upload Android Artifact
@@ -92,11 +119,12 @@ jobs:
         with:
           name: AeroSync-Android
           path: artifacts/AeroSync.apk
+          if-no-files-found: error
 
   publish-release:
     name: Publish Release Assets
     needs: [build-windows, build-android]
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && (inputs.tag_name != '' || startsWith(github.ref, 'refs/tags/v')))
     runs-on: ubuntu-latest
     steps:
       - name: Download Windows Artifact
@@ -114,23 +142,23 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name || 'v1.0.0' }}
-          name: AeroSync ${{ github.ref_name || 'v1.0.0' }}
-          draft: false
-          prerelease: false
+          tag_name: ${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}
+          name: AeroSync ${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}
+          draft: ${{ inputs.draft || false }}
+          prerelease: ${{ inputs.prerelease || false }}
           body: |
-            ## ⚡ AeroSync Official Release
-            
-            High-speed peer-to-peer Wi-Fi and hotspot file transfer between Windows and Android.
-            
-            ### 📥 Direct Downloads
-            - 🪟 **Windows Desktop App**: `AeroSync.exe`
-            - 🤖 **Android Mobile App**: `AeroSync.apk`
-            
-            ### 🌟 Key Highlights
-            - Zero-cloud, 100% peer-to-peer over local network
-            - 100+ MB/s real-world transfer speed
-            - Instant radar peer discovery & PIN pairing
+            ## AeroSync Release
+
+            High-speed peer-to-peer file transfer over local Wi-Fi and hotspot.
+
+            ### Direct Downloads
+            - **Windows Desktop App**: `AeroSync.exe`
+            - **Android Mobile App**: `AeroSync.apk`
+
+            ### Key Highlights
+            - Zero-cloud, 100% peer-to-peer file transfer over local network
+            - High-speed peer-to-peer file transfer over local Wi-Fi and hotspot
+            - Peer discovery and secure PIN pairing
           files: |
             release-assets/AeroSync.exe
             release-assets/AeroSync.apk
