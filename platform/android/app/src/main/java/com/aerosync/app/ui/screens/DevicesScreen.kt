@@ -32,8 +32,7 @@ fun DevicesScreen(
     onRefreshPeers: () -> Unit,
     onSelectTab: (Int) -> Unit
 ) {
-    var showDirectIpDialog by remember { mutableStateOf(false) }
-    var directIpInput by remember { mutableStateOf("192.168.43.1") }
+    var directIpInput by remember { mutableStateOf("") }
     var showRenameDialog by remember { mutableStateOf(false) }
     var renameInput by remember { mutableStateOf(uiState.deviceName) }
 
@@ -45,8 +44,7 @@ fun DevicesScreen(
     val textPrimary = if (isDark) Color(0xFFF9FAFB) else Color(0xFF0F172A)
     val textSecondary = if (isDark) Color(0xFF9CA3AF) else Color(0xFF64748B)
     val textMuted = if (isDark) Color(0xFF6B7280) else Color(0xFF94A3B8)
-    val brandBlue = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7)
-    val activeDotColor = Color(0xFF10B981)
+    val brandBlue = Color(0xFF2563EB)
 
     Box(
         modifier = Modifier
@@ -70,22 +68,22 @@ fun DevicesScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        AeroSyncLogoIcon(size = 34.dp)
-                        Spacer(modifier = Modifier.width(10.dp))
+                        AeroSyncLogoIcon(size = 32.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Devices",
-                            fontSize = 21.sp,
+                            text = "AeroSync",
+                            fontSize = 19.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            color = brandBlue,
-                            letterSpacing = 0.5.sp
+                            color = textPrimary,
+                            letterSpacing = (-0.3).sp
                         )
                     }
 
                     Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(cardBgAlt)
-                            .border(1.dp, borderColor, RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(cardBg)
+                            .border(1.dp, borderColor, RoundedCornerShape(24.dp))
                             .padding(3.dp),
                         horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
@@ -93,16 +91,16 @@ fun DevicesScreen(
                             val isSelected = index == 1
                             Surface(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
+                                    .clip(RoundedCornerShape(20.dp))
                                     .clickable { onSelectTab(index) },
-                                color = if (isSelected) (if (isDark) Color(0xFF374151) else Color(0xFFE2E8F0)) else Color.Transparent
+                                color = if (isSelected) brandBlue else Color.Transparent
                             ) {
                                 Text(
                                     text = tab,
                                     fontSize = 12.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) textPrimary else textSecondary,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                    color = if (isSelected) Color.White else textSecondary,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                                 )
                             }
                         }
@@ -129,7 +127,7 @@ fun DevicesScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Surface(
                                 shape = CircleShape,
-                                color = if (isDark) Color(0xFF0C4A6E) else Color(0xFFE0F2FE),
+                                color = Color(0xFFEFF6FF),
                                 modifier = Modifier.size(42.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
@@ -138,24 +136,28 @@ fun DevicesScreen(
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
-                                Text(uiState.deviceName, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = textPrimary)
-                                Text("Broadcast Active • Port 48124", fontSize = 11.sp, color = textSecondary)
+                                Text(
+                                    text = uiState.deviceName,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = textPrimary
+                                )
+                                Text(
+                                    text = "Ready to discover peers • Port 48124",
+                                    fontSize = 11.sp,
+                                    color = textMuted
+                                )
                             }
                         }
-                        IconButton(
-                            onClick = {
-                                renameInput = uiState.deviceName
-                                showRenameDialog = true
-                            },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(Icons.Default.Edit, contentDescription = "Rename", tint = brandBlue, modifier = Modifier.size(18.dp))
+
+                        TextButton(onClick = { showRenameDialog = true }) {
+                            Text("Rename", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = brandBlue)
                         }
                     }
                 }
             }
 
-            // Discovered Devices Section Card
+            // Direct IP Connect Card
             item {
                 Surface(
                     modifier = Modifier
@@ -165,213 +167,177 @@ fun DevicesScreen(
                     border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "CONNECT VIA DIRECT IP",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = textMuted,
+                            letterSpacing = 0.5.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = directIpInput,
+                                onValueChange = { directIpInput = it },
+                                placeholder = { Text("e.g. 192.168.1.105", fontSize = 12.sp) },
+                                modifier = Modifier.weight(1f).height(48.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                singleLine = true
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    if (directIpInput.isNotBlank()) {
+                                        onConnectDirectIp(directIpInput.trim())
+                                        directIpInput = ""
+                                    }
+                                },
+                                modifier = Modifier.height(48.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = brandBlue)
+                            ) {
+                                Text("Connect", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Discovered Peers
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "NEARBY PEERS (${uiState.peers.size})",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = textMuted,
+                        letterSpacing = 0.5.sp
+                    )
+                    IconButton(onClick = onRefreshPeers, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Scan", tint = brandBlue, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+
+            if (uiState.peers.isEmpty()) {
+                item {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp)),
+                        color = cardBg,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color(0xFFEFF6FF),
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Devices, contentDescription = null, tint = brandBlue, modifier = Modifier.size(24.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "No devices found",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = textPrimary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Make sure both devices are on the same Wi-Fi or Mobile Hotspot.",
+                                fontSize = 11.sp,
+                                color = textSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            } else {
+                items(uiState.peers.size) { index ->
+                    val peer = uiState.peers[index]
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp)),
+                        color = cardBg,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("DISCOVERED PEERS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textSecondary, letterSpacing = 0.8.sp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Surface(shape = RoundedCornerShape(10.dp), color = brandBlue) {
-                                    Text(
-                                        text = "${uiState.peers.size} Found",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                                    )
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF10B981))
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(peer.deviceName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                                    Text("${peer.ipAddress}:${peer.port}", fontSize = 11.sp, color = textMuted)
                                 }
                             }
-                            IconButton(onClick = onRefreshPeers, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = brandBlue, modifier = Modifier.size(18.dp))
-                            }
-                        }
 
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        if (uiState.peers.isEmpty()) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                            Button(
+                                onClick = { onSelectPeer(peer) },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = brandBlue),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                             ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(28.dp),
-                                    color = brandBlue,
-                                    strokeWidth = 2.5.dp
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    text = "Searching for nearby devices on Wi-Fi / Hotspot...",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = textPrimary,
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Ensure other devices have AeroSync open on the same local network.",
-                                    fontSize = 11.sp,
-                                    color = textMuted,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(horizontal = 12.dp)
-                                )
+                                Text("Send Files", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
-                        } else {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                uiState.peers.forEach { peer ->
-                                    val isSelected = uiState.selectedPeer?.deviceId == peer.deviceId
-                                    Surface(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .clickable { onSelectPeer(peer) },
-                                        color = if (isSelected) (if (isDark) Color(0xFF0C4A6E).copy(alpha = 0.3f) else Color(0xFFE0F2FE)) else cardBgAlt,
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) brandBlue else borderColor)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(12.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            val icon = when (peer.deviceType.lowercase()) {
-                                                "windows", "desktop" -> Icons.Default.Computer
-                                                "macos", "mac" -> Icons.Default.LaptopMac
-                                                "ios", "iphone", "ipad" -> Icons.Default.PhoneIphone
-                                                else -> Icons.Default.Devices
-                                            }
-                                            Icon(icon, contentDescription = null, tint = brandBlue, modifier = Modifier.size(24.dp))
-                                            Spacer(modifier = Modifier.width(12.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(peer.deviceName, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = textPrimary)
-                                                Text("${peer.ipAddress}:${peer.port} • ${peer.deviceType.uppercase()}", fontSize = 11.sp, color = textSecondary)
-                                            }
-                                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(activeDotColor))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Direct IP Connection Card
-            item {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp)),
-                    color = cardBg,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text("DIRECT IP CONNECTION", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textSecondary, letterSpacing = 0.8.sp)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Connect directly using target IP (e.g. 192.168.43.1 for Mobile Hotspot / USB Tethering gateway).",
-                            fontSize = 11.sp,
-                            color = textMuted
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Button(
-                            onClick = { showDirectIpDialog = true },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = brandBlue, contentColor = Color.White),
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(vertical = 8.dp)
-                        ) {
-                            Icon(Icons.Default.Cable, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Connect via IP Address", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
         }
 
-        // Direct IP Dialog
-        if (showDirectIpDialog) {
-            AlertDialog(
-                onDismissRequest = { showDirectIpDialog = false },
-                containerColor = cardBg,
-                title = { Text("Direct IP Connection", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = textPrimary) },
-                text = {
-                    Column {
-                        Text("Enter the remote device IP address:", fontSize = 12.sp, color = textSecondary)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = directIpInput,
-                            onValueChange = { directIpInput = it },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = textPrimary,
-                                unfocusedTextColor = textPrimary,
-                                focusedBorderColor = brandBlue,
-                                unfocusedBorderColor = borderColor
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            showDirectIpDialog = false
-                            onConnectDirectIp(directIpInput)
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = brandBlue)
-                    ) {
-                        Text("Connect & Pair", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDirectIpDialog = false }) {
-                        Text("Cancel", color = textMuted)
-                    }
-                }
-            )
-        }
-
-        // Rename Dialog
+        // Rename Device Dialog
         if (showRenameDialog) {
             AlertDialog(
                 onDismissRequest = { showRenameDialog = false },
-                containerColor = cardBg,
-                title = { Text("Change Device Name", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = textPrimary) },
+                title = { Text("Rename Device", fontWeight = FontWeight.Bold) },
                 text = {
-                    Column {
-                        Text("Enter a new broadcast name for this device:", fontSize = 12.sp, color = textSecondary)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = renameInput,
-                            onValueChange = { renameInput = it },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = textPrimary,
-                                unfocusedTextColor = textPrimary,
-                                focusedBorderColor = brandBlue,
-                                unfocusedBorderColor = borderColor
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+                    OutlinedTextField(
+                        value = renameInput,
+                        onValueChange = { renameInput = it },
+                        label = { Text("Device Name") },
+                        singleLine = true
+                    )
                 },
                 confirmButton = {
                     Button(
                         onClick = {
-                            showRenameDialog = false
-                            onUpdateDeviceName(renameInput)
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = brandBlue)
+                            if (renameInput.isNotBlank()) {
+                                onUpdateDeviceName(renameInput.trim())
+                                showRenameDialog = false
+                            }
+                        }
                     ) {
-                        Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Save")
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showRenameDialog = false }) {
-                        Text("Cancel", color = textMuted)
+                        Text("Cancel")
                     }
                 }
             )

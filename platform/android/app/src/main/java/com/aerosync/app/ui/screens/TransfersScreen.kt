@@ -1,24 +1,20 @@
 package com.aerosync.app.ui.screens
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -26,7 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.aerosync.app.ui.components.AeroSyncLogoIcon
 import com.aerosync.app.viewmodel.AeroSyncUiState
 import com.aerosync.app.viewmodel.QueueItemStatus
-import java.io.File
+import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -41,7 +37,8 @@ fun TransfersScreen(
     onClearHistory: () -> Unit = {},
     onChangeDownloadLocation: () -> Unit = {}
 ) {
-    val context = LocalContext.current
+    var selectedFilterTab by remember { mutableStateOf(0) } // 0: All, 1: Active, 2: Completed
+
     val isDark = uiState.isDarkTheme
     val bgColor = if (isDark) Color(0xFF090D16) else Color(0xFFF8FAFC)
     val cardBg = if (isDark) Color(0xFF111827) else Color(0xFFFFFFFF)
@@ -50,10 +47,19 @@ fun TransfersScreen(
     val textPrimary = if (isDark) Color(0xFFF9FAFB) else Color(0xFF0F172A)
     val textSecondary = if (isDark) Color(0xFF9CA3AF) else Color(0xFF64748B)
     val textMuted = if (isDark) Color(0xFF6B7280) else Color(0xFF94A3B8)
-    val brandBlue = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7)
-    val activeDotColor = Color(0xFF10B981)
+    val brandBlue = Color(0xFF2563EB)
+    val brandGreen = Color(0xFF059669)
 
     val dateFormat = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
+    val df = DecimalFormat("#,##0.#")
+
+    fun formatBytes(bytes: Long): String {
+        if (bytes <= 0) return "0 B"
+        val k = 1024.0
+        val sizes = arrayOf("B", "KB", "MB", "GB", "TB")
+        val i = (Math.log(bytes.toDouble()) / Math.log(k)).toInt().coerceIn(0, sizes.size - 1)
+        return "${df.format(bytes / Math.pow(k, i.toDouble()))} ${sizes[i]}"
+    }
 
     Box(
         modifier = Modifier
@@ -63,375 +69,300 @@ fun TransfersScreen(
             .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Header with navigation tabs
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    AeroSyncLogoIcon(size = 34.dp)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Activity",
-                        fontSize = 21.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = brandBlue,
-                        letterSpacing = 0.5.sp
-                    )
-                }
-
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Header Tabs
+            item {
                 Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(cardBgAlt)
-                        .border(1.dp, borderColor, RoundedCornerShape(20.dp))
-                        .padding(3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    listOf("Files", "Devices", "Activity").forEachIndexed { index, tab ->
-                        val isSelected = index == 2
-                        Surface(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .clickable { onSelectTab(index) },
-                            color = if (isSelected) (if (isDark) Color(0xFF374151) else Color(0xFFE2E8F0)) else Color.Transparent
-                        ) {
-                            Text(
-                                text = tab,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) textPrimary else textSecondary,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                            )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AeroSyncLogoIcon(size = 32.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "AeroSync",
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = textPrimary,
+                            letterSpacing = (-0.3).sp
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(cardBg)
+                            .border(1.dp, borderColor, RoundedCornerShape(24.dp))
+                            .padding(3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        listOf("Files", "Devices", "Activity").forEachIndexed { index, tab ->
+                            val isSelected = index == 2
+                            Surface(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .clickable { onSelectTab(index) },
+                                color = if (isSelected) brandBlue else Color.Transparent
+                            ) {
+                                Text(
+                                    text = tab,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) Color.White else textSecondary,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // Download Location Quick Card
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp)
-                    .clip(RoundedCornerShape(14.dp)),
-                color = cardBg,
-                border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
-            ) {
+            // Active Transfer Stream Card (If active)
+            if (uiState.isTransferring || uiState.transferQueue.isNotEmpty()) {
+                val activeItem = uiState.transferQueue.firstOrNull { it.status == QueueItemStatus.TRANSFERRING } ?: uiState.transferQueue.firstOrNull()
+                val activeName = uiState.activeTransfer?.fileName ?: activeItem?.fileName ?: "Transferring files..."
+                val progressPct = if (uiState.activeTransfer != null && uiState.activeTransfer.totalBytes > 0) {
+                    ((uiState.activeTransfer.transferredBytes.toDouble() / uiState.activeTransfer.totalBytes.toDouble()) * 100).toInt().coerceIn(0, 100)
+                } else {
+                    activeItem?.progressPercent ?: 0
+                }
+
+                item {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp)),
+                        color = cardBg,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, brandBlue.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF10B981))
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text("ACTIVE STREAM", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = brandBlue)
+                                        Text(
+                                            text = activeName,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = textPrimary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFFEFF6FF)
+                                ) {
+                                    Text(
+                                        text = uiState.transferRateText,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = brandBlue,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            LinearProgressIndicator(
+                                progress = (progressPct / 100f).coerceIn(0f, 1f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp)),
+                                color = brandBlue,
+                                trackColor = borderColor
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "$progressPct% completed",
+                                    fontSize = 11.sp,
+                                    color = textSecondary
+                                )
+
+                                TextButton(
+                                    onClick = onCancelTransfer,
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text("Cancel", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Filter Tabs
+            item {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Folder, contentDescription = null, tint = brandBlue, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (uiState.downloadDirectory.isNotBlank()) uiState.downloadDirectory else "Downloads/AeroSync",
-                            fontSize = 11.sp,
-                            color = textSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Text(
-                        text = "Change",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = brandBlue,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .clickable { onChangeDownloadLocation() }
-                            .padding(4.dp)
-                    )
-                }
-            }
-
-            // Active Transfer Section Card (if transferring or paused)
-            val active = uiState.activeTransfer
-            if (active != null) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp)
-                        .clip(RoundedCornerShape(16.dp)),
-                    color = cardBg,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, brandBlue)
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = active.fileName,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = textPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "${active.transferredBytes / (1024 * 1024)} MB / ${active.totalBytes / (1024 * 1024)} MB",
-                                    fontSize = 12.sp,
-                                    color = textSecondary
-                                )
-                            }
-                            val percent = if (active.totalBytes > 0) ((active.transferredBytes * 100) / active.totalBytes).toInt() else 0
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(cardBgAlt)
+                            .padding(2.dp)
+                    ) {
+                        listOf("All", "Active", "Completed").forEachIndexed { index, label ->
+                            val isSelected = selectedFilterTab == index
                             Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = brandBlue.copy(alpha = 0.15f),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, brandBlue)
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable { selectedFilterTab = index },
+                                color = if (isSelected) cardBg else Color.Transparent
                             ) {
                                 Text(
-                                    text = "$percent%",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = brandBlue,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    text = label,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) brandBlue else textSecondary,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                 )
                             }
                         }
+                    }
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                    if (uiState.history.isNotEmpty()) {
+                        IconButton(onClick = onClearHistory, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Default.Delete, contentDescription = "Clear History", tint = textMuted, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
 
-                        val progress = if (active.totalBytes > 0) (active.transferredBytes.toFloat() / active.totalBytes).coerceIn(0f, 1f) else 0f
-                        LinearProgressIndicator(
-                            progress = progress,
+            // History & Log List
+            val filteredHistory = uiState.history.filter {
+                when (selectedFilterTab) {
+                    1 -> false
+                    2 -> it.status.equals("COMPLETED", ignoreCase = true)
+                    else -> true
+                }
+            }
+
+            if (filteredHistory.isEmpty() && !uiState.isTransferring) {
+                item {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp)),
+                        color = cardBg,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+                    ) {
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp)),
-                            color = brandBlue,
-                            trackColor = if (isDark) Color(0xFF374151) else Color(0xFFE2E8F0)
-                        )
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
+                                .padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color(0xFFEFF6FF),
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.History, contentDescription = null, tint = brandBlue, modifier = Modifier.size(24.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "No transfer history yet",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = textPrimary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Files you send or receive across devices will appear here.",
+                                fontSize = 11.sp,
+                                color = textSecondary
+                            )
+                        }
+                    }
+                }
+            } else {
+                items(filteredHistory.size) { index ->
+                    val historyItem = filteredHistory[index]
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp)),
+                        color = cardBg,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+                    ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.padding(12.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Speed,
-                                    contentDescription = null,
-                                    tint = activeDotColor,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(5.dp))
-                                Text(
-                                    text = "${"%.1f".format(active.speedMbps)} MB/s",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = activeDotColor
-                                )
-                                if (active.etaSeconds > 0) {
-                                    Spacer(modifier = Modifier.width(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (historyItem.isReceived) Color(0xFFECFDF5) else Color(0xFFEFF6FF),
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = if (historyItem.isReceived) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
+                                            contentDescription = null,
+                                            tint = if (historyItem.isReceived) brandGreen else brandBlue,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
                                     Text(
-                                        text = "• ETA: ${active.etaSeconds}s",
-                                        fontSize = 11.sp,
+                                        text = historyItem.fileName,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = textPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${formatBytes(historyItem.fileSize)} • ${dateFormat.format(Date(historyItem.timestamp))} • ${historyItem.peerName}",
+                                        fontSize = 10.sp,
                                         color = textMuted
                                     )
                                 }
                             }
 
-                            Row {
-                                FilledTonalIconButton(
-                                    onClick = onTogglePause,
-                                    modifier = Modifier.size(32.dp),
-                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = if (isDark) Color(0xFF374151) else Color(0xFFE2E8F0)
-                                    )
-                                ) {
-                                    Icon(
-                                        imageVector = if (active.isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                                        contentDescription = if (active.isPaused) "Resume" else "Pause",
-                                        tint = textPrimary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                FilledTonalIconButton(
-                                    onClick = onCancelTransfer,
-                                    modifier = Modifier.size(32.dp),
-                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = Color(0xFFEF4444).copy(alpha = 0.2f)
-                                    )
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Cancel",
-                                        tint = Color(0xFFEF4444),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Queue & History Title Bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Transfer Queue & History (${uiState.transferQueue.size + uiState.history.size})",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = textPrimary
-                )
-                if (uiState.history.isNotEmpty()) {
-                    Text(
-                        text = "Clear History",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFEF4444),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .clickable { onClearHistory() }
-                            .padding(4.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Scrollable List of Queue & History items
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Pending & Paused Queue items
-                val activeQueue = uiState.transferQueue.filter {
-                    it.status == QueueItemStatus.QUEUED || it.status == QueueItemStatus.PAUSED || it.status == QueueItemStatus.FAILED
-                }
-                items(activeQueue, key = { it.id }) { item ->
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp)),
-                        color = cardBg,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = when (item.status) {
-                                    QueueItemStatus.PAUSED -> Icons.Default.PauseCircle
-                                    QueueItemStatus.FAILED -> Icons.Default.Error
-                                    else -> Icons.Default.Schedule
-                                },
-                                contentDescription = null,
-                                tint = when (item.status) {
-                                    QueueItemStatus.PAUSED -> Color(0xFFF59E0B)
-                                    QueueItemStatus.FAILED -> Color(0xFFEF4444)
-                                    else -> textSecondary
-                                },
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = item.fileName,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = textPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = "${item.fileSize / (1024 * 1024)} MB • ${item.status.name}",
-                                    fontSize = 11.sp,
-                                    color = textMuted
-                                )
-                            }
-                            IconButton(onClick = { onRemoveQueueItem(item.id) }, modifier = Modifier.size(28.dp)) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Remove",
-                                    tint = Color(0xFFEF4444),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Completed History items
-                items(uiState.history, key = { it.id }) { item ->
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp)),
-                        color = cardBg,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = if (item.isReceived) Icons.Default.Download else Icons.Default.Upload,
-                                contentDescription = null,
-                                tint = if (item.isReceived) activeDotColor else brandBlue,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = item.fileName,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = textPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                val dateStr = dateFormat.format(Date(item.timestamp))
-                                val speedStr = if (item.avgSpeedBps > 0) " • %.1f MB/s".format(item.avgSpeedBps / (1024.0 * 1024.0)) else ""
-                                Text(
-                                    text = "${item.fileSize / (1024 * 1024)} MB • ${if (item.isReceived) "Received" else "Sent"} • $dateStr$speedStr",
-                                    fontSize = 11.sp,
-                                    color = textSecondary
-                                )
-                            }
-                            IconButton(
-                                onClick = {
-                                    val file = File(item.filePath)
-                                    if (file.exists()) {
-                                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                                            setDataAndType(Uri.fromFile(file), "*/*")
-                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        }
-                                        try { context.startActivity(intent) } catch (_: Exception) {}
-                                    }
-                                },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.OpenInNew,
-                                    contentDescription = "Open",
-                                    tint = brandBlue,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
+                            Text("Completed", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = brandGreen)
                         }
                     }
                 }
