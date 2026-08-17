@@ -61,6 +61,7 @@ private:
     std::filesystem::path m_downloadDirectory;
     mutable std::mutex m_mutex;
     std::atomic<bool> m_cancelRequested{false};
+    std::atomic<int> m_activeTransferSock{-1};
 
     PairingStateMachine m_pairingStateMachine;
 };

@@ -557,7 +557,26 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun cancelActiveTransfer() {
+        // 1. Instant UI update
+        _uiState.update { state ->
+            val activeId = state.activeTransfer?.queueItemId
+            val updatedQueue = state.transferQueue.map {
+                if (it.id == activeId || it.status == QueueItemStatus.TRANSFERRING) {
+                    it.copy(status = QueueItemStatus.CANCELLED)
+                } else it
+            }
+            state.copy(
+                isTransferring = false,
+                activeTransfer = null,
+                transferQueue = updatedQueue,
+                transferRateText = "0.0 MB/s",
+                statusMessage = "Transfer cancelled."
+            )
+        }
+
+        // 2. Immediate Native Cancel & Service Stop in background
         viewModelScope.launch(Dispatchers.IO) {
+            AeroSyncTransferService.stopTransfer(getApplication())
             nativeBridge.nativeCancelTransfer()
             val activeId = _uiState.value.activeTransfer?.queueItemId
             if (!activeId.isNullOrEmpty()) {
@@ -569,11 +588,7 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
             val updatedQueue = dbHelper.getAllQueueItems()
             _uiState.update { state ->
                 state.copy(
-                    isTransferring = false,
-                    activeTransfer = null,
-                    transferQueue = updatedQueue,
-                    transferRateText = "0.0 MB/s",
-                    statusMessage = "Transfer cancelled."
+                    transferQueue = updatedQueue
                 )
             }
             checkAndStopServiceIfQueueEmpty()

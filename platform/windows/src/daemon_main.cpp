@@ -379,11 +379,17 @@ static void handleHttpClient(socket_t clientSock) {
                 {
                     std::lock_guard<std::mutex> lock(g_state.mtx);
                     g_state.isTransferring = false;
-                    for (const auto& fp : filePaths) {
-                        std::string fn = std::filesystem::path(fp).filename().string();
-                        g_state.completedHistory.push_back(fn);
+                    if (ok) {
+                        for (const auto& fp : filePaths) {
+                            std::string fn = std::filesystem::path(fp).filename().string();
+                            g_state.completedHistory.push_back(fn);
+                        }
+                        g_state.statusMessage = "Transfer completed successfully!";
+                    } else {
+                        g_state.currentProgress.state = aerosync::TransferState::CANCELLED;
+                        g_state.currentProgress.speedBytesPerSec = 0;
+                        g_state.statusMessage = "Transfer cancelled or interrupted";
                     }
-                    g_state.statusMessage = ok ? "Transfer completed successfully!" : "Transfer interrupted";
                 }
             }).detach();
 
@@ -394,6 +400,8 @@ static void handleHttpClient(socket_t clientSock) {
         {
             std::lock_guard<std::mutex> lock(g_state.mtx);
             g_state.isTransferring = false;
+            g_state.currentProgress.state = aerosync::TransferState::CANCELLED;
+            g_state.currentProgress.speedBytesPerSec = 0;
             g_state.statusMessage = "Transfer cancelled";
         }
         sendHttpResponse(clientSock, 200, "application/json", "{\"success\":true,\"message\":\"Cancelled\"}");

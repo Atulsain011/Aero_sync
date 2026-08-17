@@ -282,31 +282,47 @@ fun TransfersScreen(
                 }
             }
 
-            // Queue & History Title Bar
+            // Queue & History Title Bar with Clear Actions
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                    .padding(vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Transfer Queue & History (${uiState.transferQueue.size + uiState.history.size})",
+                    text = "Transfer Queue & Activity (${uiState.transferQueue.size + uiState.history.size})",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = textPrimary
                 )
                 if (uiState.history.isNotEmpty()) {
-                    Text(
-                        text = "Clear History",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFEF4444),
+                    Surface(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .clickable { onClearHistory() }
-                            .padding(4.dp)
-                    )
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onClearHistory() },
+                        color = Color(0xFFEF4444).copy(alpha = 0.15f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteSweep,
+                                contentDescription = "Clear History",
+                                tint = Color(0xFFEF4444),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Clear History",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFEF4444)
+                            )
+                        }
+                    }
                 }
             }
 

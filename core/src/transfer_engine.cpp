@@ -145,7 +145,15 @@ bool TransferEngine::sendFileBatch(int sockFd,
     std::vector<uint8_t> txBuffer(24 + chunkSize);
 
     for (size_t i = 0; i < manifest.files.size(); ++i) {
-        if (cancelSignal) return false;
+        if (cancelSignal) {
+            if (progressCb) {
+                TransferProgress prog;
+                prog.batchId = manifest.batchId;
+                prog.state = TransferState::CANCELLED;
+                progressCb(prog);
+            }
+            return false;
+        }
 
         const auto& fileMeta = manifest.files[i];
         const auto& localPath = localFilePaths[i];
@@ -170,7 +178,15 @@ bool TransferEngine::sendFileBatch(int sockFd,
         }
 
         while (fileBytesTransferred < fileMeta.fileSize) {
-            if (cancelSignal) return false;
+            if (cancelSignal) {
+                if (progressCb) {
+                    TransferProgress prog;
+                    prog.batchId = manifest.batchId;
+                    prog.state = TransferState::CANCELLED;
+                    progressCb(prog);
+                }
+                return false;
+            }
 
             size_t bytesToRead = std::min(static_cast<uint64_t>(chunkSize), fileMeta.fileSize - fileBytesTransferred);
 
@@ -203,7 +219,14 @@ bool TransferEngine::sendFileBatch(int sockFd,
 
             // Single unified socket write: header + payload together in one packet
             if (!SocketTransport::sendRaw(sockFd, txBuffer.data(), 24 + bytesRead)) {
-                appendResumeJournal(journalPath, chunkIndex);
+                if (cancelSignal && progressCb) {
+                    TransferProgress prog;
+                    prog.batchId = manifest.batchId;
+                    prog.state = TransferState::CANCELLED;
+                    progressCb(prog);
+                } else {
+                    appendResumeJournal(journalPath, chunkIndex);
+                }
                 return false;
             }
 
@@ -280,7 +303,15 @@ bool TransferEngine::receiveFileBatch(int sockFd,
     std::filesystem::create_directories(downloadDirectory);
 
     for (size_t i = 0; i < manifest.files.size(); ++i) {
-        if (cancelSignal) return false;
+        if (cancelSignal) {
+            if (progressCb) {
+                TransferProgress prog;
+                prog.batchId = manifest.batchId;
+                prog.state = TransferState::CANCELLED;
+                progressCb(prog);
+            }
+            return false;
+        }
 
         const auto& fileMeta = manifest.files[i];
         std::string safeName = sanitizeFilename(fileMeta.relativePath);
@@ -322,13 +353,24 @@ bool TransferEngine::receiveFileBatch(int sockFd,
         while (fileBytesTransferred < fileMeta.fileSize) {
             if (cancelSignal) {
                 file.close();
+                if (progressCb) {
+                    TransferProgress prog;
+                    prog.batchId = manifest.batchId;
+                    prog.state = TransferState::CANCELLED;
+                    progressCb(prog);
+                }
                 return false;
             }
 
             ChunkHeader header;
             if (!receiveStreamChunk(sockFd, header, chunkData)) {
-                std::cerr << "CRC32C mismatch or socket error on received chunk!" << std::endl;
                 file.close();
+                if (cancelSignal && progressCb) {
+                    TransferProgress prog;
+                    prog.batchId = manifest.batchId;
+                    prog.state = TransferState::CANCELLED;
+                    progressCb(prog);
+                }
                 return false;
             }
 

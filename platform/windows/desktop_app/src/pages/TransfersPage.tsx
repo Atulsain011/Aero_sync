@@ -28,6 +28,7 @@ interface TransfersPageProps {
   onAddFiles: () => void;
   onCancelTransfer: () => void;
   onClearCompleted: () => void;
+  onClearHistory?: () => void;
 }
 
 export const TransfersPage: React.FC<TransfersPageProps> = ({
@@ -36,7 +37,8 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
   isTransferring,
   onAddFiles,
   onCancelTransfer,
-  onClearCompleted
+  onClearCompleted,
+  onClearHistory
 }) => {
   const activeFileName = currentProgress?.currentFileName || (queue[0]?.name ?? 'Preparing files...');
   const progressPercent = Math.min(100, Math.max(0, currentProgress?.progressPercent || 0));
@@ -53,7 +55,13 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
           <p className="page-subtitle">Real-time parallel multi-stream transmission progress.</p>
         </div>
         <div className="page-header-actions">
-          <button className="btn btn-secondary" onClick={onClearCompleted}>
+          {onClearHistory && (
+            <button className="btn btn-secondary" onClick={onClearHistory} title="Clear completed transmission logs">
+              <Trash2 size={15} />
+              <span>Clear History</span>
+            </button>
+          )}
+          <button className="btn btn-secondary" onClick={onClearCompleted} title="Clear pending queue items">
             <Trash2 size={15} />
             <span>Clear Queue</span>
           </button>

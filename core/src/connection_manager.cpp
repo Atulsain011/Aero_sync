@@ -97,6 +97,16 @@ std::filesystem::path ConnectionManager::getDownloadDirectory() const {
 
 void ConnectionManager::cancelActiveTransfer() {
     m_cancelRequested = true;
+    int sock = m_activeTransferSock.exchange(-1);
+    if (sock >= 0) {
+#ifdef _WIN32
+        shutdown(static_cast<SOCKET>(sock), SD_BOTH);
+        closesocket(static_cast<SOCKET>(sock));
+#else
+        shutdown(sock, SHUT_RDWR);
+        close(sock);
+#endif
+    }
 }
 
 void ConnectionManager::serverLoop() {
@@ -249,6 +259,7 @@ void ConnectionManager::handleClientConnection(int clientSockFd) {
                         SocketTransport::sendControlFrame(clientSockFd, ControlMessageType::FILE_ACCEPT, nextSeq + 1, acceptPayload);
 
                         m_cancelRequested = false;
+                        m_activeTransferSock.store(clientSockFd);
                         m_pairingStateMachine.startTransfer();
 
                         TransferProgressCallback progCb;
@@ -259,6 +270,7 @@ void ConnectionManager::handleClientConnection(int clientSockFd) {
 
                         bool ok = TransferEngine::receiveFileBatch(clientSockFd, manifest, downloadDir, progCb, m_cancelRequested, resumeOffset);
 
+                        m_activeTransferSock.store(-1);
                         m_pairingStateMachine.finishTransfer(ok);
 
                         if (ok) {
@@ -352,6 +364,7 @@ void ConnectionManager::handleClientConnection(int clientSockFd) {
             std::string acceptPayload = manifest.batchId + "|" + std::to_string(resumeChunkIdx) + "|" + std::to_string(resumeOffset);
             SocketTransport::sendControlFrame(clientSockFd, ControlMessageType::FILE_ACCEPT, seq + 1, acceptPayload);
             m_cancelRequested = false;
+            m_activeTransferSock.store(clientSockFd);
             m_pairingStateMachine.startTransfer();
 
             TransferProgressCallback progCb;
@@ -362,6 +375,7 @@ void ConnectionManager::handleClientConnection(int clientSockFd) {
 
             bool ok = TransferEngine::receiveFileBatch(clientSockFd, manifest, downloadDir, progCb, m_cancelRequested, resumeOffset);
 
+            m_activeTransferSock.store(-1);
             m_pairingStateMachine.finishTransfer(ok);
 
             if (ok) {
@@ -451,10 +465,12 @@ bool ConnectionManager::requestTransfer(const PeerInfo& targetPeer,
     }
 
     m_cancelRequested = false;
+    m_activeTransferSock.store(clientSock);
     m_pairingStateMachine.startTransfer();
 
     bool result = TransferEngine::sendFileBatch(clientSock, manifest, localFilePaths, progressCb, m_cancelRequested, resumeByteOffset);
 
+    m_activeTransferSock.store(-1);
     m_pairingStateMachine.finishTransfer(result);
 
     if (result) {

@@ -127,6 +127,7 @@ export const App: React.FC = () => {
               onAddFiles={handlePickAndSendFiles}
               onCancelTransfer={cancelTransfer}
               onClearCompleted={clearCompletedQueue}
+              onClearHistory={clearHistory}
             />
           )}
 
