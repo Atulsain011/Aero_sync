@@ -1,9 +1,16 @@
 package com.aerosync.app.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -15,7 +22,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -27,7 +37,9 @@ import androidx.compose.ui.unit.sp
 import com.aerosync.app.ui.components.AeroSyncLogoIcon
 import com.aerosync.app.viewmodel.AeroSyncUiState
 import com.aerosync.app.viewmodel.DiscoveredPeer
-import com.aerosync.app.viewmodel.QueueItemStatus
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun HomeScreen(
@@ -47,17 +59,29 @@ fun HomeScreen(
     var showDirectIpDialog by remember { mutableStateOf(false) }
     var directIpInput by remember { mutableStateOf("192.168.43.1") }
 
+    // Collapsible sections - Collapsed by default as requested
+    var isSettingsExpanded by remember { mutableStateOf(false) }
+    var isPeersExpanded by remember { mutableStateOf(false) }
+    var isTransfersExpanded by remember { mutableStateOf(false) }
+
     val isDark = uiState.isDarkTheme
     val bgColor = if (isDark) Color(0xFF090D16) else Color(0xFFF8FAFC)
     val cardBg = if (isDark) Color(0xFF111827) else Color(0xFFFFFFFF)
-    val cardBgAlt = if (isDark) Color(0xFF1F2937) else Color(0xFFF1F5F9)
+    val cardBgAlt = if (isDark) Color(0xFF1F2937) else Color(0xFFF8FAFC)
     val borderColor = if (isDark) Color(0xFF374151) else Color(0xFFE2E8F0)
-    val borderDashedColor = if (isDark) Color(0xFF4B5563) else Color(0xFF94A3B8)
     val textPrimary = if (isDark) Color(0xFFF9FAFB) else Color(0xFF0F172A)
     val textSecondary = if (isDark) Color(0xFF9CA3AF) else Color(0xFF64748B)
     val textMuted = if (isDark) Color(0xFF6B7280) else Color(0xFF94A3B8)
-    val brandBlue = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7)
-    val activeDotColor = Color(0xFF10B981)
+    
+    // Vibrant brand gradients matching reference image
+    val primaryGradient = Brush.horizontalGradient(
+        listOf(Color(0xFF2563EB), Color(0xFF7C3AED))
+    )
+    val circleDashedGradient = Brush.sweepGradient(
+        listOf(Color(0xFF38BDF8), Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFF38BDF8))
+    )
+
+    val dateFormat = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
 
     Box(
         modifier = Modifier
@@ -69,10 +93,10 @@ fun HomeScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header: Official Logo, Navigation Tabs, Theme Toggle
+            // 1. Top App Bar: Logo + Brand + Segmented Navigation Tabs + Theme Toggle
             item {
                 Row(
                     modifier = Modifier
@@ -81,270 +105,349 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Left: Official Project Logo + Brand Text
                     Row(
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(end = 4.dp)
                     ) {
-                        AeroSyncLogoIcon(size = 34.dp)
-                        Spacer(modifier = Modifier.width(10.dp))
+                        AeroSyncLogoIcon(size = 32.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "AeroSync",
-                            fontSize = 21.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            color = brandBlue,
-                            letterSpacing = 0.5.sp
+                            color = if (isDark) Color(0xFFF1F5F9) else Color(0xFF0F172A),
+                            letterSpacing = (-0.3).sp
                         )
                     }
 
-                    Row(
+                    // Center: Floating Pill Segmented Navigation (Files, Devices, Activity)
+                    Surface(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(cardBgAlt)
-                            .border(1.dp, borderColor, RoundedCornerShape(20.dp))
-                            .padding(3.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .border(1.dp, borderColor, RoundedCornerShape(24.dp)),
+                        color = if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF),
+                        shadowElevation = 2.dp
                     ) {
-                        listOf("Files", "Devices", "Activity").forEachIndexed { index, tab ->
-                            val isSelected = index == 0
-                            Surface(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .clickable { onSelectTab(index) },
-                                color = if (isSelected) (if (isDark) Color(0xFF374151) else Color(0xFFE2E8F0)) else Color.Transparent
-                            ) {
-                                Text(
-                                    text = tab,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) textPrimary else textSecondary,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                                )
+                        Row(
+                            modifier = Modifier.padding(3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val tabs = listOf(
+                                Triple("Files", Icons.Default.Description, 0),
+                                Triple("Devices", Icons.Default.Devices, 1),
+                                Triple("Activity", Icons.Default.ShowChart, 2)
+                            )
+
+                            tabs.forEach { (name, icon, tabIndex) ->
+                                val isSelected = tabIndex == 0 // Files selected
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .then(
+                                            if (isSelected) Modifier.background(primaryGradient)
+                                            else Modifier.background(Color.Transparent)
+                                        )
+                                        .clickable { onSelectTab(tabIndex) }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = name,
+                                            tint = if (isSelected) Color.White else textSecondary,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Text(
+                                            text = name,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) Color.White else textSecondary
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
 
-                    IconButton(
-                        onClick = onToggleTheme,
+                    // Right: Circular Theme Toggle Button
+                    Surface(
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
-                            .background(cardBgAlt)
                             .border(1.dp, borderColor, CircleShape)
+                            .clickable { onToggleTheme() },
+                        color = if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF),
+                        shadowElevation = 2.dp
                     ) {
-                        Icon(
-                            imageVector = if (isDark) Icons.Default.DarkMode else Icons.Default.LightMode,
-                            contentDescription = "Toggle Theme",
-                            tint = if (isDark) Color(0xFFFBBF24) else Color(0xFF0284C7),
-                            modifier = Modifier.size(18.dp)
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = if (isDark) Icons.Default.LightMode else Icons.Default.WbSunny,
+                                contentDescription = "Toggle Theme",
+                                tint = if (isDark) Color(0xFFFBBF24) else Color(0xFF6366F1),
+                                modifier = Modifier.size(17.dp)
+                            )
+                        }
                     }
                 }
             }
 
-            // Upload Center Drop Zone Card
+            // 2. Main Hero Card: Circular Drop Zone + 3 Feature Badges + Browse Files Button
             item {
-                Box(
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(cardBg)
-                        .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(22.dp)),
+                    color = cardBg,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+                    shadowElevation = if (isDark) 0.dp else 3.dp
                 ) {
-                    Canvas(modifier = Modifier.matchParentSize()) {
-                        val stripeWidth = 24.dp.toPx()
-                        val stripeSpacing = 24.dp.toPx()
-                        val totalW = size.width
-                        val totalH = size.height
-                        val strokeColor = if (isDark) Color(0xFF374151).copy(alpha = 0.2f) else Color(0xFFE2E8F0).copy(alpha = 0.4f)
-                        var x = -totalH
-                        while (x < totalW + totalH) {
-                            drawLine(color = strokeColor, start = Offset(x, 0f), end = Offset(x + totalH, totalH), strokeWidth = 6f)
-                            x += stripeWidth + stripeSpacing
-                        }
-                    }
-
-                    Box(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 20.dp)
+                    ) {
+                        // Background Subtle Geometric Shapes for Polish
                         Canvas(modifier = Modifier.matchParentSize()) {
-                            drawRoundRect(
-                                color = borderDashedColor.copy(alpha = 0.5f),
-                                size = size,
-                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx(), 12.dp.toPx()),
-                                style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f), 0f))
-                            )
+                            val dotColor = if (isDark) Color(0x1538BDF8) else Color(0x122563EB)
+                            val ringColor = if (isDark) Color(0x158B5CF6) else Color(0x157C3AED)
+                            
+                            drawCircle(dotColor, radius = 5f, center = Offset(size.width * 0.12f, size.height * 0.15f))
+                            drawCircle(dotColor, radius = 3f, center = Offset(size.width * 0.88f, size.height * 0.22f))
+                            drawCircle(ringColor, radius = 4f, center = Offset(size.width * 0.82f, size.height * 0.72f))
+                            drawCircle(dotColor, radius = 3f, center = Offset(size.width * 0.15f, size.height * 0.85f))
                         }
 
                         Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 20.dp),
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = if (isDark) Color(0xFF0C4A6E) else Color(0xFFE0F2FE),
-                                modifier = Modifier.size(52.dp)
+                            // Circular Drop & Tap Zone
+                            Box(
+                                modifier = Modifier
+                                    .size(200.dp)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) { onPickFiles() },
+                                contentAlignment = Alignment.Center
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.CloudUpload,
-                                        contentDescription = "Upload",
-                                        tint = brandBlue,
-                                        modifier = Modifier.size(28.dp)
+                                // Outer Concentric Dashed Ring
+                                Canvas(modifier = Modifier.fillMaxSize()) {
+                                    val strokeWidth = 2.dp.toPx()
+                                    val dashLength = 8.dp.toPx()
+                                    val gapLength = 6.dp.toPx()
+                                    
+                                    drawCircle(
+                                        brush = circleDashedGradient,
+                                        radius = (size.minDimension / 2) - strokeWidth,
+                                        style = Stroke(
+                                            width = strokeWidth,
+                                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(dashLength, gapLength), 0f)
+                                        )
                                     )
                                 }
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = "Drop or Pick Files to Transfer",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = textPrimary
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "High-speed streaming • Multi-gigabyte support • Direct Wi-Fi",
-                                fontSize = 11.sp,
-                                color = textMuted,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(14.dp))
-                            Button(
-                                onClick = onPickFiles,
-                                shape = RoundedCornerShape(20.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = brandBlue, contentColor = Color.White),
-                                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Browse Files", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            }
 
-            // Download Location Card
-            item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)),
-                    color = cardBg,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "DOWNLOAD LOCATION",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = textSecondary,
-                                letterSpacing = 0.8.sp
-                            )
-                            Text(
-                                text = "Change Folder",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = brandBlue,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { onChangeDownloadLocation() }
-                                    .padding(4.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Surface(
-                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)),
-                            color = cardBgAlt,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.Folder, contentDescription = null, tint = brandBlue, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (uiState.downloadDirectory.isNotBlank()) uiState.downloadDirectory else "Default: Downloads/AeroSync",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = textPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+                                // Inner Glowing Elevated Disk
+                                Surface(
+                                    modifier = Modifier
+                                        .size(164.dp)
+                                        .clip(CircleShape)
+                                        .shadow(elevation = 6.dp, shape = CircleShape),
+                                    color = if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        if (isDark) Color(0xFF334155) else Color(0xFFEFF6FF)
+                                    )
+                                ) {
+                                    Column(
+                                        modifier = Modifier.fillMaxSize(),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        // Colorful Cloud Icon with Upward Arrow
+                                        Box(
+                                            modifier = Modifier
+                                                .size(54.dp)
+                                                .clip(RoundedCornerShape(16.dp))
+                                                .background(
+                                                    Brush.linearGradient(
+                                                        listOf(Color(0xFF3B82F6).copy(alpha = 0.15f), Color(0xFF8B5CF6).copy(alpha = 0.2f))
+                                                    )
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.CloudUpload,
+                                                contentDescription = "Upload",
+                                                tint = Color(0xFF3B82F6),
+                                                modifier = Modifier.size(32.dp)
+                                            )
+                                        }
 
-            // Real-Time System Status & Live Diagnostics Card
-            item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)),
-                    color = cardBg,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("NETWORK & STORAGE STATUS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textSecondary, letterSpacing = 0.8.sp)
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        Text(
+                                            text = "Drop files here",
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = textPrimary
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "or tap to pick files",
+                                            fontSize = 11.5.sp,
+                                            color = textSecondary
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // 3 Feature Badges Row (High-speed, Multi-gigabyte, Direct Wi-Fi)
                             Surface(
-                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp)),
                                 color = cardBgAlt,
                                 border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(activeDotColor))
-                                    Spacer(modifier = Modifier.width(5.dp))
-                                    Text(
-                                        text = uiState.connectionTypeLabel,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = textSecondary
+                                    // 1. High-speed transfer
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Bolt,
+                                            contentDescription = null,
+                                            tint = Color(0xFF2563EB),
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Column(horizontalAlignment = Alignment.Start) {
+                                            Text(
+                                                text = "High-speed",
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = textPrimary
+                                            )
+                                            Text(
+                                                text = "transfer",
+                                                fontSize = 9.5.sp,
+                                                color = textSecondary
+                                            )
+                                        }
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .height(24.dp)
+                                            .width(1.dp)
+                                            .background(borderColor)
                                     )
+
+                                    // 2. Multi-gigabyte support
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Storage,
+                                            contentDescription = null,
+                                            tint = Color(0xFF10B981),
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Column(horizontalAlignment = Alignment.Start) {
+                                            Text(
+                                                text = "Multi-gigabyte",
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = textPrimary
+                                            )
+                                            Text(
+                                                text = "support",
+                                                fontSize = 9.5.sp,
+                                                color = textSecondary
+                                            )
+                                        }
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .height(24.dp)
+                                            .width(1.dp)
+                                            .background(borderColor)
+                                    )
+
+                                    // 3. Direct Wi-Fi
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Wifi,
+                                            contentDescription = null,
+                                            tint = Color(0xFF8B5CF6),
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Column(horizontalAlignment = Alignment.Start) {
+                                            Text(
+                                                text = "Direct",
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = textPrimary
+                                            )
+                                            Text(
+                                                text = "Wi-Fi",
+                                                fontSize = 9.5.sp,
+                                                color = textSecondary
+                                            )
+                                        }
+                                    }
                                 }
                             }
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Storage Used", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = textPrimary)
-                            Text("${uiState.storageUsedPercent}%", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = textPrimary)
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        LinearProgressIndicator(
-                            progress = (uiState.storageUsedPercent / 100f).coerceIn(0f, 1f),
-                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                            color = brandBlue,
-                            trackColor = if (isDark) Color(0xFF374151) else Color(0xFFE2E8F0)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Surface(
-                                modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp)),
-                                color = cardBgAlt,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Vibrant "Browse Files" Action Button
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(primaryGradient)
+                                    .clickable { onPickFiles() },
+                                contentAlignment = Alignment.Center
                             ) {
-                                Column(modifier = Modifier.padding(10.dp)) {
-                                    Text("Free Space", fontSize = 11.sp, color = textSecondary)
-                                    Text(uiState.freeSpaceText, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = textPrimary)
-                                }
-                            }
-                            Surface(
-                                modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp)),
-                                color = cardBgAlt,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
-                            ) {
-                                Column(modifier = Modifier.padding(10.dp)) {
-                                    Text("Throughput", fontSize = 11.sp, color = textSecondary)
-                                    Text(uiState.transferRateText, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = activeDotColor)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.FolderOpen,
+                                        contentDescription = "Browse Files",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = "Browse Files",
+                                        fontSize = 14.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        letterSpacing = 0.2.sp
+                                    )
                                 }
                             }
                         }
@@ -352,237 +455,490 @@ fun HomeScreen(
                 }
             }
 
-            // Connected Devices Quick List Card
+            // 3. Collapsible Card 1: Settings & Status
             item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)),
-                    color = cardBg,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+                CollapsibleCard(
+                    title = "Settings & Status",
+                    subtitle = "Download location, network & storage",
+                    icon = Icons.Default.Settings,
+                    iconBgColor = if (isDark) Color(0xFF1E3A8A).copy(alpha = 0.4f) else Color(0xFFEFF6FF),
+                    iconTint = Color(0xFF3B82F6),
+                    isExpanded = isSettingsExpanded,
+                    onToggle = { isSettingsExpanded = !isSettingsExpanded },
+                    cardBg = cardBg,
+                    borderColor = borderColor,
+                    textPrimary = textPrimary,
+                    textSecondary = textSecondary
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Download Location Row
+                        Surface(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            shape = RoundedCornerShape(12.dp),
+                            color = cardBgAlt,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
                         ) {
-                            Text("NEARBY PEERS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textSecondary, letterSpacing = 0.8.sp)
-                            Surface(shape = RoundedCornerShape(10.dp), color = brandBlue) {
-                                Text(
-                                    text = "${uiState.peers.size} Online",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Download Location",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = textPrimary
+                                    )
+                                    Text(
+                                        text = if (uiState.downloadDirectory.isNotBlank()) uiState.downloadDirectory else "Downloads/AeroSync",
+                                        fontSize = 10.5.sp,
+                                        color = textSecondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Button(
+                                    onClick = onChangeDownloadLocation,
+                                    modifier = Modifier.height(32.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
+                                ) {
+                                    Text("Change", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
+                        }
+
+                        // Storage Metrics Bar
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = cardBgAlt,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Device Storage", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                                    Text("${uiState.freeSpaceText} free", fontSize = 10.5.sp, color = textSecondary)
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                val usedRatio = (uiState.storageUsedPercent / 100f).coerceIn(0f, 1f)
+                                LinearProgressIndicator(
+                                    progress = usedRatio,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(6.dp)
+                                        .clip(RoundedCornerShape(3.dp)),
+                                    color = Color(0xFF3B82F6),
+                                    trackColor = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.height(10.dp))
 
-                        if (uiState.peers.isEmpty()) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                        // Network Details
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = cardBgAlt,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = "Scanning local network for AeroSync peers...",
-                                    fontSize = 12.sp,
-                                    color = textMuted,
-                                    textAlign = TextAlign.Center
-                                )
+                                Column {
+                                    Text("Network Connection", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                                    Text(
+                                        text = "${uiState.connectionTypeLabel} • Port 48124",
+                                        fontSize = 11.sp,
+                                        color = textSecondary
+                                    )
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color(0xFF10B981).copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = if (uiState.isHotspotConnected) "Hotspot Ready" else "Wi-Fi Ready",
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF10B981),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 4. Collapsible Card 2: Nearby Peers
+            item {
+                CollapsibleCard(
+                    title = "Nearby Peers",
+                    subtitle = "Connected devices & direct IP",
+                    icon = Icons.Default.Devices,
+                    iconBgColor = if (isDark) Color(0xFF064E3B).copy(alpha = 0.4f) else Color(0xFFECFDF5),
+                    iconTint = Color(0xFF10B981),
+                    isExpanded = isPeersExpanded,
+                    onToggle = { isPeersExpanded = !isPeersExpanded },
+                    cardBg = cardBg,
+                    borderColor = borderColor,
+                    textPrimary = textPrimary,
+                    textSecondary = textSecondary
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (uiState.peers.isEmpty()) {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                color = cardBgAlt,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.WifiTethering,
+                                        contentDescription = null,
+                                        tint = Color(0xFF10B981),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Scanning for nearby AeroSync peers...",
+                                        fontSize = 11.5.sp,
+                                        color = textSecondary,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
                             }
                         } else {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                uiState.peers.forEach { peer ->
-                                    val isSelected = uiState.selectedPeer?.deviceId == peer.deviceId
-                                    Surface(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .clickable { onSelectPeer(peer) },
-                                        color = if (isSelected) (if (isDark) Color(0xFF0C4A6E).copy(alpha = 0.3f) else Color(0xFFE0F2FE)) else cardBgAlt,
-                                        border = if (isSelected) androidx.compose.foundation.BorderStroke(1.dp, brandBlue) else androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+                            uiState.peers.forEach { peer ->
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onSelectPeer(peer) },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = cardBgAlt,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(Icons.Default.Devices, contentDescription = null, tint = brandBlue, modifier = Modifier.size(20.dp))
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(peer.deviceName, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = textPrimary)
-                                                Text(peer.ipAddress, fontSize = 11.sp, color = textSecondary)
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(34.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFF10B981).copy(alpha = 0.15f)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (peer.deviceType.contains("win", ignoreCase = true)) Icons.Default.Computer else Icons.Default.PhoneAndroid,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF10B981),
+                                                    modifier = Modifier.size(18.dp)
+                                                )
                                             }
-                                            Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(activeDotColor))
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(
+                                                    text = peer.deviceName,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = textPrimary
+                                                )
+                                                Text(
+                                                    text = "${peer.ipAddress} • ${peer.deviceType}",
+                                                    fontSize = 10.5.sp,
+                                                    color = textSecondary
+                                                )
+                                            }
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                onSelectPeer(peer)
+                                                onPickFiles()
+                                            },
+                                            modifier = Modifier.height(30.dp),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                                        ) {
+                                            Text("Send", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                         }
                                     }
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Surface(
+                        // Direct IP Button
+                        OutlinedButton(
+                            onClick = { showDirectIpDialog = true },
+                            modifier = Modifier.fillMaxWidth().height(36.dp),
                             shape = RoundedCornerShape(10.dp),
-                            color = cardBgAlt,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onSelectTab(1) }
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF10B981))
                         ) {
-                            Text(
-                                text = "Manage Devices & Direct IP",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = brandBlue,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
+                            Icon(Icons.Default.AddLink, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Direct IP Connect", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
 
-            // Recent Activity & Active Transfer Card
+            // 5. Collapsible Card 3: Recent Transfers
             item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)),
-                    color = cardBg,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+                CollapsibleCard(
+                    title = "Recent Transfers",
+                    subtitle = "See your recent and active transfers",
+                    icon = Icons.Default.History,
+                    iconBgColor = if (isDark) Color(0xFF4C1D95).copy(alpha = 0.4f) else Color(0xFFF5F3FF),
+                    iconTint = Color(0xFF8B5CF6),
+                    isExpanded = isTransfersExpanded,
+                    onToggle = { isTransfersExpanded = !isTransfersExpanded },
+                    cardBg = cardBg,
+                    borderColor = borderColor,
+                    textPrimary = textPrimary,
+                    textSecondary = textSecondary
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("RECENT TRANSFERS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textSecondary, letterSpacing = 0.8.sp)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (uiState.history.isNotEmpty()) {
-                                    Text(
-                                        text = "Clear",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFFEF4444),
-                                        modifier = Modifier.clickable { onClearHistory() }.padding(4.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                }
-                                Text(
-                                    text = "View All",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = brandBlue,
-                                    modifier = Modifier.clickable { onSelectTab(2) }.padding(4.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
-
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Active Streaming Card (if transferring)
                         val active = uiState.activeTransfer
                         if (active != null) {
                             Surface(
-                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)),
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
                                 color = cardBgAlt,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, brandBlue)
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF8B5CF6))
                             ) {
-                                Column(modifier = Modifier.padding(10.dp)) {
-                                    Text(active.fileName, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = textPrimary)
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    val pct = if (active.totalBytes > 0) ((active.transferredBytes * 100) / active.totalBytes).toInt() else 0
-                                    LinearProgressIndicator(
-                                        progress = (pct / 100f).coerceIn(0f, 1f),
-                                        modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)),
-                                        color = brandBlue,
-                                        trackColor = if (isDark) Color(0xFF374151) else Color(0xFFE2E8F0)
-                                    )
+                                Column(modifier = Modifier.padding(12.dp)) {
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                                        modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "${active.transferredBytes / (1024 * 1024)} MB / ${active.totalBytes / (1024 * 1024)} MB (${pct}%)",
-                                            fontSize = 11.sp,
+                                            text = active.fileName,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = textPrimary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Text(
+                                            text = "${"%.1f".format(active.speedMbps)} MB/s",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Color(0xFF8B5CF6)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    val prog = if (active.totalBytes > 0) (active.transferredBytes.toFloat() / active.totalBytes.toFloat()).coerceIn(0f, 1f) else 0f
+                                    LinearProgressIndicator(
+                                        progress = prog,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(5.dp)
+                                            .clip(RoundedCornerShape(3.dp)),
+                                        color = Color(0xFF8B5CF6),
+                                        trackColor = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "${active.transferredBytes / (1024 * 1024)} MB / ${active.totalBytes / (1024 * 1024)} MB",
+                                            fontSize = 10.5.sp,
                                             color = textSecondary
                                         )
-                                        Row {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                             Text(
                                                 text = if (active.isPaused) "Resume" else "Pause",
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = brandBlue,
-                                                modifier = Modifier.clickable { onTogglePause() }.padding(4.dp)
+                                                color = Color(0xFF3B82F6),
+                                                modifier = Modifier.clickable { onTogglePause() }
                                             )
-                                            Spacer(modifier = Modifier.width(6.dp))
                                             Text(
                                                 text = "Cancel",
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = Color(0xFFEF4444),
-                                                modifier = Modifier.clickable { onCancelTransfer() }.padding(4.dp)
+                                                modifier = Modifier.clickable { onCancelTransfer() }
                                             )
                                         }
                                     }
                                 }
                             }
-                            Spacer(modifier = Modifier.height(8.dp))
                         }
 
-                        if (active == null && uiState.history.isEmpty() && uiState.transferQueue.isEmpty()) {
+                        // Real Recent Items from SQLite Database
+                        if (uiState.history.isEmpty() && active == null) {
                             Text(
-                                text = "No active or recent transfers.",
-                                fontSize = 12.sp,
-                                color = textMuted,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                                text = "No recent transfers logged yet.",
+                                fontSize = 11.5.sp,
+                                color = textSecondary,
+                                modifier = Modifier.padding(vertical = 4.dp)
                             )
                         } else {
-                            // Show queued items
-                            uiState.transferQueue.filter { it.status == QueueItemStatus.QUEUED || it.status == QueueItemStatus.PAUSED }.take(2).forEach { qItem ->
+                            uiState.history.take(3).forEach { item ->
                                 Surface(
-                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)),
-                                    color = cardBgAlt
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = cardBgAlt,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        modifier = Modifier.padding(10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(Icons.Default.Schedule, contentDescription = null, tint = textMuted, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(qItem.fileName, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            Text("${qItem.fileSize / (1024 * 1024)} MB • ${qItem.status.name}", fontSize = 10.sp, color = textMuted)
-                                        }
-                                        IconButton(onClick = { onRemoveQueueItem(qItem.id) }, modifier = Modifier.size(24.dp)) {
-                                            Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color(0xFFEF4444), modifier = Modifier.size(14.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                            Icon(
+                                                imageVector = if (!item.isReceived) Icons.Default.ArrowOutward else Icons.Default.SouthWest,
+                                                contentDescription = null,
+                                                tint = if (!item.isReceived) Color(0xFF3B82F6) else Color(0xFF10B981),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text(
+                                                    text = item.fileName,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = textPrimary,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = "${item.fileSize / (1024 * 1024)} MB • ${dateFormat.format(Date(item.timestamp))}",
+                                                    fontSize = 10.sp,
+                                                    color = textSecondary
+                                                )
+                                            }
                                         }
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(6.dp))
                             }
+                        }
 
-                            // Show recent history
-                            uiState.history.take(2).forEach { hItem ->
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)),
-                                    color = cardBgAlt
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = activeDotColor, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(hItem.fileName, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            Text("${hItem.fileSize / (1024 * 1024)} MB • ${if (hItem.isReceived) "Received" else "Sent"}", fontSize = 10.sp, color = textMuted)
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(6.dp))
+                        // View All in Activity button
+                        TextButton(
+                            onClick = { onSelectTab(2) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "View All Activity History →",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF8B5CF6)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 6. Bottom Security Badge Card
+            item {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp)),
+                    color = if (isDark) Color(0xFF064E3B).copy(alpha = 0.2f) else Color(0xFFECFDF5),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (isDark) Color(0xFF065F46) else Color(0xFFA7F3D0)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF10B981).copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.VerifiedUser,
+                                    contentDescription = "Secure",
+                                    tint = Color(0xFF10B981),
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Secure  •  Private  •  Local Transfer",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isDark) Color(0xFFE2E8F0) else Color(0xFF065F46)
+                                )
+                                Text(
+                                    text = "Your data never leaves your network.",
+                                    fontSize = 10.5.sp,
+                                    color = if (isDark) Color(0xFF94A3B8) else Color(0xFF047857)
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isDark) Color(0xFF3B0764) else Color(0xFFF3E8FF)
+                        ) {
+                            Box(modifier = Modifier.padding(6.dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = "Encrypted",
+                                    tint = Color(0xFF8B5CF6),
+                                    modifier = Modifier.size(15.dp)
+                                )
                             }
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(10.dp))
             }
         }
 
@@ -590,22 +946,15 @@ fun HomeScreen(
         if (showDirectIpDialog) {
             AlertDialog(
                 onDismissRequest = { showDirectIpDialog = false },
-                containerColor = cardBg,
-                title = { Text("Connect via Direct IP", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = textPrimary) },
+                title = { Text("Direct IP Connection", fontWeight = FontWeight.Bold, color = textPrimary) },
                 text = {
-                    Column {
-                        Text("Enter remote IP address (e.g. 192.168.43.1):", fontSize = 12.sp, color = textSecondary)
-                        Spacer(modifier = Modifier.height(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Enter the IP address of the target device on your Wi-Fi or Hotspot:", fontSize = 12.sp, color = textSecondary)
                         OutlinedTextField(
                             value = directIpInput,
                             onValueChange = { directIpInput = it },
+                            label = { Text("Target IP Address") },
                             singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = textPrimary,
-                                unfocusedTextColor = textPrimary,
-                                focusedBorderColor = brandBlue,
-                                unfocusedBorderColor = borderColor
-                            ),
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -613,64 +962,147 @@ fun HomeScreen(
                 confirmButton = {
                     Button(
                         onClick = {
-                            showDirectIpDialog = false
-                            onConnectDirectIp(directIpInput)
+                            if (directIpInput.isNotBlank()) {
+                                onConnectDirectIp(directIpInput.trim())
+                                showDirectIpDialog = false
+                            }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = brandBlue)
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
                     ) {
-                        Text("Connect", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Connect & Send", color = Color.White)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showDirectIpDialog = false }) {
-                        Text("Cancel", color = textMuted)
+                        Text("Cancel", color = textSecondary)
                     }
-                }
+                },
+                containerColor = cardBg
             )
         }
 
-        // Pairing PIN Prompt Dialog
-        val prompt = uiState.incomingPairingPrompt
-        if (prompt != null) {
+        // Incoming Pairing Request Dialog
+        val pairing = uiState.incomingPairingPrompt
+        if (pairing != null) {
             AlertDialog(
                 onDismissRequest = { onRespondPairing(false) },
-                containerColor = cardBg,
-                title = { Text("Pairing Request", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = textPrimary) },
+                title = { Text("Connection Request", fontWeight = FontWeight.Bold, color = textPrimary) },
                 text = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                        Text("${prompt.senderName} wants to sync with this device.", fontSize = 13.sp, color = textSecondary, textAlign = TextAlign.Center)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = cardBgAlt,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
-                        ) {
-                            Text(
-                                text = "PIN: ${prompt.pin}",
-                                fontSize = 26.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = brandBlue,
-                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text("Verify this PIN matches the sender screen before accepting.", fontSize = 11.sp, color = textMuted, textAlign = TextAlign.Center)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Device '${pairing.senderName}' wants to pair with you.", fontSize = 13.sp, color = textPrimary)
+                        Text("PIN: ${pairing.pin}", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF2563EB))
                     }
                 },
                 confirmButton = {
                     Button(
                         onClick = { onRespondPairing(true) },
-                        colors = ButtonDefaults.buttonColors(containerColor = activeDotColor)
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
                     ) {
-                        Text("Confirm & Pair", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Accept", color = Color.White)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { onRespondPairing(false) }) {
                         Text("Decline", color = Color(0xFFEF4444))
                     }
-                }
+                },
+                containerColor = cardBg
             )
+        }
+    }
+}
+
+// Reusable Collapsible Card Component
+@Composable
+private fun CollapsibleCard(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconBgColor: Color,
+    iconTint: Color,
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+    cardBg: Color,
+    borderColor: Color,
+    textPrimary: Color,
+    textSecondary: Color,
+    content: @Composable () -> Unit
+) {
+    val rotation by animateFloatAsState(if (isExpanded) 90f else 0f, label = "chevronRotation")
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp)),
+        color = cardBg,
+        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onToggle() },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(iconBgColor),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = title,
+                            tint = iconTint,
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = title,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = textPrimary
+                        )
+                        Text(
+                            text = subtitle,
+                            fontSize = 11.sp,
+                            color = textSecondary
+                        )
+                    }
+                }
+
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    tint = textSecondary,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .rotate(rotation)
+                )
+            }
+
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                content()
+            }
         }
     }
 }
