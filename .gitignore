@@ -1,0 +1,84 @@
+# Prerequisites & Toolchains
+.tools/
+.tool/
+
+# Build Output Directories
+build/
+build_*/
+build_windows/
+build_android/
+build_android_arm64-v8a/
+build_android_armeabi-v7a/
+build_android_x86/
+build_android_x86_64/
+build_jni/
+build_tests/
+
+# Compiled Binaries & Object Files
+*.exe
+*.dll
+*.so
+*.dylib
+*.obj
+*.o
+*.a
+*.lib
+*.pdb
+*.ilk
+*.exp
+*.apk
+*.aab
+
+# C++ / CMake / Ninja
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.ninja
+.ninja_*
+compile_commands.json
+
+# Node / Web Frontend
+node_modules/
+node_modules_trash/
+-Force/
+dist/
+.vite/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Rust / Cargo
+**/target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# Android / Gradle
+.gradle/
+**/build/
+**/.cxx/
+local.properties
+*.keystore
+*.jks
+captures/
+.externalNativeBuild/
+
+# IDE & Editor Settings
+.idea/
+.vscode/
+*.swp
+*~
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS & Temp Files
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+.DS_Store
+*.tmp
+test_output.txt

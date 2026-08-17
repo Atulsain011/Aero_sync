@@ -1,0 +1,309 @@
+package com.aerosync.app.ui
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.os.Environment
+import android.provider.DocumentsContract
+import android.provider.MediaStore
+import android.provider.OpenableColumns
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import android.widget.Toast
+import androidx.core.view.WindowCompat
+import com.aerosync.app.service.AeroSyncTransferService
+import com.aerosync.app.ui.screens.DevicesScreen
+import com.aerosync.app.ui.screens.HomeScreen
+import com.aerosync.app.ui.screens.TransfersScreen
+import com.aerosync.app.viewmodel.AeroSyncViewModel
+import java.io.File
+import java.io.FileOutputStream
+
+class MainActivity : ComponentActivity() {
+
+    private val viewModel: AeroSyncViewModel by viewModels()
+    private var multicastLock: android.net.wifi.WifiManager.MulticastLock? = null
+    private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
+
+    private fun acquireWifiDiscoveryLocks() {
+        try {
+            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+            if (wifiManager != null) {
+                if (multicastLock == null) {
+                    multicastLock = wifiManager.createMulticastLock("AeroSync:MulticastLock").apply {
+                        setReferenceCounted(true)
+                        acquire()
+                    }
+                }
+                if (wifiLock == null) {
+                    @Suppress("DEPRECATION")
+                    wifiLock = wifiManager.createWifiLock(
+                        android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF,
+                        "AeroSync:WifiDiscoveryLock"
+                    ).apply {
+                        setReferenceCounted(false)
+                        acquire()
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun releaseWifiDiscoveryLocks() {
+        try {
+            if (multicastLock?.isHeld == true) multicastLock?.release()
+            multicastLock = null
+            if (wifiLock?.isHeld == true) wifiLock?.release()
+            wifiLock = null
+        } catch (_: Exception) {}
+    }
+
+    private val folderPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            } catch (_: Exception) {}
+
+            val path = uri.path ?: ""
+            val resolved = if (path.contains("primary:")) {
+                Environment.getExternalStorageDirectory().absolutePath + "/" + path.substringAfter("primary:")
+            } else {
+                val docId = DocumentsContract.getTreeDocumentId(uri)
+                if (docId.contains("primary:")) {
+                    Environment.getExternalStorageDirectory().absolutePath + "/" + docId.substringAfter("primary:")
+                } else {
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath + "/AeroSync"
+                }
+            }
+            val targetFolder = File(resolved)
+            if (!targetFolder.exists()) targetFolder.mkdirs()
+            viewModel.setDownloadDirectory(targetFolder.absolutePath)
+        }
+    }
+
+    private val filePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                val paths = uris.mapNotNull { uri ->
+                    resolveUriToFilePath(this@MainActivity, uri)
+                }
+                if (paths.isNotEmpty()) {
+                    viewModel.enqueueFiles(paths)
+                }
+            }
+        }
+    }
+
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ ->
+        // Permissions granted
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        acquireWifiDiscoveryLocks()
+
+        // Initialize background native engine with saved preferences
+        viewModel.initializeNativeEngine()
+        viewModel.updateStorageMetrics()
+        viewModel.updateNetworkDiagnostics()
+
+        requestPermissions()
+
+        setContent {
+            val uiState by viewModel.uiState.collectAsState()
+            var lastBackPressTime by remember { mutableStateOf(0L) }
+
+            BackHandler {
+                if (uiState.selectedTab != 0) {
+                    viewModel.setSelectedTab(0)
+                } else {
+                    val currentTime = System.currentTimeMillis()
+                    if (currentTime - lastBackPressTime < 2000) {
+                        finish()
+                    } else {
+                        lastBackPressTime = currentTime
+                        Toast.makeText(this@MainActivity, "Press back again to exit AeroSync", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+
+            when (uiState.selectedTab) {
+                1 -> DevicesScreen(
+                    uiState = uiState,
+                    onSelectPeer = { viewModel.selectPeer(it) },
+                    onConnectDirectIp = { viewModel.connectToDirectIp(it) },
+                    onUpdateDeviceName = { viewModel.updateDeviceName(it) },
+                    onRefreshPeers = { viewModel.initializeNativeEngine() },
+                    onSelectTab = { viewModel.setSelectedTab(it) }
+                )
+                2 -> TransfersScreen(
+                    uiState = uiState,
+                    onTogglePause = { viewModel.togglePauseTransfer() },
+                    onCancelTransfer = { viewModel.cancelActiveTransfer() },
+                    onSelectTab = { viewModel.setSelectedTab(it) },
+                    onRemoveQueueItem = { viewModel.removeQueueItem(it) },
+                    onClearHistory = { viewModel.clearHistory() },
+                    onChangeDownloadLocation = { folderPickerLauncher.launch(null) }
+                )
+                else -> HomeScreen(
+                    uiState = uiState,
+                    onSelectPeer = { viewModel.selectPeer(it) },
+                    onConnectDirectIp = { viewModel.connectToDirectIp(it) },
+                    onPickFiles = { filePickerLauncher.launch("*/*") },
+                    onRespondPairing = { viewModel.respondToPairingRequest(it) },
+                    onToggleTheme = { viewModel.toggleTheme() },
+                    onSelectTab = { viewModel.setSelectedTab(it) },
+                    onTogglePause = { viewModel.togglePauseTransfer() },
+                    onCancelTransfer = { viewModel.cancelActiveTransfer() },
+                    onRemoveQueueItem = { viewModel.removeQueueItem(it) },
+                    onClearHistory = { viewModel.clearHistory() },
+                    onChangeDownloadLocation = { folderPickerLauncher.launch(null) }
+                )
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        acquireWifiDiscoveryLocks()
+        // Always refresh storage metrics and network info dynamically when returning to app
+        viewModel.updateStorageMetrics()
+        viewModel.updateNetworkDiagnostics()
+    }
+
+    override fun onDestroy() {
+        releaseWifiDiscoveryLocks()
+        super.onDestroy()
+    }
+
+    private fun requestPermissions() {
+        val permissions = mutableListOf(
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add("android.permission.NEARBY_WIFI_DEVICES")
+            permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
+            permissions.add(android.Manifest.permission.READ_MEDIA_IMAGES)
+            permissions.add(android.Manifest.permission.READ_MEDIA_VIDEO)
+            permissions.add(android.Manifest.permission.READ_MEDIA_AUDIO)
+        }
+        permissionLauncher.launch(permissions.toTypedArray())
+    }
+
+    companion object {
+        fun resolveUriToFilePath(context: Context, uri: Uri): String? {
+            if (uri.scheme == "file") {
+                return uri.path
+            }
+
+            // 1. Direct SAF / Storage Document resolution without copying files
+            try {
+                if (DocumentsContract.isDocumentUri(context, uri)) {
+                    val docId = DocumentsContract.getDocumentId(uri)
+                    val authority = uri.authority
+                    if ("com.android.externalstorage.documents" == authority) {
+                        val split = docId.split(":")
+                        val type = split[0]
+                        if ("primary".equals(type, ignoreCase = true)) {
+                            val path = Environment.getExternalStorageDirectory().absolutePath + "/" + split.getOrNull(1).orEmpty()
+                            if (File(path).exists()) return path
+                        }
+                    } else if ("com.android.providers.downloads.documents" == authority) {
+                        if (docId.startsWith("raw:")) {
+                            val path = docId.removePrefix("raw:")
+                            if (File(path).exists()) return path
+                        }
+                    } else if ("com.android.providers.media.documents" == authority) {
+                        val split = docId.split(":")
+                        val id = split.getOrNull(1) ?: docId
+                        val contentUri = MediaStore.Files.getContentUri("external")
+                        context.contentResolver.query(
+                            contentUri,
+                            arrayOf(MediaStore.MediaColumns.DATA),
+                            "${MediaStore.MediaColumns._ID}=?",
+                            arrayOf(id),
+                            null
+                        )?.use { cursor ->
+                            if (cursor.moveToFirst()) {
+                                val colIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
+                                if (colIdx >= 0) {
+                                    val directPath = cursor.getString(colIdx)
+                                    if (!directPath.isNullOrBlank() && File(directPath).exists()) {
+                                        return directPath
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2. Direct query on general content URI
+                context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val colIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
+                        if (colIdx >= 0) {
+                            val directPath = cursor.getString(colIdx)
+                            if (!directPath.isNullOrBlank() && File(directPath).exists()) {
+                                return directPath
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+
+            // 3. Fallback for virtual / remote streams only
+            try {
+                var fileName = "file_${System.currentTimeMillis()}"
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0 && cursor.moveToFirst()) {
+                        val name = cursor.getString(nameIndex)
+                        if (!name.isNullOrBlank()) fileName = name
+                    }
+                }
+                val stagingDir = context.externalCacheDir ?: context.cacheDir
+                val stagingFolder = File(stagingDir, "transfer_staging")
+                if (!stagingFolder.exists()) stagingFolder.mkdirs()
+                val tempFile = File(stagingFolder, fileName)
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(tempFile).use { output ->
+                        val buffer = ByteArray(4 * 1024 * 1024)
+                        var bytesRead: Int
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            output.write(buffer, 0, bytesRead)
+                        }
+                        output.flush()
+                    }
+                }
+                return tempFile.absolutePath
+            } catch (e: Exception) {
+                return null
+            }
+        }
+    }
+}
