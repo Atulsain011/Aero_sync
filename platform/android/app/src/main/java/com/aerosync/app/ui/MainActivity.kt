@@ -124,12 +124,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        acquireWifiDiscoveryLocks()
-
-        // Initialize background native engine with saved preferences
-        viewModel.initializeNativeEngine()
-        viewModel.updateStorageMetrics()
-        viewModel.updateNetworkDiagnostics()
+        // Asynchronously initialize background locks and native engine without blocking UI mount
+        lifecycleScope.launch(Dispatchers.IO) {
+            acquireWifiDiscoveryLocks()
+            viewModel.initializeNativeEngine()
+        }
 
         requestPermissions()
 

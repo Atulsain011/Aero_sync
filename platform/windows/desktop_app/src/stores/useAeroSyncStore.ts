@@ -126,25 +126,36 @@ export function useAeroSyncStore() {
     }
   }, [settings.downloadDirectory]);
 
-  // Enqueue multiple files for transfer
+  const pollTriggerRef = useRef<(() => void) | null>(null);
+
+  // Enqueue multiple files for transfer with 0ms instantaneous UI feedback
   const enqueueFiles = useCallback((filePaths: string[], targetPeer?: PeerInfo) => {
-    const peer = targetPeer || selectedPeer;
+    if (!filePaths || filePaths.length === 0) return;
+
+    let peer = targetPeer || selectedPeer;
+    if (!peer && peers.length > 0) {
+      peer = peers[0];
+      setSelectedPeer(peer);
+    }
+
     if (!peer) {
-      // If no peer selected, switch to devices tab to pick one
       setCurrentTab('devices');
+      setStatusMessage('Files selected. Click Send Files on any discovered device below.');
       return;
     }
 
+    // 1. INSTANT OPTIMISTIC UI: Immediately add items to queue without waiting for IPC
+    const now = Date.now();
     const newItems: QueueItem[] = filePaths.map((filePath, index) => {
       const fileName = getFileName(filePath);
       return {
-        id: `q-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`,
+        id: `q-${now}-${index}-${Math.random().toString(36).substr(2, 5)}`,
         name: fileName,
         path: filePath,
-        size: 0, // Will be filled dynamically by daemon
+        size: 0,
         targetDeviceName: peer.deviceName,
         targetIp: peer.ipAddress,
-        status: 'waiting',
+        status: 'transferring',
         progressPercent: 0,
         transferredBytes: 0,
         speedBytesPerSec: 0,
@@ -152,28 +163,44 @@ export function useAeroSyncStore() {
       };
     });
 
+    // 2. Switch tab to transfers IMMEDIATELY on the same frame (<1ms)
     setQueue(prev => [...prev, ...newItems]);
     setCurrentTab('transfers');
+    setIsTransferring(true);
+    latestTransferringRef.current = true;
+    setStatusMessage(`Transferring ${filePaths.length} file(s) to ${peer.deviceName}...`);
 
-    // Trigger daemon transfer API
-    daemonService.sendTransfer(peer.ipAddress, peer.port || 48124, filePaths)
+    // 3. Retrieve exact file metadata and initiate transfer in background
+    const targetPeerObj = peer;
+    tauriBridge.getFilesMetadata(filePaths).then(metaList => {
+      setQueue(prev => prev.map(item => {
+        const meta = metaList.find(m => m.path === item.path);
+        return meta && meta.size > 0 ? { ...item, size: meta.size, name: meta.name } : item;
+      }));
+    }).catch(() => {});
+
+    // 4. Trigger daemon transfer API & immediate poll
+    daemonService.sendTransfer(targetPeerObj.ipAddress, targetPeerObj.port || 48124, filePaths)
       .then(res => {
         if (res.success) {
-          setStatusMessage(`Transferring ${filePaths.length} file(s) to ${peer.deviceName}`);
+          setStatusMessage(`Streaming ${filePaths.length} file(s) to ${targetPeerObj.deviceName}`);
         }
+        if (pollTriggerRef.current) pollTriggerRef.current();
       })
       .catch(err => {
         console.error('Failed to trigger transfer via daemon:', err);
         setStatusMessage(`Transfer error: ${err.message}`);
       });
-  }, [selectedPeer]);
+  }, [selectedPeer, peers]);
 
   // Cancel active transfer
   const cancelTransfer = useCallback(async () => {
     await daemonService.cancelTransfer();
     setQueue(prev => prev.map(item => item.status === 'transferring' ? { ...item, status: 'cancelled' } : item));
     setIsTransferring(false);
+    latestTransferringRef.current = false;
     setStatusMessage('Transfer cancelled');
+    if (pollTriggerRef.current) pollTriggerRef.current();
   }, []);
 
   // Clear completed/cancelled queue items
@@ -197,7 +224,7 @@ export function useAeroSyncStore() {
     });
   }, []);
 
-  // Adaptive daemon polling loop
+  // High-frequency adaptive daemon polling loop (Immediate reaction)
   useEffect(() => {
     let timer: number | null = null;
     let isCancelled = false;
@@ -210,7 +237,18 @@ export function useAeroSyncStore() {
         setIsDaemonOnline(true);
         setPeers(data.peers || []);
         setIsTransferring(data.isTransferring);
-        setCurrentProgress(data.currentProgress);
+        latestTransferringRef.current = data.isTransferring;
+        setCurrentProgress(data.currentProgress || {
+          state: 0,
+          currentFileName: '',
+          fileSize: 0,
+          fileBytesTransferred: 0,
+          totalBytesTransferred: 0,
+          speedBytesPerSec: 0,
+          progressPercent: 0,
+          etaSeconds: 0,
+          errorCode: 0
+        });
 
         if (data.downloadDir && data.downloadDir !== settings.downloadDirectory) {
           // Sync download directory from daemon if configured
@@ -249,7 +287,7 @@ export function useAeroSyncStore() {
 
         // Periodic completed history check from daemon array
         const now = Date.now();
-        if (now - lastHistorySyncRef.current > 5000 && data.completedHistory && data.completedHistory.length > 0) {
+        if (now - lastHistorySyncRef.current > 4000 && data.completedHistory && data.completedHistory.length > 0) {
           lastHistorySyncRef.current = now;
           refreshStorage();
         }
@@ -262,10 +300,15 @@ export function useAeroSyncStore() {
       }
 
       if (!isCancelled) {
-        // Adaptive rate: 200ms when transferring, 1500ms when idle
-        const interval = isTransferring ? 200 : 1500;
+        // High responsiveness: 80ms when transferring, 250ms when idle, 80ms when connecting
+        const interval = !isDaemonOnline ? 80 : (latestTransferringRef.current ? 80 : 250);
         timer = window.setTimeout(poll, interval);
       }
+    };
+
+    pollTriggerRef.current = () => {
+      if (timer) clearTimeout(timer);
+      poll();
     };
 
     poll();
@@ -274,8 +317,9 @@ export function useAeroSyncStore() {
     return () => {
       isCancelled = true;
       if (timer) clearTimeout(timer);
+      pollTriggerRef.current = null;
     };
-  }, [isTransferring, selectedPeer, settings.downloadDirectory, refreshStorage]);
+  }, [isDaemonOnline, selectedPeer, settings.downloadDirectory, refreshStorage]);
 
   return {
     currentTab,

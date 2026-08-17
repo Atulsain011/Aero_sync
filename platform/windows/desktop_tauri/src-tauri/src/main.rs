@@ -2,14 +2,14 @@
 
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager, Window};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
 struct DaemonState {
-    child: Mutex<Option<Child>>,
+    child: Arc<Mutex<Option<Child>>>,
 }
 
 // Windows constant for hidden console
@@ -20,7 +20,7 @@ fn find_daemon_executable() -> Option<PathBuf> {
     let current_exe = std::env::current_exe().ok()?;
     let current_dir = current_exe.parent()?;
 
-    // 1. Check in same directory as current executable
+    // 1. Check in same directory as current executable (fast path)
     let candidate1 = current_dir.join("aerosync_daemon.exe");
     if candidate1.exists() {
         return Some(candidate1);
@@ -31,7 +31,6 @@ fn find_daemon_executable() -> Option<PathBuf> {
         current_dir.join("build_windows").join("aerosync_daemon.exe"),
         current_dir.join("..").join("build_windows").join("aerosync_daemon.exe"),
         current_dir.join("..").join("..").join("build_windows").join("aerosync_daemon.exe"),
-        current_dir.join("..").join("..").join("..").join("build_windows").join("aerosync_daemon.exe"),
         PathBuf::from("C:\\Users\\Atul\\Desktop\\Aerosync\\build_windows\\aerosync_daemon.exe"),
     ];
 
@@ -45,26 +44,25 @@ fn find_daemon_executable() -> Option<PathBuf> {
 }
 
 fn start_daemon_process(state: &DaemonState) {
-    if let Some(daemon_path) = find_daemon_executable() {
-        println!("[AeroSync] Found daemon binary at: {:?}", daemon_path);
-        let mut cmd = Command::new(&daemon_path);
+    let child_arc = state.child.clone();
+    std::thread::spawn(move || {
+        if let Some(daemon_path) = find_daemon_executable() {
+            let mut cmd = Command::new(&daemon_path);
 
-        #[cfg(windows)]
-        cmd.creation_flags(CREATE_NO_WINDOW);
+            #[cfg(windows)]
+            cmd.creation_flags(CREATE_NO_WINDOW);
 
-        match cmd.spawn() {
-            Ok(child) => {
-                println!("[AeroSync] Successfully spawned background daemon process (PID: {})", child.id());
-                let mut guard = state.child.lock().unwrap();
-                *guard = Some(child);
-            }
-            Err(e) => {
-                eprintln!("[AeroSync] Warning: Failed to spawn daemon process: {}", e);
+            match cmd.spawn() {
+                Ok(child) => {
+                    let mut guard = child_arc.lock().unwrap();
+                    *guard = Some(child);
+                }
+                Err(e) => {
+                    eprintln!("[AeroSync] Warning: Failed to spawn daemon process: {}", e);
+                }
             }
         }
-    } else {
-        println!("[AeroSync] Note: aerosync_daemon.exe not found on relative path; assuming standalone or already running.");
-    }
+    });
 }
 
 fn stop_daemon_process(state: &DaemonState) {
@@ -255,7 +253,7 @@ async fn get_files_metadata(paths: Vec<String>) -> Result<Vec<FileMetadataItem>,
 
 fn main() {
     let daemon_state = DaemonState {
-        child: Mutex::new(None),
+        child: Arc::new(Mutex::new(None)),
     };
 
     start_daemon_process(&daemon_state);

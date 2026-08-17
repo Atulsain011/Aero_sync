@@ -75,6 +75,13 @@ static std::string escapeJson(const std::string& input) {
 }
 
 static void updateStorageAndNetwork() {
+    static auto s_lastUpdate = std::chrono::steady_clock::now() - std::chrono::seconds(10);
+    auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - s_lastUpdate).count() < 2500) {
+        return; // Return cached metrics instantly
+    }
+    s_lastUpdate = now;
+
 #ifdef _WIN32
     ULARGE_INTEGER freeBytes, totalBytes, totalFree;
     std::string root = "C:\\";

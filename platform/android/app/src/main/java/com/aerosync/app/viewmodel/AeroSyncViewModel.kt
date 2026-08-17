@@ -136,10 +136,12 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
     private var lastServiceNotificationMs = 0L
 
     init {
-        // Load persistent data from SQLite and Preferences
+        // Load persistent data from SQLite and Preferences in background
         loadPersistentState()
-        updateStorageMetrics()
-        updateNetworkDiagnostics()
+        viewModelScope.launch(Dispatchers.IO) {
+            updateStorageMetrics()
+            updateNetworkDiagnostics()
+        }
     }
 
     private fun loadPersistentState() {
@@ -314,24 +316,40 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
                 fileName = f.name.ifEmpty { "file_${System.currentTimeMillis()}" },
                 fileSize = if (f.exists()) f.length() else 1024L * 1024L,
                 filePath = path,
-                status = QueueItemStatus.QUEUED,
+                status = QueueItemStatus.TRANSFERRING,
                 progressPercent = 0,
                 isReceived = false
             )
         }
 
+        val totalBatchBytes = newItems.sumOf { it.fileSize }
+        val firstFileName = newItems.first().fileName
+
+        // 1. INSTANT OPTIMISTIC UI: Immediately switch to Transfers screen and show item in queue
+        _uiState.update { state ->
+            val autoPeer = if (state.selectedPeer == null && state.peers.isNotEmpty()) state.peers.first() else state.selectedPeer
+            state.copy(
+                selectedTab = 2, // INSTANTLY switch to Transfers tab!
+                selectedPeer = autoPeer,
+                transferQueue = newItems + state.transferQueue,
+                isTransferring = true,
+                activeTransfer = ActiveTransfer(
+                    queueItemId = newItems.first().id,
+                    fileName = if (newItems.size == 1) firstFileName else "${newItems.size} files batch",
+                    fileIndex = 0,
+                    transferredBytes = 0L,
+                    totalBytes = totalBatchBytes,
+                    speedMbps = 0.0,
+                    etaSeconds = 0,
+                    isReceived = false
+                ),
+                statusMessage = "Transferring ${newItems.size} file(s)..."
+            )
+        }
+
+        // 2. Persist to SQLite and start transfer in background
         viewModelScope.launch(Dispatchers.IO) {
             dbHelper.insertQueueItems(newItems)
-            val updatedQueue = dbHelper.getAllQueueItems()
-
-            _uiState.update { state ->
-                val autoPeer = if (state.selectedPeer == null && state.peers.isNotEmpty()) state.peers.first() else state.selectedPeer
-                state.copy(
-                    selectedPeer = autoPeer,
-                    transferQueue = updatedQueue,
-                    statusMessage = "Queued ${newItems.size} file(s) for transfer..."
-                )
-            }
             startQueueProcessor()
         }
     }
@@ -617,7 +635,7 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
         totalFiles: Int,
         totalBytes: Long
     ) {
-        // Receiver UI immediately displays the incoming file in Queue
+        // Receiver UI immediately displays the incoming file in Transfers section with 0ms delay
         val itemId = batchId.ifEmpty { UUID.randomUUID().toString() }
         val targetPath = File(prefs.downloadDirectory, fileName).absolutePath
         val newItem = TransferQueueItem(
@@ -631,29 +649,29 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
             timestamp = System.currentTimeMillis()
         )
 
+        // 1. INSTANT UI UPDATE: Show item immediately in active queue and switch to Transfers view
+        _uiState.update { state ->
+            state.copy(
+                selectedTab = 2, // Switch directly to Transfers section so user sees it instantly
+                transferQueue = listOf(newItem) + state.transferQueue.filter { it.id != itemId },
+                isTransferring = true,
+                activeTransfer = ActiveTransfer(
+                    queueItemId = itemId,
+                    fileName = fileName,
+                    fileIndex = 0,
+                    transferredBytes = 0L,
+                    totalBytes = if (fileSize > 0) fileSize else totalBytes,
+                    speedMbps = 0.0,
+                    etaSeconds = 0,
+                    isReceived = true
+                ),
+                statusMessage = "Receiving $fileName from $senderName..."
+            )
+        }
+
+        // 2. Persist to SQLite and start Foreground Service concurrently in background
         viewModelScope.launch(Dispatchers.IO) {
             dbHelper.insertOrUpdateQueueItem(newItem)
-            val updatedQueue = dbHelper.getAllQueueItems()
-
-            _uiState.update { state ->
-                state.copy(
-                    transferQueue = updatedQueue,
-                    isTransferring = true,
-                    activeTransfer = ActiveTransfer(
-                        queueItemId = itemId,
-                        fileName = fileName,
-                        fileIndex = 0,
-                        transferredBytes = 0L,
-                        totalBytes = if (fileSize > 0) fileSize else totalBytes,
-                        speedMbps = 0.0,
-                        etaSeconds = 0,
-                        isReceived = true
-                    ),
-                    statusMessage = "Receiving $fileName from $senderName..."
-                )
-            }
-
-            // Start Foreground Service for background receiving
             AeroSyncTransferService.startTransfer(
                 context = getApplication(),
                 fileName = fileName,
@@ -693,8 +711,8 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
             )
         }
 
-        // Throttle progress updates to UI to avoid Compose recomposition flooding
-        if (now - lastProgressReportMs < 100 && transferred < total) {
+        // Smooth high-refresh UI progress updates (~30-60fps)
+        if (now - lastProgressReportMs < 33 && transferred < total) {
             return
         }
         lastProgressReportMs = now
