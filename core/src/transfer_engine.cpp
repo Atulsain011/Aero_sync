@@ -10,6 +10,9 @@
 #include <condition_variable>
 #include <thread>
 #include <set>
+#include <memory>
+#include <algorithm>
+#include <cstring>
 #include <fcntl.h>
 
 #ifdef _WIN32
@@ -18,10 +21,119 @@
 #else
     #include <arpa/inet.h>
     #include <netinet/in.h>
+    #include <netinet/tcp.h>
     #include <unistd.h>
+    #include <sys/stat.h>
+    #include <sys/types.h>
 #endif
 
 namespace aerosync {
+
+// Buffer Block for zero-allocation recycling
+struct ChunkBufferBlock {
+    std::vector<uint8_t> data;
+    size_t capacity{0};
+
+    explicit ChunkBufferBlock(size_t cap = LARGE_CHUNK_SIZE) : capacity(cap) {
+        data.resize(cap);
+    }
+};
+
+// Thread-safe Fixed Pre-allocated Buffer Pool
+class BufferPool {
+private:
+    std::mutex m_mtx;
+    std::condition_variable m_cv;
+    std::vector<std::unique_ptr<ChunkBufferBlock>> m_pool;
+    size_t m_blockSize;
+    bool m_stopping{false};
+
+public:
+    BufferPool(size_t poolSize, size_t blockSize) : m_blockSize(blockSize) {
+        m_pool.reserve(poolSize);
+        for (size_t i = 0; i < poolSize; ++i) {
+            m_pool.push_back(std::make_unique<ChunkBufferBlock>(blockSize));
+        }
+    }
+
+    std::unique_ptr<ChunkBufferBlock> acquire(const std::atomic<bool>& cancelSignal) {
+        std::unique_lock<std::mutex> lock(m_mtx);
+        m_cv.wait(lock, [&]() {
+            return !m_pool.empty() || m_stopping || cancelSignal.load();
+        });
+        if (m_stopping || cancelSignal.load() || m_pool.empty()) {
+            return nullptr;
+        }
+        auto buf = std::move(m_pool.back());
+        m_pool.pop_back();
+        return buf;
+    }
+
+    void release(std::unique_ptr<ChunkBufferBlock> buf) {
+        if (!buf) return;
+        std::lock_guard<std::mutex> lock(m_mtx);
+        m_pool.push_back(std::move(buf));
+        m_cv.notify_one();
+    }
+
+    void stop() {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        m_stopping = true;
+        m_cv.notify_all();
+    }
+};
+
+// Queue item passed from Network Producer thread to Disk Consumer thread
+struct AsyncChunkPacket {
+    ChunkHeader header;
+    std::unique_ptr<ChunkBufferBlock> buffer;
+    bool isEof{false};
+    bool isError{false};
+};
+
+// Thread-safe bounded channel with backpressure
+class AsyncChunkQueue {
+private:
+    std::mutex m_mtx;
+    std::condition_variable m_cvNotFull;
+    std::condition_variable m_cvNotEmpty;
+    std::queue<AsyncChunkPacket> m_queue;
+    size_t m_maxCapacity;
+    bool m_stopped{false};
+
+public:
+    explicit AsyncChunkQueue(size_t maxCap = 8) : m_maxCapacity(maxCap) {}
+
+    bool push(AsyncChunkPacket&& packet, const std::atomic<bool>& cancelSignal) {
+        std::unique_lock<std::mutex> lock(m_mtx);
+        m_cvNotFull.wait(lock, [&]() {
+            return m_queue.size() < m_maxCapacity || m_stopped || cancelSignal.load();
+        });
+        if (m_stopped || cancelSignal.load()) return false;
+        m_queue.push(std::move(packet));
+        m_cvNotEmpty.notify_one();
+        return true;
+    }
+
+    bool pop(AsyncChunkPacket& outPacket) {
+        std::unique_lock<std::mutex> lock(m_mtx);
+        m_cvNotEmpty.wait(lock, [&]() {
+            return !m_queue.empty() || m_stopped;
+        });
+        if (m_queue.empty()) return false;
+        outPacket = std::move(m_queue.front());
+        m_queue.pop();
+        m_cvNotFull.notify_one();
+        return true;
+    }
+
+    void stop() {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        m_stopped = true;
+        m_cvNotEmpty.notify_all();
+        m_cvNotFull.notify_all();
+    }
+};
 
 // Journal Helper: reads/writes completed chunk indices for crash recovery
 static std::set<uint32_t> loadResumeJournal(const std::filesystem::path& journalPath) {
@@ -46,12 +158,10 @@ static void appendResumeJournal(const std::filesystem::path& journalPath, uint32
 
 static std::string sanitizeFilename(const std::string& rawPath) {
     std::string s = rawPath;
-    // Strip everything before the last slash or backslash
     size_t lastSlash = s.find_last_of("/\\");
     if (lastSlash != std::string::npos) {
         s = s.substr(lastSlash + 1);
     }
-    // Also remove any leading drive prefix like "C:" if present
     size_t colon = s.find_last_of(':');
     if (colon != std::string::npos) {
         s = s.substr(colon + 1);
@@ -131,6 +241,9 @@ bool TransferEngine::receiveStreamChunk(int streamSockFd, ChunkHeader& outHeader
     return (calcCrc == outHeader.crc32c);
 }
 
+// -----------------------------------------------------------------------------
+// High-Speed Double-Buffered Sender Engine
+// -----------------------------------------------------------------------------
 bool TransferEngine::sendFileBatch(int sockFd,
                                    const TransferManifest& manifest,
                                    const std::vector<std::filesystem::path>& localFilePaths,
@@ -142,6 +255,8 @@ bool TransferEngine::sendFileBatch(int sockFd,
     auto lastReportTime = startTime;
 
     size_t chunkSize = manifest.chunkSize > 0 ? manifest.chunkSize : LARGE_CHUNK_SIZE;
+
+    // Pre-allocated double buffers for sending
     std::vector<uint8_t> txBuffer(24 + chunkSize);
 
     for (size_t i = 0; i < manifest.files.size(); ++i) {
@@ -170,7 +285,6 @@ bool TransferEngine::sendFileBatch(int sockFd,
         uint64_t fileBytesTransferred = 0;
         uint32_t chunkIndex = 0;
 
-        // Apply resumeByteOffset on current file if resuming
         if (i == 0 && resumeByteOffset > 0 && resumeByteOffset < fileMeta.fileSize) {
             fileBytesTransferred = resumeByteOffset;
             chunkIndex = static_cast<uint32_t>(resumeByteOffset / chunkSize);
@@ -190,7 +304,6 @@ bool TransferEngine::sendFileBatch(int sockFd,
 
             size_t bytesToRead = std::min(static_cast<uint64_t>(chunkSize), fileMeta.fileSize - fileBytesTransferred);
 
-            // Skip completed chunks if resuming
             if (completedChunks.count(chunkIndex) > 0 && fileBytesTransferred + bytesToRead <= resumeByteOffset) {
                 fileBytesTransferred += bytesToRead;
                 chunkIndex++;
@@ -198,11 +311,12 @@ bool TransferEngine::sendFileBatch(int sockFd,
                 continue;
             }
 
-            // Read directly into txBuffer at offset 24 for single-pass zero copy send
+            // Direct read into txBuffer payload area (Zero-copy)
             file.read(reinterpret_cast<char*>(txBuffer.data() + 24), bytesToRead);
             size_t bytesRead = file.gcount();
             if (bytesRead == 0) break;
 
+            // Fast hardware-accelerated CRC32C
             uint32_t crc = ProtocolSerializer::computeCRC32C(txBuffer.data() + 24, bytesRead);
 
             uint32_t fileIdxNet = htonl(static_cast<uint32_t>(i));
@@ -217,7 +331,7 @@ bool TransferEngine::sendFileBatch(int sockFd,
             std::memcpy(txBuffer.data() + 16, &lenNet, 4);
             std::memcpy(txBuffer.data() + 20, &crcNet, 4);
 
-            // Single unified socket write: header + payload together in one packet
+            // Single unified atomic socket transmission
             if (!SocketTransport::sendRaw(sockFd, txBuffer.data(), 24 + bytesRead)) {
                 if (cancelSignal && progressCb) {
                     TransferProgress prog;
@@ -290,6 +404,9 @@ bool TransferEngine::sendFileBatch(int sockFd,
     return true;
 }
 
+// -----------------------------------------------------------------------------
+// High-Speed Asynchronous Decoupled Receiver Pipeline (Producer-Consumer)
+// -----------------------------------------------------------------------------
 bool TransferEngine::receiveFileBatch(int sockFd,
                                       const TransferManifest& manifest,
                                       const std::filesystem::path& downloadDirectory,
@@ -301,6 +418,12 @@ bool TransferEngine::receiveFileBatch(int sockFd,
     auto lastReportTime = startTime;
 
     std::filesystem::create_directories(downloadDirectory);
+
+    size_t chunkSize = manifest.chunkSize > 0 ? manifest.chunkSize : LARGE_CHUNK_SIZE;
+    
+    // Fixed Pool of 8 Pre-allocated 4MB chunk buffers (32MB RAM max)
+    const size_t POOL_SIZE = 8;
+    BufferPool bufferPool(POOL_SIZE, chunkSize);
 
     for (size_t i = 0; i < manifest.files.size(); ++i) {
         if (cancelSignal) {
@@ -329,55 +452,163 @@ bool TransferEngine::receiveFileBatch(int sockFd,
             fileBytesTransferred = resumeByteOffset;
         }
 
+        // 1. Open destination file using high-performance Direct POSIX / Native file handles
+#if defined(__linux__) || defined(__ANDROID__)
+        int fd = open(partPath.c_str(), O_WRONLY | O_CREAT | O_CLOEXEC, 0644);
+        if (fd < 0) {
+            return false;
+        }
+
+        // Upfront block pre-allocation on Android/Linux to eliminate FUSE filesystem thrashing
+        if (fileMeta.fileSize > 0 && fileBytesTransferred == 0) {
+#if defined(FALLOC_FL_KEEP_SIZE)
+            fallocate(fd, 0, 0, static_cast<off_t>(fileMeta.fileSize));
+#else
+            posix_fallocate(fd, 0, static_cast<off_t>(fileMeta.fileSize));
+#endif
+#ifdef POSIX_FADV_SEQUENTIAL
+            posix_fadvise(fd, 0, static_cast<off_t>(fileMeta.fileSize), POSIX_FADV_SEQUENTIAL);
+#endif
+        }
+#else
         std::vector<char> fileStreamBuf(4 * 1024 * 1024);
         std::fstream file;
         file.rdbuf()->pubsetbuf(fileStreamBuf.data(), fileStreamBuf.size());
 
-        // Check if resuming from part file
         if (fileBytesTransferred > 0 && std::filesystem::exists(partPath)) {
             file.open(partPath, std::ios::binary | std::ios::in | std::ios::out);
         }
         if (!file.is_open()) {
-            // Open new part file
             file.open(partPath, std::ios::binary | std::ios::out | std::ios::trunc);
             file.close();
             file.open(partPath, std::ios::binary | std::ios::in | std::ios::out);
         }
         if (!file.is_open()) return false;
-
         file.seekp(static_cast<std::streamoff>(fileBytesTransferred));
+#endif
 
-        std::vector<uint8_t> chunkData;
-        chunkData.reserve(LARGE_CHUNK_SIZE);
+        // 2. Launch Background Asynchronous Disk Writer Worker Thread
+        AsyncChunkQueue chunkQueue(POOL_SIZE);
+        std::atomic<bool> writerSuccess{true};
+        std::atomic<uint64_t> currentFileWritten{fileBytesTransferred};
 
-        while (fileBytesTransferred < fileMeta.fileSize) {
-            if (cancelSignal) {
-                file.close();
-                if (progressCb) {
-                    TransferProgress prog;
-                    prog.batchId = manifest.batchId;
-                    prog.state = TransferState::CANCELLED;
-                    progressCb(prog);
+        std::thread diskWriterThread([&]() {
+            while (true) {
+                AsyncChunkPacket packet;
+                if (!chunkQueue.pop(packet)) {
+                    break;
                 }
-                return false;
+
+                if (packet.isEof) {
+                    bufferPool.release(std::move(packet.buffer));
+                    break;
+                }
+
+                if (packet.isError || cancelSignal.load()) {
+                    writerSuccess = false;
+                    bufferPool.release(std::move(packet.buffer));
+                    break;
+                }
+
+                // Verify hardware-accelerated CRC32C checksum
+                uint32_t calcCrc = ProtocolSerializer::computeCRC32C(packet.buffer->data.data(), packet.header.length);
+                if (calcCrc != packet.header.crc32c) {
+                    std::cerr << "CRC32C mismatch on chunk offset: " << packet.header.offset << std::endl;
+                    writerSuccess = false;
+                    bufferPool.release(std::move(packet.buffer));
+                    break;
+                }
+
+                // Direct asynchronous disk write
+#if defined(__linux__) || defined(__ANDROID__)
+                ssize_t written = pwrite(fd, packet.buffer->data.data(), packet.header.length, static_cast<off_t>(packet.header.offset));
+                if (written < 0 || static_cast<size_t>(written) != packet.header.length) {
+                    writerSuccess = false;
+                    bufferPool.release(std::move(packet.buffer));
+                    break;
+                }
+#else
+                file.seekp(static_cast<std::streamoff>(packet.header.offset));
+                file.write(reinterpret_cast<const char*>(packet.buffer->data.data()), packet.header.length);
+                if (!file.good()) {
+                    writerSuccess = false;
+                    bufferPool.release(std::move(packet.buffer));
+                    break;
+                }
+#endif
+
+                currentFileWritten += packet.header.length;
+                bufferPool.release(std::move(packet.buffer));
+            }
+        });
+
+        // 3. Main Network Receiver Loop (Dedicated to 100% Wire Saturation)
+        uint64_t fileBytesReceived = fileBytesTransferred;
+        bool networkSuccess = true;
+
+        while (fileBytesReceived < fileMeta.fileSize) {
+            if (cancelSignal || !writerSuccess) {
+                networkSuccess = false;
+                break;
+            }
+
+            // Acquire pre-allocated buffer from pool (Zero heap allocations)
+            auto block = bufferPool.acquire(cancelSignal);
+            if (!block) {
+                networkSuccess = false;
+                break;
+            }
+
+            // Read 24-byte Chunk Header
+            uint8_t headerBuf[24];
+            if (!SocketTransport::recvRaw(sockFd, headerBuf, sizeof(headerBuf))) {
+                bufferPool.release(std::move(block));
+                networkSuccess = false;
+                break;
             }
 
             ChunkHeader header;
-            if (!receiveStreamChunk(sockFd, header, chunkData)) {
-                file.close();
-                if (cancelSignal && progressCb) {
-                    TransferProgress prog;
-                    prog.batchId = manifest.batchId;
-                    prog.state = TransferState::CANCELLED;
-                    progressCb(prog);
-                }
-                return false;
+            if (!ProtocolSerializer::deserializeChunkHeader(headerBuf, sizeof(headerBuf), header)) {
+                bufferPool.release(std::move(block));
+                networkSuccess = false;
+                break;
             }
 
-            file.seekp(static_cast<std::streamoff>(header.offset));
-            file.write(reinterpret_cast<const char*>(chunkData.data()), header.length);
+            if (header.length > block->capacity) {
+                bufferPool.release(std::move(block));
+                networkSuccess = false;
+                break;
+            }
 
-            fileBytesTransferred += header.length;
+            // Read payload directly into pre-allocated memory
+            if (header.length > 0) {
+                if (!SocketTransport::recvRaw(sockFd, block->data.data(), header.length)) {
+                    bufferPool.release(std::move(block));
+                    networkSuccess = false;
+                    break;
+                }
+            }
+
+#if defined(__linux__) || defined(__ANDROID__)
+#ifdef TCP_QUICKACK
+            int quickack = 1;
+            setsockopt(sockFd, IPPROTO_TCP, TCP_QUICKACK, (const char*)&quickack, sizeof(quickack));
+#endif
+#endif
+
+            // Enqueue chunk packet for asynchronous disk write
+            AsyncChunkPacket packet;
+            packet.header = header;
+            packet.buffer = std::move(block);
+            packet.isEof = false;
+            packet.isError = false;
+
+            if (!chunkQueue.push(std::move(packet), cancelSignal)) {
+                networkSuccess = false;
+                break;
+            }
+
+            fileBytesReceived += header.length;
             batchBytesTransferred += header.length;
 
             auto now = std::chrono::steady_clock::now();
@@ -392,7 +623,7 @@ bool TransferEngine::receiveFileBatch(int sockFd,
                 prog.batchId = manifest.batchId;
                 prog.currentFileIndex = static_cast<uint32_t>(i);
                 prog.currentFileName = fileMeta.relativePath;
-                prog.fileBytesTransferred = fileBytesTransferred;
+                prog.fileBytesTransferred = currentFileWritten.load();
                 prog.fileSize = fileMeta.fileSize;
                 prog.batchBytesTransferred = batchBytesTransferred;
                 prog.batchTotalBytes = manifest.totalBytes;
@@ -407,12 +638,39 @@ bool TransferEngine::receiveFileBatch(int sockFd,
             }
         }
 
+        // 4. Signal EOF to writer and join thread
+        AsyncChunkPacket eofPacket;
+        eofPacket.isEof = true;
+        eofPacket.isError = !networkSuccess;
+        chunkQueue.push(std::move(eofPacket), cancelSignal);
+        chunkQueue.stop();
+
+        if (diskWriterThread.joinable()) {
+            diskWriterThread.join();
+        }
+
+        // 5. Close file descriptors
+#if defined(__linux__) || defined(__ANDROID__)
+        close(fd);
+#else
         file.close();
+#endif
+
+        if (!networkSuccess || !writerSuccess || cancelSignal) {
+            if (cancelSignal && progressCb) {
+                TransferProgress prog;
+                prog.batchId = manifest.batchId;
+                prog.state = TransferState::CANCELLED;
+                progressCb(prog);
+            }
+            return false;
+        }
 
         if (std::filesystem::exists(journalPath)) {
             std::filesystem::remove(journalPath);
         }
 
+        // 6. Atomic Rename Part -> Final
         std::error_code ec;
         if (std::filesystem::exists(finalPath, ec)) {
             std::filesystem::remove(finalPath, ec);

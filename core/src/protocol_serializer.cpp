@@ -433,6 +433,24 @@ static inline uint32_t computeCRC32C_Hardware(const uint8_t* data, size_t length
     }
     return static_cast<uint32_t>(crc ^ 0xFFFFFFFF);
 }
+#elif defined(__aarch64__) && (defined(__GNUC__) || defined(__clang__))
+#if defined(__ARM_FEATURE_CRC32)
+static inline uint32_t computeCRC32C_ARM(const uint8_t* data, size_t length) {
+    uint32_t crc = 0xFFFFFFFF;
+    const uint8_t* p = data;
+    while (length >= 8) {
+        crc = __builtin_arm_crc32cd(crc, *reinterpret_cast<const uint64_t*>(p));
+        p += 8;
+        length -= 8;
+    }
+    while (length > 0) {
+        crc = __builtin_arm_crc32cb(crc, *p);
+        p++;
+        length--;
+    }
+    return crc ^ 0xFFFFFFFF;
+}
+#endif
 #endif
 
 uint32_t ProtocolSerializer::computeCRC32C(const uint8_t* data, size_t length) {
@@ -441,6 +459,10 @@ uint32_t ProtocolSerializer::computeCRC32C(const uint8_t* data, size_t length) {
 #if (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
     #if defined(__SSE4_2__)
         return computeCRC32C_Hardware(data, length);
+    #endif
+#elif defined(__aarch64__) && (defined(__GNUC__) || defined(__clang__))
+    #if defined(__ARM_FEATURE_CRC32)
+        return computeCRC32C_ARM(data, length);
     #endif
 #endif
 
