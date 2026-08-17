@@ -1,196 +1,195 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
-  Activity,
+  X,
   Plus,
   Trash2,
-  X,
-  ArrowUpRight,
-  ArrowDownLeft,
-  CheckCircle2,
-  AlertTriangle
+  FileText,
+  Activity,
+  Zap,
+  Clock,
+  ArrowDownCircle,
+  CheckCircle2
 } from 'lucide-react';
-import { QueueItem, TransferProgress, TransferHistoryRecord } from '../types/aerosync';
-import { formatBytes, formatSpeed } from '../utils/formatters';
+import { QueueItem, DaemonStatusResponse } from '../types/aerosync';
+import {
+  formatBytes,
+  formatSpeedMBs,
+  formatSpeedMbps,
+  formatEta
+} from '../utils/formatters';
 
 interface TransfersPageProps {
   queue: QueueItem[];
-  history: TransferHistoryRecord[];
-  currentProgress: TransferProgress;
+  currentProgress: DaemonStatusResponse['currentProgress'];
   isTransferring: boolean;
-  downloadDirectory?: string;
   onAddFiles: () => void;
   onCancelTransfer: () => void;
-  onClearCompleted?: () => void;
-  onClearHistory: () => void;
+  onClearCompleted: () => void;
 }
 
 export const TransfersPage: React.FC<TransfersPageProps> = ({
   queue,
-  history,
   currentProgress,
   isTransferring,
   onAddFiles,
   onCancelTransfer,
-  onClearHistory
+  onClearCompleted
 }) => {
-  const [filterTab, setFilterTab] = useState<'all' | 'active' | 'completed' | 'failed'>('all');
-
-  const activeFileName = currentProgress.currentFileName || queue[0]?.name || 'Transferring data...';
-  const progressPercent = Math.min(100, Math.max(0, currentProgress.progressPercent || (isTransferring ? 45 : 0)));
-  const speedBytes = currentProgress.speedBytesPerSec || (isTransferring ? 18 * 1024 * 1024 : 0);
-  const transferredBytes = currentProgress.fileBytesTransferred || 0;
-  const totalBytes = currentProgress.fileSize || queue[0]?.size || 0;
-
-  // Filter history records
-  const filteredHistory = history.filter(item => {
-    if (filterTab === 'all') return true;
-    if (filterTab === 'completed') return item.status === 'completed';
-    if (filterTab === 'failed') return item.status === 'failed';
-    return true;
-  });
+  const activeFileName = currentProgress?.currentFileName || (queue[0]?.name ?? 'Preparing files...');
+  const progressPercent = Math.min(100, Math.max(0, currentProgress?.progressPercent || 0));
+  const speedBytes = currentProgress?.speedBytesPerSec || 0;
+  const etaSec = currentProgress?.etaSeconds || 0;
+  const transferredBytes = currentProgress?.fileBytesTransferred || 0;
+  const totalBytes = currentProgress?.fileSize || 0;
 
   return (
-    <div className="page-screen-card">
-      <div className="screen-header-row">
+    <div className="page-container">
+      <div className="page-header">
         <div>
-          <h2 className="screen-main-title">Activity & Transfers</h2>
-          <p className="screen-subtitle">Real-time active streams and complete file transfer history.</p>
+          <h2 className="page-title">Transfer Queue</h2>
+          <p className="page-subtitle">Real-time parallel multi-stream transmission progress.</p>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {history.length > 0 && (
-            <button className="btn-direct-connect" onClick={onClearHistory} title="Clear history">
-              <Trash2 size={14} />
-            </button>
-          )}
-          <button
-            className="btn-peer-send"
-            onClick={onAddFiles}
-            style={{ background: 'var(--primary-gradient)' }}
-          >
-            <Plus size={14} />
-            <span>Send Files</span>
+        <div className="page-header-actions">
+          <button className="btn btn-secondary" onClick={onClearCompleted}>
+            <Trash2 size={15} />
+            <span>Clear Queue</span>
+          </button>
+          <button className="btn btn-primary" onClick={onAddFiles}>
+            <Plus size={15} />
+            <span>Add Files</span>
           </button>
         </div>
       </div>
 
-      {/* Active Transfer Card (If Active) */}
-      {(isTransferring || queue.length > 0) && (
-        <section className="active-transfer-card" style={{ padding: '20px' }}>
-          <div className="transfer-header-row">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div className="status-online-dot" style={{ animation: 'pulse 1.5s infinite' }} />
+      {/* Active Transfer Hero Card */}
+      {isTransferring ? (
+        <div className="active-transfer-card">
+          <div className="active-card-top">
+            <div className="active-file-group">
+              <div className="active-file-icon">
+                <Activity size={22} className="animate-pulse" />
+              </div>
               <div>
-                <span style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--primary-blue)' }}>
-                  Active Stream
-                </span>
-                <h3 className="transfer-file-title" style={{ fontSize: '15px' }}>{activeFileName}</h3>
+                <span className="active-badge">Active Streaming</span>
+                <h3 className="active-file-name">{activeFileName}</h3>
               </div>
             </div>
-            <span className="transfer-speed-badge">{formatSpeed(speedBytes)}</span>
-          </div>
 
-          <div className="progress-bar-track" style={{ height: '10px' }}>
-            <div className="progress-bar-fill" style={{ width: `${Math.max(4, progressPercent)}%` }} />
-          </div>
-
-          <div className="transfer-meta-footer">
-            <span>
-              {formatBytes(transferredBytes)} / {formatBytes(totalBytes)} ({progressPercent.toFixed(1)}%)
-            </span>
-            <div className="transfer-actions-row">
-              {currentProgress.etaSeconds > 0 && (
-                <span>ETA: ~{currentProgress.etaSeconds}s</span>
-              )}
-              <button className="btn-transfer-action" onClick={onCancelTransfer}>
-                <X size={12} />
+            <div className="active-card-controls">
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={onCancelTransfer}
+                title="Cancel Transfer"
+              >
+                <X size={15} />
                 <span>Cancel</span>
               </button>
             </div>
           </div>
-        </section>
-      )}
 
-      {/* Filter Tabs */}
-      <div className="screen-header-row" style={{ marginTop: '8px' }}>
-        <div className="activity-filter-tabs">
-          <button
-            className={`activity-filter-btn ${filterTab === 'all' ? 'active' : ''}`}
-            onClick={() => setFilterTab('all')}
-          >
-            All ({history.length + (isTransferring ? 1 : 0)})
-          </button>
-          <button
-            className={`activity-filter-btn ${filterTab === 'active' ? 'active' : ''}`}
-            onClick={() => setFilterTab('active')}
-          >
-            Active ({isTransferring ? 1 : 0})
-          </button>
-          <button
-            className={`activity-filter-btn ${filterTab === 'completed' ? 'active' : ''}`}
-            onClick={() => setFilterTab('completed')}
-          >
-            Completed ({history.filter(h => h.status === 'completed').length})
-          </button>
-          <button
-            className={`activity-filter-btn ${filterTab === 'failed' ? 'active' : ''}`}
-            onClick={() => setFilterTab('failed')}
-          >
-            Failed ({history.filter(h => h.status === 'failed').length})
-          </button>
-        </div>
-      </div>
-
-      {/* History Items List */}
-      {filteredHistory.length === 0 && !isTransferring ? (
-        <div className="empty-state-box" style={{ padding: '40px 16px' }}>
-          <div className="accordion-icon-badge purple" style={{ width: '56px', height: '56px', marginBottom: '12px' }}>
-            <Activity size={28} />
+          {/* Progress Bar */}
+          <div className="active-progress-container">
+            <div className="active-progress-bar">
+              <div
+                className="active-progress-fill"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <div className="active-progress-labels">
+              <span>{progressPercent.toFixed(1)}% Completed</span>
+              <span>{formatBytes(transferredBytes)} / {formatBytes(totalBytes)}</span>
+            </div>
           </div>
-          <h3 className="empty-state-title">No transfer activity yet</h3>
-          <p className="empty-state-desc">
-            When you send or receive files, their live progress and historical logs will be recorded here.
-          </p>
-        </div>
-      ) : (
-        <div className="history-items-group">
-          {filteredHistory.map((item) => (
-            <div key={item.id} className="history-item-row" style={{ padding: '12px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                {item.direction === 'sent' ? (
-                  <div className="accordion-icon-badge blue" style={{ width: '36px', height: '36px' }}>
-                    <ArrowUpRight size={18} />
-                  </div>
-                ) : (
-                  <div className="accordion-icon-badge green" style={{ width: '36px', height: '36px' }}>
-                    <ArrowDownLeft size={18} />
-                  </div>
-                )}
-                <div>
-                  <h4 className="history-file-name" style={{ fontSize: '14px' }}>{item.fileName}</h4>
-                  <span className="history-file-meta">
-                    {formatBytes(item.fileSize)} • {new Date(item.timestampMs).toLocaleString()} • {item.peerName || 'Remote Peer'}
-                  </span>
-                </div>
-              </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {item.status === 'completed' ? (
-                  <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <CheckCircle2 size={14} />
-                    Completed
-                  </span>
-                ) : (
-                  <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-danger)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <AlertTriangle size={14} />
-                    Failed
-                  </span>
-                )}
+          {/* Real-Time Live Telemetry Row */}
+          <div className="telemetry-grid">
+            <div className="telemetry-item">
+              <div className="telemetry-label">
+                <Zap size={14} />
+                <span>Throughput</span>
+              </div>
+              <div className="telemetry-val-group">
+                <span className="telemetry-primary-val">{formatSpeedMBs(speedBytes)}</span>
+                <span className="telemetry-secondary-val">({formatSpeedMbps(speedBytes)})</span>
               </div>
             </div>
-          ))}
+
+            <div className="telemetry-item">
+              <div className="telemetry-label">
+                <Clock size={14} />
+                <span>Estimated Time</span>
+              </div>
+              <div className="telemetry-val-group">
+                <span className="telemetry-primary-val">{formatEta(etaSec)}</span>
+              </div>
+            </div>
+
+            <div className="telemetry-item">
+              <div className="telemetry-label">
+                <ArrowDownCircle size={14} />
+                <span>Stream Channels</span>
+              </div>
+              <div className="telemetry-val-group">
+                <span className="telemetry-primary-val">4 Parallel TCP</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="idle-transfer-card">
+          <div className="idle-icon-box">
+            <CheckCircle2 size={32} />
+          </div>
+          <div>
+            <h3 className="idle-title">No Active Transfers</h3>
+            <p className="idle-desc">Pick files or select a discovered peer to begin high-speed transmission.</p>
+          </div>
+          <button className="btn btn-primary" onClick={onAddFiles}>
+            <Plus size={16} />
+            <span>Send New Files</span>
+          </button>
         </div>
       )}
+
+      {/* Queue Items List */}
+      <section className="section-block">
+        <h3 className="section-title">Enqueued Files ({queue.length})</h3>
+
+        {queue.length === 0 ? (
+          <div className="empty-queue-box">
+            <FileText size={28} />
+            <p>Queue is empty. Select files to queue them for direct transmission.</p>
+          </div>
+        ) : (
+          <div className="queue-list">
+            {queue.map(item => {
+              const isItemActive = isTransferring && item.name === activeFileName;
+
+              return (
+                <div key={item.id} className={`queue-item ${isItemActive ? 'queue-item-active' : ''}`}>
+                  <div className="queue-item-left">
+                    <div className="queue-file-icon">
+                      <FileText size={18} />
+                    </div>
+                    <div className="queue-file-meta">
+                      <span className="queue-file-name">{item.name}</span>
+                      <span className="queue-file-details">
+                        {item.targetDeviceName} ({item.targetIp})
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="queue-item-right">
+                    <span className={`queue-status-tag status-${item.status}`}>
+                      {item.status.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 };

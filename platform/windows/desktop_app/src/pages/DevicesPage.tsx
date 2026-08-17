@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
-  Laptop,
+  Monitor,
   Smartphone,
   Send,
   Plus,
-  ShieldCheck
+  RefreshCw,
+  CheckCircle2,
+  Cpu
 } from 'lucide-react';
 import { PeerInfo } from '../types/aerosync';
+import { formatTimestamp } from '../utils/formatters';
 
 interface DevicesPageProps {
   peers: PeerInfo[];
@@ -23,122 +26,100 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({
   onSendFilesToPeer,
   onOpenDirectIpModal
 }) => {
-  const [directIp, setDirectIp] = useState<string>('');
-
-  const handleDirectConnect = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!directIp.trim()) return;
-    const directPeer: PeerInfo = {
-      deviceId: `manual-${directIp.trim()}`,
-      deviceName: `Device (${directIp.trim()})`,
-      platform: 'unknown',
-      deviceType: 0,
-      ipAddress: directIp.trim(),
-      port: 48124,
-      lastSeenMs: Date.now()
-    };
-    onSendFilesToPeer(directPeer);
-    setDirectIp('');
-  };
-
   return (
-    <div className="page-screen-card">
-      <div className="screen-header-row">
+    <div className="page-container">
+      <div className="page-header">
         <div>
-          <h2 className="screen-main-title">Connected & Nearby Devices</h2>
-          <p className="screen-subtitle">Auto-discovered peers and direct IP connections on local network.</p>
+          <h2 className="page-title">Discovered Devices</h2>
+          <p className="page-subtitle">Auto-discovered AeroSync instances active on the local subnet & hotspot.</p>
         </div>
-        <button
-          className="btn-peer-send"
-          onClick={onOpenDirectIpModal}
-          style={{ background: 'var(--primary-gradient)' }}
-        >
-          <Plus size={14} />
-          <span>Direct IP</span>
-        </button>
+        <div className="page-header-actions">
+          <button className="btn btn-secondary" onClick={onOpenDirectIpModal}>
+            <Plus size={16} />
+            <span>Connect Direct IP</span>
+          </button>
+        </div>
       </div>
 
-      {/* Direct IP Quick Connect */}
-      <form onSubmit={handleDirectConnect} className="direct-ip-section" style={{ marginBottom: '8px' }}>
-        <input
-          type="text"
-          placeholder="Enter IP address to connect directly (e.g. 192.168.1.100)..."
-          className="direct-ip-input"
-          value={directIp}
-          onChange={(e) => setDirectIp(e.target.value)}
-        />
-        <button type="submit" className="btn-direct-connect">
-          Connect & Send
-        </button>
-      </form>
-
-      {/* Discovered Peers List */}
       {peers.length === 0 ? (
-        <div className="empty-state-box" style={{ padding: '40px 16px' }}>
-          <div className="accordion-icon-badge green" style={{ width: '56px', height: '56px', marginBottom: '12px' }}>
-            <Laptop size={28} />
+        <div className="empty-state-card">
+          <div className="empty-icon-circle">
+            <RefreshCw size={32} className="animate-spin-slow" />
           </div>
-          <h3 className="empty-state-title">No devices currently detected</h3>
-          <p className="empty-state-desc">
-            Make sure AeroSync is open on your other phone or computer and connected to the same Wi-Fi network or Mobile Hotspot.
+          <h3 className="empty-state-title">Searching for Devices...</h3>
+          <p className="empty-state-text">
+            Ensure the recipient has AeroSync open on Windows or Android and is connected to the same Wi-Fi or Mobile Hotspot.
           </p>
+          <button className="btn btn-primary" onClick={onOpenDirectIpModal}>
+            <Plus size={16} />
+            <span>Enter Target IP Manually</span>
+          </button>
         </div>
       ) : (
-        <div className="peers-list-group">
+        <div className="devices-grid">
           {peers.map(peer => {
-            const isAndroid = (peer.platform || '').toLowerCase().includes('android') || peer.deviceType === 1;
+            const isAndroid = peer.platform.toLowerCase().includes('android');
             const isSelected = selectedPeer?.deviceId === peer.deviceId;
 
             return (
               <div
-                key={peer.deviceId || peer.ipAddress}
-                className="peer-item-row"
-                style={{
-                  borderColor: isSelected ? 'var(--primary-blue)' : 'var(--border-subtle)',
-                  padding: '14px 18px'
-                }}
+                key={peer.deviceId}
+                className={`device-card ${isSelected ? 'device-card-selected' : ''}`}
                 onClick={() => onSelectPeer(peer)}
               >
-                <div className="peer-info-left">
-                  <div className={`accordion-icon-badge ${isAndroid ? 'green' : 'blue'}`} style={{ width: '40px', height: '40px' }}>
-                    {isAndroid ? <Smartphone size={20} /> : <Laptop size={20} />}
+                <div className="device-card-header">
+                  <div className={`device-avatar ${isAndroid ? 'avatar-android' : 'avatar-windows'}`}>
+                    {isAndroid ? <Smartphone size={24} /> : <Monitor size={24} />}
                   </div>
-                  <div>
-                    <h4 className="peer-name-text" style={{ fontSize: '14px' }}>{peer.deviceName || 'AeroSync Device'}</h4>
-                    <span className="peer-ip-text">
-                      {isAndroid ? 'Android' : 'Windows PC'} • {peer.ipAddress}:{peer.port || 48124}
+                  <div className="device-meta">
+                    <h4 className="device-name">{peer.deviceName}</h4>
+                    <span className="device-platform-badge">
+                      {isAndroid ? 'Android' : 'Windows PC'}
                     </span>
                   </div>
                 </div>
 
-                <button
-                  className="btn-peer-send"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSendFilesToPeer(peer);
-                  }}
-                >
-                  <Send size={13} />
-                  <span>Send Files</span>
-                </button>
+                <div className="device-card-body">
+                  <div className="device-spec-row">
+                    <span className="spec-label">IP Address</span>
+                    <span className="spec-value">{peer.ipAddress}:{peer.port || 48124}</span>
+                  </div>
+                  <div className="device-spec-row">
+                    <span className="spec-label">Engine Protocol</span>
+                    <span className="spec-value">4-Stream Turbo TCP</span>
+                  </div>
+                  <div className="device-spec-row">
+                    <span className="spec-label">Last Seen</span>
+                    <span className="spec-value">{formatTimestamp(peer.lastSeenMs)}</span>
+                  </div>
+                </div>
+
+                <div className="device-card-footer">
+                  <button
+                    className={`btn ${isSelected ? 'btn-primary' : 'btn-secondary'} btn-full`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSendFilesToPeer(peer);
+                    }}
+                  >
+                    <Send size={15} />
+                    <span>Send Files</span>
+                  </button>
+                </div>
               </div>
             );
           })}
         </div>
       )}
 
-      {/* Security note */}
-      <div className="security-trust-card" style={{ marginTop: '12px' }}>
-        <div className="security-trust-left">
-          <div className="security-shield-badge">
-            <ShieldCheck size={20} />
-          </div>
-          <div>
-            <div className="security-title-row">
-              <span>Direct Peer-to-Peer Transmission</span>
-            </div>
-            <p className="security-subtitle">Data travels directly between local network interfaces with zero cloud relay.</p>
-          </div>
+      {/* Network protocol footnote */}
+      <div className="info-callout">
+        <div className="callout-icon">
+          <Cpu size={18} />
+        </div>
+        <div className="callout-content">
+          <h4>Peer-to-Peer Zero-Cloud Direct Transmission</h4>
+          <p>Files travel directly across your local network hardware without touching any external servers. Transfer speeds reach the maximum physical bandwidth of your Wi-Fi router or Mobile Hotspot.</p>
         </div>
       </div>
     </div>

@@ -19,10 +19,6 @@ export function formatSpeedMBs(bytesPerSec: number): string {
   return `${mbPerSec.toFixed(1)} MB/s`;
 }
 
-export function formatSpeed(bytesPerSec: number): string {
-  return formatSpeedMBs(bytesPerSec);
-}
-
 export function formatSpeedMbps(bytesPerSec: number): string {
   if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) return '0 Mbps';
   const mbps = (bytesPerSec * 8) / (1024 * 1024);
@@ -45,15 +41,12 @@ export function formatEta(seconds: number): string {
 }
 
 export function formatTimestamp(ms: number): string {
-  if (!ms || ms <= 0) return 'Just now';
-  if (ms < 946684800000) return 'Just now';
-
+  if (!ms || ms <= 0) return 'Recently';
   const date = new Date(ms);
   const now = new Date();
   const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diffSec < 10 || diffSec < 0) return 'Just now';
-  if (diffSec < 60) return `${diffSec}s ago`;
+  if (diffSec < 60) return 'Just now';
   if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
   if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
 

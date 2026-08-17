@@ -19,10 +19,6 @@ export function formatSpeedMBs(bytesPerSec: number): string {
   return `${mbPerSec.toFixed(1)} MB/s`;
 }
 
-export function formatSpeed(bytesPerSec: number): string {
-  return formatSpeedMBs(bytesPerSec);
-}
-
 export function formatSpeedMbps(bytesPerSec: number): string {
   if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) return '0 Mbps';
   const mbps = (bytesPerSec * 8) / (1024 * 1024);
@@ -46,6 +42,7 @@ export function formatEta(seconds: number): string {
 
 export function formatTimestamp(ms: number): string {
   if (!ms || ms <= 0) return 'Just now';
+  // If timestamp is smaller than year 2000 in ms (946684800000), treat as recent relative uptime
   if (ms < 946684800000) return 'Just now';
 
   const date = new Date(ms);

@@ -70,8 +70,6 @@ export interface DaemonStatusResponse {
   completedHistory: string[];
 }
 
-export type TransferProgress = DaemonStatusResponse['currentProgress'];
-
 export interface SettingsState {
   theme: 'system' | 'dark' | 'light';
   downloadDirectory: string;

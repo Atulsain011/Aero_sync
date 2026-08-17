@@ -16,7 +16,7 @@ const STORAGE_KEY_SETTINGS = 'aerosync_settings_v2';
 const STORAGE_KEY_HISTORY = 'aerosync_history_v2';
 
 const DEFAULT_SETTINGS: SettingsState = {
-  theme: 'light',
+  theme: 'dark',
   downloadDirectory: 'C:\\Users\\Atul\\Downloads\\AeroSync',
   deviceName: 'Windows PC (AeroSync)',
   startWithWindows: false,
