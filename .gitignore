@@ -82,3 +82,4 @@ $RECYCLE.BIN/
 .DS_Store
 *.tmp
 test_output.txt
+release/

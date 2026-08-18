@@ -53,11 +53,11 @@ jobs:
         working-directory: platform/windows/desktop_tauri
         run: npm run build
 
-      - name: Build Windows Executable
-        working-directory: platform/windows/desktop_tauri/src-tauri
-        run: cargo build --release
+      - name: Build Windows Executable & NSIS Installer
+        working-directory: platform/windows/desktop_tauri
+        run: npx @tauri-apps/cli build --bundles nsis
 
-      - name: Prepare Windows Release Binary
+      - name: Prepare Windows Release Binaries
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts
@@ -67,12 +67,19 @@ jobs:
             exit 1
           }
           Copy-Item $sourceExe "artifacts/AeroSync.exe" -Force
+          $setupExe = Get-ChildItem "platform/windows/desktop_tauri/src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
+          if ($setupExe) {
+            Copy-Item $setupExe.FullName "artifacts/AeroSync-Setup-v1.0.4.exe" -Force
+          } else {
+            Write-Error "NSIS setup executable not found!"
+            exit 1
+          }
 
-      - name: Upload Windows Artifact
+      - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: AeroSync-Windows
-          path: artifacts/AeroSync.exe
+          path: artifacts/*
           if-no-files-found: error
 
   build-android:
@@ -150,7 +157,8 @@ jobs:
             High-speed peer-to-peer file transfer over local Wi-Fi and hotspot.
 
             ### Direct Downloads
-            - **Windows Desktop App**: `AeroSync.exe`
+            - **Windows Installer (Recommended)**: `AeroSync-Setup-v1.0.4.exe`
+            - **Windows Portable Executable**: `AeroSync.exe`
             - **Android Mobile App**: `AeroSync.apk`
 
             ### Key Highlights
@@ -158,5 +166,6 @@ jobs:
             - High-speed peer-to-peer file transfer over local Wi-Fi and hotspot
             - Peer discovery and secure PIN pairing
           files: |
+            release-assets/AeroSync-Setup-v1.0.4.exe
             release-assets/AeroSync.exe
             release-assets/AeroSync.apk
