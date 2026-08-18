@@ -103,13 +103,39 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.GetMultipleContents()
     ) { uris ->
         if (uris.isNotEmpty()) {
-            lifecycleScope.launch(Dispatchers.IO) {
-                val paths = uris.mapNotNull { uri ->
-                    resolveUriToFilePath(this@MainActivity, uri)
+            val selectedItems = uris.mapNotNull { uri ->
+                var fileName = "file_${System.currentTimeMillis()}"
+                var fileSize = 0L
+                val mimeType = contentResolver.getType(uri) ?: ""
+                try {
+                    contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                        val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        val sizeIdx = cursor.getColumnIndex(OpenableColumns.SIZE)
+                        if (cursor.moveToFirst()) {
+                            if (nameIdx >= 0) fileName = cursor.getString(nameIdx) ?: fileName
+                            if (sizeIdx >= 0) fileSize = cursor.getLong(sizeIdx)
+                        }
+                    }
+                } catch (_: Exception) {}
+
+                val formatted = when {
+                    fileSize >= 1024 * 1024 * 1024 -> String.format(java.util.Locale.US, "%.2f GB", fileSize.toDouble() / (1024 * 1024 * 1024))
+                    fileSize >= 1024 * 1024 -> String.format(java.util.Locale.US, "%.1f MB", fileSize.toDouble() / (1024 * 1024))
+                    fileSize >= 1024 -> "${fileSize / 1024} KB"
+                    fileSize > 0 -> "$fileSize B"
+                    else -> "Ready"
                 }
-                if (paths.isNotEmpty()) {
-                    viewModel.enqueueFiles(paths)
-                }
+
+                com.aerosync.app.viewmodel.SelectedFileItem(
+                    uriString = uri.toString(),
+                    fileName = fileName,
+                    fileSize = fileSize,
+                    mimeType = mimeType,
+                    formattedSize = formatted
+                )
+            }
+            if (selectedItems.isNotEmpty()) {
+                viewModel.addSelectedFiles(selectedItems)
             }
         }
     }
@@ -136,52 +162,57 @@ class MainActivity : ComponentActivity() {
             val uiState by viewModel.uiState.collectAsState()
             var lastBackPressTime by remember { mutableStateOf(0L) }
 
-            BackHandler {
-                if (uiState.selectedTab != 0) {
-                    viewModel.setSelectedTab(0)
-                } else {
-                    val currentTime = System.currentTimeMillis()
-                    if (currentTime - lastBackPressTime < 2000) {
-                        finish()
+            com.aerosync.app.ui.theme.AeroSyncTheme(themeMode = uiState.themeMode) {
+                BackHandler {
+                    if (uiState.selectedTab != 0) {
+                        viewModel.setSelectedTab(0)
                     } else {
-                        lastBackPressTime = currentTime
-                        Toast.makeText(this@MainActivity, "Press back again to exit AeroSync", Toast.LENGTH_SHORT).show()
+                        val currentTime = System.currentTimeMillis()
+                        if (currentTime - lastBackPressTime < 2000) {
+                            finish()
+                        } else {
+                            lastBackPressTime = currentTime
+                            Toast.makeText(this@MainActivity, "Press back again to exit AeroSync", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
-            }
 
-            when (uiState.selectedTab) {
-                1 -> DevicesScreen(
-                    uiState = uiState,
-                    onSelectPeer = { viewModel.selectPeer(it) },
-                    onConnectDirectIp = { viewModel.connectToDirectIp(it) },
-                    onUpdateDeviceName = { viewModel.updateDeviceName(it) },
-                    onRefreshPeers = { viewModel.initializeNativeEngine() },
-                    onSelectTab = { viewModel.setSelectedTab(it) }
-                )
-                2 -> TransfersScreen(
-                    uiState = uiState,
-                    onTogglePause = { viewModel.togglePauseTransfer() },
-                    onCancelTransfer = { viewModel.cancelActiveTransfer() },
-                    onSelectTab = { viewModel.setSelectedTab(it) },
-                    onRemoveQueueItem = { viewModel.removeQueueItem(it) },
-                    onClearHistory = { viewModel.clearHistory() },
-                    onChangeDownloadLocation = { folderPickerLauncher.launch(null) }
-                )
-                else -> HomeScreen(
-                    uiState = uiState,
-                    onSelectPeer = { viewModel.selectPeer(it) },
-                    onConnectDirectIp = { viewModel.connectToDirectIp(it) },
-                    onPickFiles = { filePickerLauncher.launch("*/*") },
-                    onRespondPairing = { viewModel.respondToPairingRequest(it) },
-                    onToggleTheme = { viewModel.toggleTheme() },
-                    onSelectTab = { viewModel.setSelectedTab(it) },
-                    onTogglePause = { viewModel.togglePauseTransfer() },
-                    onCancelTransfer = { viewModel.cancelActiveTransfer() },
-                    onRemoveQueueItem = { viewModel.removeQueueItem(it) },
-                    onClearHistory = { viewModel.clearHistory() },
-                    onChangeDownloadLocation = { folderPickerLauncher.launch(null) }
-                )
+                when (uiState.selectedTab) {
+                    1 -> DevicesScreen(
+                        uiState = uiState,
+                        onSelectPeer = { viewModel.selectPeer(it) },
+                        onConnectDirectIp = { viewModel.connectToDirectIp(it) },
+                        onUpdateDeviceName = { viewModel.updateDeviceName(it) },
+                        onRefreshPeers = { viewModel.initializeNativeEngine() },
+                        onSelectTab = { viewModel.setSelectedTab(it) },
+                        onToggleTheme = { viewModel.toggleTheme() }
+                    )
+                    2 -> TransfersScreen(
+                        uiState = uiState,
+                        onTogglePause = { viewModel.togglePauseTransfer() },
+                        onCancelTransfer = { viewModel.cancelActiveTransfer() },
+                        onSelectTab = { viewModel.setSelectedTab(it) },
+                        onRemoveQueueItem = { viewModel.removeQueueItem(it) },
+                        onClearHistory = { viewModel.clearHistory() },
+                        onChangeDownloadLocation = { folderPickerLauncher.launch(null) },
+                        onToggleTheme = { viewModel.toggleTheme() }
+                    )
+                    else -> HomeScreen(
+                        uiState = uiState,
+                        onSelectPeer = { viewModel.selectPeer(it) },
+                        onConnectDirectIp = { viewModel.connectToDirectIp(it) },
+                        onPickFiles = { filePickerLauncher.launch("*/*") },
+                        onRemoveSelectedFile = { viewModel.removeSelectedFile(it) },
+                        onClearSelectedFiles = { viewModel.clearSelectedFiles() },
+                        onSendSelectedFiles = { viewModel.startTransferOfSelectedFiles() },
+                        onRespondPairing = { viewModel.respondToPairingRequest(it) },
+                        onToggleTheme = { viewModel.toggleTheme() },
+                        onSelectTab = { viewModel.setSelectedTab(it) },
+                        onTogglePause = { viewModel.togglePauseTransfer() },
+                        onCancelTransfer = { viewModel.cancelActiveTransfer() },
+                        onChangeDownloadLocation = { folderPickerLauncher.launch(null) }
+                    )
+                }
             }
         }
     }

@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aerosync.app.ui.components.AeroSyncLogoIcon
+import com.aerosync.app.ui.components.AeroSyncTopAppBar
 import com.aerosync.app.viewmodel.AeroSyncUiState
 import com.aerosync.app.viewmodel.DiscoveredPeer
 
@@ -31,7 +31,8 @@ fun DevicesScreen(
     onConnectDirectIp: (String) -> Unit,
     onUpdateDeviceName: (String) -> Unit,
     onRefreshPeers: () -> Unit,
-    onSelectTab: (Int) -> Unit
+    onSelectTab: (Int) -> Unit,
+    onToggleTheme: () -> Unit = {}
 ) {
     var showDirectIpDialog by remember { mutableStateOf(false) }
     var directIpInput by remember { mutableStateOf("192.168.43.1") }
@@ -46,10 +47,6 @@ fun DevicesScreen(
     val textPrimary = if (isDark) Color(0xFFF9FAFB) else Color(0xFF0F172A)
     val textSecondary = if (isDark) Color(0xFF9CA3AF) else Color(0xFF64748B)
 
-    val primaryGradient = Brush.horizontalGradient(
-        listOf(Color(0xFF2563EB), Color(0xFF7C3AED))
-    )
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -62,108 +59,39 @@ fun DevicesScreen(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 1. Top App Bar: Brand + Segmented Navigation Tabs
+            // 1. Top Navigation Bar: Brand + Segmented Navigation Tabs + Refresh/Theme
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Left: Official Project Logo + Brand Text
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(end = 4.dp)
-                    ) {
-                        AeroSyncLogoIcon(size = 32.dp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Devices",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = if (isDark) Color(0xFFF1F5F9) else Color(0xFF0F172A),
-                            letterSpacing = (-0.3).sp
-                        )
-                    }
-
-                    // Center: Floating Pill Segmented Navigation (Files, Devices, Activity)
-                    Surface(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(24.dp))
-                            .border(1.dp, borderColor, RoundedCornerShape(24.dp)),
-                        color = if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF),
-                        shadowElevation = 2.dp
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(3.dp),
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                AeroSyncTopAppBar(
+                    title = "Devices",
+                    selectedTab = uiState.selectedTab,
+                    themeMode = uiState.themeMode,
+                    isDark = isDark,
+                    onSelectTab = onSelectTab,
+                    onToggleTheme = onToggleTheme,
+                    rightActionContent = {
+                        Surface(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .border(1.dp, borderColor, CircleShape)
+                                .clickable { onRefreshPeers() },
+                            color = if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF),
+                            shadowElevation = 2.dp
                         ) {
-                            val tabs = listOf(
-                                Triple("Files", Icons.Default.Description, 0),
-                                Triple("Devices", Icons.Default.Devices, 1),
-                                Triple("Activity", Icons.Default.ShowChart, 2)
-                            )
-
-                            tabs.forEach { (name, icon, tabIndex) ->
-                                val isSelected = tabIndex == 1 // Devices selected
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(20.dp))
-                                        .then(
-                                            if (isSelected) Modifier.background(primaryGradient)
-                                            else Modifier.background(Color.Transparent)
-                                        )
-                                        .clickable { onSelectTab(tabIndex) }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = icon,
-                                            contentDescription = name,
-                                            tint = if (isSelected) Color.White else textSecondary,
-                                            modifier = Modifier.size(13.dp)
-                                        )
-                                        Text(
-                                            text = name,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isSelected) Color.White else textSecondary
-                                        )
-                                    }
-                                }
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Scan Devices",
+                                    tint = Color(0xFF3B82F6),
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
                         }
                     }
-
-                    // Right: Refresh Devices Button
-                    Surface(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .border(1.dp, borderColor, CircleShape)
-                            .clickable { onRefreshPeers() },
-                        color = if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF),
-                        shadowElevation = 2.dp
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Scan Devices",
-                                tint = Color(0xFF3B82F6),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
+                )
             }
 
-            // 2. Local Device Card (Device Name & Network IP)
+            // 2. Local Device Info Card
             item {
                 Surface(
                     modifier = Modifier
@@ -180,7 +108,7 @@ fun DevicesScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                             Box(
                                 modifier = Modifier
                                     .size(42.dp)
@@ -193,7 +121,7 @@ fun DevicesScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(uiState.deviceName, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = textPrimary)
-                                Text("${uiState.connectionTypeLabel} • Port 48124 • Broadcast Active", fontSize = 10.5.sp, color = textSecondary)
+                                Text("${uiState.connectionTypeLabel} • Port 48124 • Beacon Active", fontSize = 10.5.sp, color = textSecondary)
                             }
                         }
                         IconButton(
@@ -263,7 +191,7 @@ fun DevicesScreen(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "Ensure both devices are on the same Wi-Fi or Hotspot.",
+                                    text = "Ensure both devices are connected to the same Wi-Fi or Hotspot.",
                                     fontSize = 10.5.sp,
                                     color = textSecondary,
                                     textAlign = TextAlign.Center
@@ -273,20 +201,25 @@ fun DevicesScreen(
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 uiState.peers.forEach { peer ->
                                     val isWindows = peer.deviceType.contains("win", ignoreCase = true)
+                                    val isSelected = uiState.selectedPeer?.deviceId == peer.deviceId
+
                                     Surface(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(12.dp))
                                             .clickable { onSelectPeer(peer) },
-                                        color = cardBgAlt,
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+                                        color = if (isSelected) Color(0xFF2563EB).copy(alpha = 0.08f) else cardBgAlt,
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            if (isSelected) 1.5.dp else 1.dp,
+                                            if (isSelected) Color(0xFF2563EB) else borderColor
+                                        )
                                     ) {
                                         Row(
                                             modifier = Modifier.padding(12.dp),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                                                 Box(
                                                     modifier = Modifier
                                                         .size(36.dp)
@@ -303,7 +236,18 @@ fun DevicesScreen(
                                                 }
                                                 Spacer(modifier = Modifier.width(10.dp))
                                                 Column {
-                                                    Text(peer.deviceName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text(peer.deviceName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                                                        if (isSelected) {
+                                                            Spacer(modifier = Modifier.width(6.dp))
+                                                            Surface(
+                                                                shape = RoundedCornerShape(6.dp),
+                                                                color = Color(0xFF2563EB).copy(alpha = 0.15f)
+                                                            ) {
+                                                                Text("Selected", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2563EB), modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp))
+                                                            }
+                                                        }
+                                                    }
                                                     Text("${peer.ipAddress} • ${peer.deviceType}", fontSize = 10.5.sp, color = textSecondary)
                                                 }
                                             }

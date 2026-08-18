@@ -6,13 +6,41 @@ import android.os.Build
 import android.os.Environment
 import java.io.File
 
+enum class ThemeMode {
+    SYSTEM,
+    LIGHT,
+    DARK
+}
+
 class AeroSyncPreferences(private val context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    var themeMode: ThemeMode
+        get() {
+            val modeStr = prefs.getString(KEY_THEME_MODE, null)
+            return if (modeStr != null) {
+                try {
+                    ThemeMode.valueOf(modeStr)
+                } catch (_: Exception) {
+                    ThemeMode.DARK
+                }
+            } else {
+                if (prefs.getBoolean(KEY_IS_DARK_THEME, true)) ThemeMode.DARK else ThemeMode.LIGHT
+            }
+        }
+        set(value) {
+            prefs.edit()
+                .putString(KEY_THEME_MODE, value.name)
+                .putBoolean(KEY_IS_DARK_THEME, value != ThemeMode.LIGHT)
+                .apply()
+        }
+
     var isDarkTheme: Boolean
-        get() = prefs.getBoolean(KEY_IS_DARK_THEME, true)
-        set(value) = prefs.edit().putBoolean(KEY_IS_DARK_THEME, value).apply()
+        get() = themeMode != ThemeMode.LIGHT
+        set(value) {
+            themeMode = if (value) ThemeMode.DARK else ThemeMode.LIGHT
+        }
 
     var downloadDirectory: String
         get() {
@@ -56,6 +84,7 @@ class AeroSyncPreferences(private val context: Context) {
 
     companion object {
         private const val PREFS_NAME = "aerosync_user_preferences"
+        private const val KEY_THEME_MODE = "key_theme_mode"
         private const val KEY_IS_DARK_THEME = "key_is_dark_theme"
         private const val KEY_DOWNLOAD_DIRECTORY = "key_download_directory"
         private const val KEY_DEVICE_NAME = "key_device_name"

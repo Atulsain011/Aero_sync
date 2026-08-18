@@ -30,6 +30,7 @@ class AeroSyncNativeBridge(private val listener: NativeListener) {
     external fun nativeCancelTransfer()
     external fun nativeRespondPairing(accept: Boolean)
     external fun nativeSetDownloadDirectory(downloadDir: String)
+    external fun nativeAddBroadcastTarget(ip: String)
 
     // Callbacks from C++ JNI
     fun onNativePeersUpdated() {

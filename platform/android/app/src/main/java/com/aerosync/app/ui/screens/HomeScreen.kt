@@ -34,7 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aerosync.app.ui.components.AeroSyncLogoIcon
+import com.aerosync.app.ui.components.AeroSyncTopAppBar
 import com.aerosync.app.viewmodel.AeroSyncUiState
 import com.aerosync.app.viewmodel.DiscoveredPeer
 import java.text.SimpleDateFormat
@@ -47,13 +47,14 @@ fun HomeScreen(
     onSelectPeer: (DiscoveredPeer) -> Unit,
     onConnectDirectIp: (String) -> Unit,
     onPickFiles: () -> Unit,
+    onRemoveSelectedFile: (String) -> Unit,
+    onClearSelectedFiles: () -> Unit,
+    onSendSelectedFiles: () -> Unit,
     onRespondPairing: (Boolean) -> Unit,
     onToggleTheme: () -> Unit,
     onSelectTab: (Int) -> Unit,
     onTogglePause: () -> Unit,
     onCancelTransfer: () -> Unit,
-    onRemoveQueueItem: (String) -> Unit = {},
-    onClearHistory: () -> Unit = {},
     onChangeDownloadLocation: () -> Unit
 ) {
     var showDirectIpDialog by remember { mutableStateOf(false) }
@@ -71,9 +72,7 @@ fun HomeScreen(
     val borderColor = if (isDark) Color(0xFF374151) else Color(0xFFE2E8F0)
     val textPrimary = if (isDark) Color(0xFFF9FAFB) else Color(0xFF0F172A)
     val textSecondary = if (isDark) Color(0xFF9CA3AF) else Color(0xFF64748B)
-    val textMuted = if (isDark) Color(0xFF6B7280) else Color(0xFF94A3B8)
-    
-    // Vibrant brand gradients matching reference image
+
     val primaryGradient = Brush.horizontalGradient(
         listOf(Color(0xFF2563EB), Color(0xFF7C3AED))
     )
@@ -96,105 +95,16 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 1. Top App Bar: Logo + Brand + Segmented Navigation Tabs + Theme Toggle
+            // 1. Top Navigation Bar: Brand + Segmented Navigation Tabs (Files, Devices, Activity) + Theme Toggle
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Left: Official Project Logo + Brand Text
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(end = 4.dp)
-                    ) {
-                        AeroSyncLogoIcon(size = 32.dp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "AeroSync",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = if (isDark) Color(0xFFF1F5F9) else Color(0xFF0F172A),
-                            letterSpacing = (-0.3).sp
-                        )
-                    }
-
-                    // Center: Floating Pill Segmented Navigation (Files, Devices, Activity)
-                    Surface(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(24.dp))
-                            .border(1.dp, borderColor, RoundedCornerShape(24.dp)),
-                        color = if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF),
-                        shadowElevation = 2.dp
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(3.dp),
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val tabs = listOf(
-                                Triple("Files", Icons.Default.Description, 0),
-                                Triple("Devices", Icons.Default.Devices, 1),
-                                Triple("Activity", Icons.Default.ShowChart, 2)
-                            )
-
-                            tabs.forEach { (name, icon, tabIndex) ->
-                                val isSelected = tabIndex == 0 // Files selected
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(20.dp))
-                                        .then(
-                                            if (isSelected) Modifier.background(primaryGradient)
-                                            else Modifier.background(Color.Transparent)
-                                        )
-                                        .clickable { onSelectTab(tabIndex) }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = icon,
-                                            contentDescription = name,
-                                            tint = if (isSelected) Color.White else textSecondary,
-                                            modifier = Modifier.size(13.dp)
-                                        )
-                                        Text(
-                                            text = name,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isSelected) Color.White else textSecondary
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Right: Circular Theme Toggle Button
-                    Surface(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .border(1.dp, borderColor, CircleShape)
-                            .clickable { onToggleTheme() },
-                        color = if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF),
-                        shadowElevation = 2.dp
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = if (isDark) Icons.Default.LightMode else Icons.Default.WbSunny,
-                                contentDescription = "Toggle Theme",
-                                tint = if (isDark) Color(0xFFFBBF24) else Color(0xFF6366F1),
-                                modifier = Modifier.size(17.dp)
-                            )
-                        }
-                    }
-                }
+                AeroSyncTopAppBar(
+                    title = "AeroSync",
+                    selectedTab = uiState.selectedTab,
+                    themeMode = uiState.themeMode,
+                    isDark = isDark,
+                    onSelectTab = onSelectTab,
+                    onToggleTheme = onToggleTheme
+                )
             }
 
             // 2. Main Hero Card: Circular Drop Zone + 3 Feature Badges + Browse Files Button
@@ -212,11 +122,9 @@ fun HomeScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 20.dp)
                     ) {
-                        // Background Subtle Geometric Shapes for Polish
                         Canvas(modifier = Modifier.matchParentSize()) {
                             val dotColor = if (isDark) Color(0x1538BDF8) else Color(0x122563EB)
                             val ringColor = if (isDark) Color(0x158B5CF6) else Color(0x157C3AED)
-                            
                             drawCircle(dotColor, radius = 5f, center = Offset(size.width * 0.12f, size.height * 0.15f))
                             drawCircle(dotColor, radius = 3f, center = Offset(size.width * 0.88f, size.height * 0.22f))
                             drawCircle(ringColor, radius = 4f, center = Offset(size.width * 0.82f, size.height * 0.72f))
@@ -237,12 +145,10 @@ fun HomeScreen(
                                     ) { onPickFiles() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                // Outer Concentric Dashed Ring
                                 Canvas(modifier = Modifier.fillMaxSize()) {
                                     val strokeWidth = 2.dp.toPx()
                                     val dashLength = 8.dp.toPx()
                                     val gapLength = 6.dp.toPx()
-                                    
                                     drawCircle(
                                         brush = circleDashedGradient,
                                         radius = (size.minDimension / 2) - strokeWidth,
@@ -253,7 +159,6 @@ fun HomeScreen(
                                     )
                                 }
 
-                                // Inner Glowing Elevated Disk
                                 Surface(
                                     modifier = Modifier
                                         .size(164.dp)
@@ -270,7 +175,6 @@ fun HomeScreen(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.Center
                                     ) {
-                                        // Colorful Cloud Icon with Upward Arrow
                                         Box(
                                             modifier = Modifier
                                                 .size(54.dp)
@@ -310,7 +214,7 @@ fun HomeScreen(
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // 3 Feature Badges Row (High-speed, Multi-gigabyte, Direct Wi-Fi)
+                            // 3 Feature Badges Row
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -325,7 +229,6 @@ fun HomeScreen(
                                     horizontalArrangement = Arrangement.SpaceEvenly,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // 1. High-speed transfer
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(5.dp)
@@ -358,7 +261,6 @@ fun HomeScreen(
                                             .background(borderColor)
                                     )
 
-                                    // 2. Multi-gigabyte support
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(5.dp)
@@ -391,7 +293,6 @@ fun HomeScreen(
                                             .background(borderColor)
                                     )
 
-                                    // 3. Direct Wi-Fi
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(5.dp)
@@ -421,7 +322,7 @@ fun HomeScreen(
 
                             Spacer(modifier = Modifier.height(14.dp))
 
-                            // Vibrant "Browse Files" Action Button
+                            // Browse Files Action Button
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -455,7 +356,207 @@ fun HomeScreen(
                 }
             }
 
-            // 3. Collapsible Card 1: Settings & Status
+            // 3. Staged / Selected Files Card (Rendered immediately upon picking files)
+            if (uiState.selectedFiles.isNotEmpty()) {
+                item {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp)),
+                        color = cardBg,
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF2563EB)),
+                        shadowElevation = 4.dp
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            // Header
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF2563EB).copy(alpha = 0.15f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            tint = Color(0xFF2563EB),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = "Selected Files (${uiState.selectedFiles.size})",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = textPrimary
+                                    )
+                                }
+                                TextButton(
+                                    onClick = onClearSelectedFiles,
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                ) {
+                                    Text(
+                                        text = "Clear All",
+                                        fontSize = 11.5.sp,
+                                        color = Color(0xFFEF4444),
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+
+                            // Selected Files List
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                uiState.selectedFiles.forEach { file ->
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = cardBgAlt,
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.InsertDriveFile,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF3B82F6),
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = file.fileName,
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = textPrimary,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    Text(
+                                                        text = file.formattedSize,
+                                                        fontSize = 10.5.sp,
+                                                        color = textSecondary
+                                                    )
+                                                }
+                                            }
+
+                                            IconButton(
+                                                onClick = { onRemoveSelectedFile(file.id) },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Remove file",
+                                                    tint = Color(0xFF9CA3AF),
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Target Device Selector Pill
+                            val targetPeer = uiState.selectedPeer ?: uiState.peers.firstOrNull()
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSelectTab(1) },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (targetPeer != null) Color(0xFF10B981).copy(alpha = 0.1f) else Color(0xFFF59E0B).copy(alpha = 0.1f),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (targetPeer != null) Color(0xFF10B981).copy(alpha = 0.3f) else Color(0xFFF59E0B).copy(alpha = 0.3f)
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (targetPeer != null) Icons.Default.Devices else Icons.Default.WarningAmber,
+                                            contentDescription = null,
+                                            tint = if (targetPeer != null) Color(0xFF10B981) else Color(0xFFF59E0B),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = if (targetPeer != null) "Send to: ${targetPeer.deviceName}" else "No target device selected",
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (targetPeer != null) Color(0xFF10B981) else Color(0xFFF59E0B)
+                                        )
+                                    }
+                                    Text(
+                                        text = "Change →",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF3B82F6)
+                                    )
+                                }
+                            }
+
+                            // Send Files Button
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp)
+                                    .clip(RoundedCornerShape(22.dp))
+                                    .background(primaryGradient)
+                                    .clickable { onSendSelectedFiles() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Send,
+                                        contentDescription = "Send",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Send ${uiState.selectedFiles.size} File(s) Now",
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 4. Collapsible Card 1: Settings & Status
             item {
                 CollapsibleCard(
                     title = "Settings & Status",
@@ -476,7 +577,6 @@ fun HomeScreen(
                             .padding(top = 10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Download Location Row
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
@@ -516,7 +616,6 @@ fun HomeScreen(
                             }
                         }
 
-                        // Storage Metrics Bar
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
@@ -546,7 +645,6 @@ fun HomeScreen(
                             }
                         }
 
-                        // Network Details
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
@@ -584,7 +682,7 @@ fun HomeScreen(
                 }
             }
 
-            // 4. Collapsible Card 2: Nearby Peers
+            // 5. Collapsible Card 2: Nearby Peers
             item {
                 CollapsibleCard(
                     title = "Nearby Peers",
@@ -694,7 +792,6 @@ fun HomeScreen(
                             }
                         }
 
-                        // Direct IP Button
                         OutlinedButton(
                             onClick = { showDirectIpDialog = true },
                             modifier = Modifier.fillMaxWidth().height(36.dp),
@@ -709,7 +806,7 @@ fun HomeScreen(
                 }
             }
 
-            // 5. Collapsible Card 3: Recent Transfers
+            // 6. Collapsible Card 3: Recent Transfers
             item {
                 CollapsibleCard(
                     title = "Recent Transfers",
@@ -730,7 +827,6 @@ fun HomeScreen(
                             .padding(top = 10.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Active Streaming Card (if transferring)
                         val active = uiState.activeTransfer
                         if (active != null) {
                             Surface(
@@ -804,7 +900,6 @@ fun HomeScreen(
                             }
                         }
 
-                        // Real Recent Items from SQLite Database
                         if (uiState.history.isEmpty() && active == null) {
                             Text(
                                 text = "No recent transfers logged yet.",
@@ -854,7 +949,6 @@ fun HomeScreen(
                             }
                         }
 
-                        // View All in Activity button
                         TextButton(
                             onClick = { onSelectTab(2) },
                             modifier = Modifier.fillMaxWidth()
@@ -870,7 +964,7 @@ fun HomeScreen(
                 }
             }
 
-            // 6. Bottom Security Badge Card
+            // 7. Security Banner
             item {
                 Surface(
                     modifier = Modifier
@@ -1012,7 +1106,6 @@ fun HomeScreen(
     }
 }
 
-// Reusable Collapsible Card Component
 @Composable
 private fun CollapsibleCard(
     title: String,

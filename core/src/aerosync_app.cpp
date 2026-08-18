@@ -70,6 +70,10 @@ std::filesystem::path AeroSyncApp::getDownloadDirectory() const {
     return std::filesystem::current_path() / "Downloads";
 }
 
+void AeroSyncApp::addBroadcastTarget(const std::string& targetIp) {
+    if (m_discovery) m_discovery->addBroadcastTarget(targetIp);
+}
+
 PairingStateMachine& AeroSyncApp::getPairingStateMachine() {
     return m_connection->getPairingStateMachine();
 }

@@ -27,9 +27,15 @@ android {
     }
 
     signingConfigs {
-        getByName("debug") {
+        create("release") {
+            val debugStore = getByName("debug")
+            storeFile = debugStore.storeFile
+            storePassword = debugStore.storePassword
+            keyAlias = debugStore.keyAlias
+            keyPassword = debugStore.keyPassword
             enableV1Signing = true
             enableV2Signing = true
+            enableV3Signing = true
         }
     }
 
@@ -40,7 +46,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

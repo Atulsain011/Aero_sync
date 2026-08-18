@@ -87,8 +87,18 @@ data class TransferHistoryItem(
     val avgSpeedBps: Double = 0.0
 )
 
+data class SelectedFileItem(
+    val id: String = UUID.randomUUID().toString(),
+    val uriString: String,
+    val fileName: String,
+    val fileSize: Long,
+    val mimeType: String = "",
+    val formattedSize: String = ""
+)
+
 data class AeroSyncUiState(
     val deviceName: String = "AeroSync Device",
+    val themeMode: com.aerosync.app.data.preferences.ThemeMode = com.aerosync.app.data.preferences.ThemeMode.DARK,
     val isDarkTheme: Boolean = true,
     val selectedTab: Int = 0,
     val storageUsedPercent: Int = 0,
@@ -100,6 +110,7 @@ data class AeroSyncUiState(
     val downloadDirectory: String = "",
     val peers: List<DiscoveredPeer> = emptyList(),
     val selectedPeer: DiscoveredPeer? = null,
+    val selectedFiles: List<SelectedFileItem> = emptyList(),
     val isWaitingForAcceptance: Boolean = false,
     val waitingPeerName: String = "",
     val activePin: String = "",
@@ -123,6 +134,7 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
     private val _uiState = MutableStateFlow(
         AeroSyncUiState(
             deviceName = prefs.deviceName,
+            themeMode = prefs.themeMode,
             isDarkTheme = prefs.isDarkTheme,
             downloadDirectory = prefs.downloadDirectory
         )
@@ -141,6 +153,7 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch(Dispatchers.IO) {
             updateStorageMetrics()
             updateNetworkDiagnostics()
+            discoverAndRegisterBroadcastTargets()
         }
     }
 
@@ -180,9 +193,146 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun toggleTheme() {
-        val nextTheme = !_uiState.value.isDarkTheme
-        prefs.isDarkTheme = nextTheme
-        _uiState.update { it.copy(isDarkTheme = nextTheme) }
+        val nextMode = when (_uiState.value.themeMode) {
+            com.aerosync.app.data.preferences.ThemeMode.DARK -> com.aerosync.app.data.preferences.ThemeMode.LIGHT
+            com.aerosync.app.data.preferences.ThemeMode.LIGHT -> com.aerosync.app.data.preferences.ThemeMode.SYSTEM
+            com.aerosync.app.data.preferences.ThemeMode.SYSTEM -> com.aerosync.app.data.preferences.ThemeMode.DARK
+        }
+        prefs.themeMode = nextMode
+        _uiState.update { it.copy(themeMode = nextMode, isDarkTheme = prefs.isDarkTheme) }
+    }
+
+    fun discoverAndRegisterBroadcastTargets() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val ifaces = java.net.NetworkInterface.getNetworkInterfaces() ?: return@launch
+                for (iface in ifaces.asSequence()) {
+                    if (!iface.isUp || iface.isLoopback) continue
+                    for (addr in iface.interfaceAddresses) {
+                        val bcast = addr.broadcast
+                        if (bcast != null) {
+                            val ipStr = bcast.hostAddress
+                            if (!ipStr.isNullOrBlank() && !ipStr.contains(":")) {
+                                nativeBridge.nativeAddBroadcastTarget(ipStr)
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun addSelectedFiles(files: List<SelectedFileItem>) {
+        if (files.isEmpty()) return
+        _uiState.update { state ->
+            val updated = (state.selectedFiles + files).distinctBy { it.uriString }
+            state.copy(
+                selectedFiles = updated,
+                statusMessage = "${updated.size} file(s) staged for transfer"
+            )
+        }
+    }
+
+    fun removeSelectedFile(id: String) {
+        _uiState.update { state ->
+            val updated = state.selectedFiles.filter { it.id != id }
+            state.copy(
+                selectedFiles = updated,
+                statusMessage = if (updated.isEmpty()) "Selected files cleared" else "${updated.size} file(s) staged"
+            )
+        }
+    }
+
+    fun clearSelectedFiles() {
+        _uiState.update { state ->
+            state.copy(
+                selectedFiles = emptyList(),
+                statusMessage = "Selected files cleared"
+            )
+        }
+    }
+
+    fun startTransferOfSelectedFiles() {
+        val staged = _uiState.value.selectedFiles
+        if (staged.isEmpty()) return
+
+        val peer = _uiState.value.selectedPeer ?: _uiState.value.peers.firstOrNull()
+        if (peer == null) {
+            _uiState.update { it.copy(statusMessage = "Please select a target device in the Devices tab first.") }
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val resolvedPaths = mutableListOf<String>()
+            val queueItems = mutableListOf<TransferQueueItem>()
+
+            val context = getApplication<Application>()
+            val stagingDir = File(context.externalCacheDir ?: context.cacheDir, "transfer_staging").apply {
+                if (!exists()) mkdirs()
+            }
+
+            for (item in staged) {
+                val uri = android.net.Uri.parse(item.uriString)
+                val path = com.aerosync.app.ui.MainActivity.resolveUriToFilePath(context, uri) ?: run {
+                    val tempFile = File(stagingDir, item.fileName)
+                    try {
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            java.io.FileOutputStream(tempFile).use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        tempFile.absolutePath
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+
+                if (!path.isNullOrBlank()) {
+                    resolvedPaths.add(path)
+                    queueItems.add(
+                        TransferQueueItem(
+                            id = item.id,
+                            fileName = item.fileName,
+                            fileSize = if (item.fileSize > 0) item.fileSize else File(path).length(),
+                            filePath = path,
+                            status = QueueItemStatus.TRANSFERRING,
+                            progressPercent = 0,
+                            isReceived = false
+                        )
+                    )
+                }
+            }
+
+            if (queueItems.isEmpty()) {
+                _uiState.update { it.copy(statusMessage = "Unable to read selected files.") }
+                return@launch
+            }
+
+            // Clear staged files and switch to Transfers
+            _uiState.update { state ->
+                state.copy(
+                    selectedFiles = emptyList(),
+                    selectedTab = 2,
+                    selectedPeer = peer,
+                    transferQueue = queueItems + state.transferQueue,
+                    isTransferring = true,
+                    activeTransfer = ActiveTransfer(
+                        queueItemId = queueItems.first().id,
+                        fileName = if (queueItems.size == 1) queueItems.first().fileName else "${queueItems.size} files batch",
+                        fileIndex = 0,
+                        transferredBytes = 0L,
+                        totalBytes = queueItems.sumOf { it.fileSize },
+                        speedMbps = 0.0,
+                        etaSeconds = 0,
+                        isReceived = false
+                    ),
+                    statusMessage = "Starting transfer of ${queueItems.size} file(s) to ${peer.deviceName}..."
+                )
+            }
+
+            dbHelper.insertQueueItems(queueItems)
+            startQueueProcessor()
+        }
     }
 
     fun setSelectedTab(tab: Int) {
@@ -246,6 +396,7 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
             val name = prefs.deviceName
             nativeBridge.nativeInitialize(deviceId, name)
             nativeBridge.nativeSetDownloadDirectory(downloadDir)
+            discoverAndRegisterBroadcastTargets()
             refreshPeers()
         }
     }

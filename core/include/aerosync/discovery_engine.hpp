@@ -27,6 +27,7 @@ public:
     void stop();
 
     void setPeerCallback(PeerDiscoveredCallback cb);
+    void addBroadcastTarget(const std::string& targetIp);
     std::vector<PeerInfo> getDiscoveredPeers() const;
 
 private:
@@ -47,6 +48,9 @@ private:
     mutable std::mutex m_peersMutex;
     std::unordered_map<std::string, PeerInfo> m_peersMap;
     PeerDiscoveredCallback m_callback;
+
+    mutable std::mutex m_targetsMutex;
+    std::vector<std::string> m_customTargets;
 
     std::atomic<int> m_udpSocket{-1};
 };

@@ -24,7 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aerosync.app.ui.components.AeroSyncLogoIcon
+import com.aerosync.app.ui.components.AeroSyncTopAppBar
 import com.aerosync.app.viewmodel.AeroSyncUiState
 import com.aerosync.app.viewmodel.QueueItemStatus
 import java.io.File
@@ -40,7 +40,8 @@ fun TransfersScreen(
     onSelectTab: (Int) -> Unit,
     onRemoveQueueItem: (String) -> Unit = {},
     onClearHistory: () -> Unit = {},
-    onChangeDownloadLocation: () -> Unit = {}
+    onChangeDownloadLocation: () -> Unit = {},
+    onToggleTheme: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var showClearHistoryDialog by remember { mutableStateOf(false) }
@@ -54,10 +55,6 @@ fun TransfersScreen(
     val textSecondary = if (isDark) Color(0xFF9CA3AF) else Color(0xFF64748B)
     val textMuted = if (isDark) Color(0xFF6B7280) else Color(0xFF94A3B8)
 
-    val primaryGradient = Brush.horizontalGradient(
-        listOf(Color(0xFF2563EB), Color(0xFF7C3AED))
-    )
-
     val dateFormat = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
 
     Box(
@@ -69,104 +66,35 @@ fun TransfersScreen(
             .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // 1. Top App Bar: Brand + Segmented Navigation Tabs + Clear Action
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Left: Official Project Logo + Brand Text
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(end = 4.dp)
-                ) {
-                    AeroSyncLogoIcon(size = 32.dp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Activity",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (isDark) Color(0xFFF1F5F9) else Color(0xFF0F172A),
-                        letterSpacing = (-0.3).sp
-                    )
-                }
-
-                // Center: Floating Pill Segmented Navigation (Files, Devices, Activity)
-                Surface(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(24.dp))
-                        .border(1.dp, borderColor, RoundedCornerShape(24.dp)),
-                    color = if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF),
-                    shadowElevation = 2.dp
-                ) {
-                    Row(
-                        modifier = Modifier.padding(3.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalAlignment = Alignment.CenterVertically
+            // 1. Top Navigation Bar: Brand + Segmented Navigation Tabs + Clear Action
+            AeroSyncTopAppBar(
+                title = "Activity",
+                selectedTab = uiState.selectedTab,
+                themeMode = uiState.themeMode,
+                isDark = isDark,
+                onSelectTab = onSelectTab,
+                onToggleTheme = onToggleTheme,
+                rightActionContent = {
+                    Surface(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .border(1.dp, borderColor, CircleShape)
+                            .clickable { showClearHistoryDialog = true },
+                        color = if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF),
+                        shadowElevation = 2.dp
                     ) {
-                        val tabs = listOf(
-                            Triple("Files", Icons.Default.Description, 0),
-                            Triple("Devices", Icons.Default.Devices, 1),
-                            Triple("Activity", Icons.Default.ShowChart, 2)
-                        )
-
-                        tabs.forEach { (name, icon, tabIndex) ->
-                            val isSelected = tabIndex == 2 // Activity selected
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .then(
-                                        if (isSelected) Modifier.background(primaryGradient)
-                                        else Modifier.background(Color.Transparent)
-                                    )
-                                    .clickable { onSelectTab(tabIndex) }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = icon,
-                                        contentDescription = name,
-                                        tint = if (isSelected) Color.White else textSecondary,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Text(
-                                        text = name,
-                                        fontSize = 11.5.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) Color.White else textSecondary
-                                    )
-                                }
-                            }
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteSweep,
+                                contentDescription = "Clear History",
+                                tint = Color(0xFFEF4444),
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                 }
-
-                // Right: Clear History Action Button
-                Surface(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .border(1.dp, borderColor, CircleShape)
-                        .clickable { showClearHistoryDialog = true },
-                    color = if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF),
-                    shadowElevation = 2.dp
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteSweep,
-                            contentDescription = "Clear History",
-                            tint = Color(0xFFEF4444),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            }
+            )
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -568,7 +496,7 @@ fun TransfersScreen(
             }
         }
 
-        // 6. Confirmation Alert Dialog for Clearing History
+        // Confirmation Alert Dialog for Clearing History
         if (showClearHistoryDialog) {
             AlertDialog(
                 onDismissRequest = { showClearHistoryDialog = false },

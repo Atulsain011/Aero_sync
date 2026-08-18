@@ -29,6 +29,7 @@ public:
     void setPairingStateChangedCallback(PairingStateChangedCallback cb);
     void setDownloadDirectory(const std::filesystem::path& dir);
     std::filesystem::path getDownloadDirectory() const;
+    void addBroadcastTarget(const std::string& targetIp);
 
     std::vector<PeerInfo> getPeers() const;
 

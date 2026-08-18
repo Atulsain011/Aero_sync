@@ -28,6 +28,15 @@
     #define CLOSE_SOCKET(s) close(s)
 #endif
 
+#ifdef __ANDROID__
+    #include <android/log.h>
+    #define AERO_LOG_I(...) __android_log_print(ANDROID_LOG_INFO, "AeroSyncDiscovery", __VA_ARGS__)
+    #define AERO_LOG_E(...) __android_log_print(ANDROID_LOG_ERROR, "AeroSyncDiscovery", __VA_ARGS__)
+#else
+    #define AERO_LOG_I(...) printf(__VA_ARGS__); printf("\n")
+    #define AERO_LOG_E(...) fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n")
+#endif
+
 namespace aerosync {
 
 constexpr uint64_t PEER_OFFLINE_TIMEOUT_MS = 5000; // 5 seconds timeout
@@ -53,16 +62,20 @@ static std::vector<std::string> getBroadcastAndGatewayTargets() {
     targets.push_back(DISCOVERY_MULTICAST_IP); // Site-local Multicast
 
     // Common mobile hotspot & tethering subnet broadcasts and gateways
-    targets.push_back("192.168.43.255"); // Android default hotspot broadcast
-    targets.push_back("192.168.43.1");   // Android default hotspot gateway
-    targets.push_back("192.168.49.255"); // Wi-Fi Direct / Hotspot
+    targets.push_back("192.168.137.255"); // Windows Mobile Hotspot broadcast
+    targets.push_back("192.168.137.1");   // Windows Mobile Hotspot gateway
+    targets.push_back("192.168.43.255");  // Android default hotspot broadcast
+    targets.push_back("192.168.43.1");    // Android default hotspot gateway
+    targets.push_back("192.168.49.255");  // Wi-Fi Direct / Hotspot
     targets.push_back("192.168.49.1");
-    targets.push_back("172.20.10.15");   // iOS / Mobile Hotspot broadcast
-    targets.push_back("172.20.10.1");    // iOS / Mobile Hotspot gateway
-    targets.push_back("192.168.1.255");  // Common LAN broadcast
+    targets.push_back("172.20.10.15");    // iOS / Mobile Hotspot broadcast
+    targets.push_back("172.20.10.1");     // iOS / Mobile Hotspot gateway
+    targets.push_back("192.168.1.255");   // Common LAN broadcast
     targets.push_back("192.168.1.1");
-    targets.push_back("192.168.0.255");  // Common LAN broadcast
+    targets.push_back("192.168.0.255");   // Common LAN broadcast
     targets.push_back("192.168.0.1");
+    targets.push_back("192.168.2.255");
+    targets.push_back("192.168.2.1");
     targets.push_back("10.0.0.255");
     targets.push_back("10.0.0.1");
 
@@ -217,6 +230,15 @@ void DiscoveryEngine::setPeerCallback(PeerDiscoveredCallback cb) {
     m_callback = cb;
 }
 
+void DiscoveryEngine::addBroadcastTarget(const std::string& targetIp) {
+    if (targetIp.empty()) return;
+    std::lock_guard<std::mutex> lock(m_targetsMutex);
+    if (std::find(m_customTargets.begin(), m_customTargets.end(), targetIp) == m_customTargets.end()) {
+        m_customTargets.push_back(targetIp);
+        AERO_LOG_I("[DISCOVERY_TARGET_ADDED] Registered dynamic broadcast target: %s", targetIp.c_str());
+    }
+}
+
 std::vector<PeerInfo> DiscoveryEngine::getDiscoveredPeers() const {
     std::lock_guard<std::mutex> lock(m_peersMutex);
     std::vector<PeerInfo> list;
@@ -231,7 +253,10 @@ std::vector<PeerInfo> DiscoveryEngine::getDiscoveredPeers() const {
 
 void DiscoveryEngine::broadcastLoop() {
     socket_t sendSock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sendSock == INVALID_SOCKET) return;
+    if (sendSock == INVALID_SOCKET) {
+        AERO_LOG_E("[DISCOVERY_ERROR] Failed to create UDP broadcast socket");
+        return;
+    }
 
     int broadcastEnable = 1;
     setsockopt(sendSock, SOL_SOCKET, SO_BROADCAST, (const char*)&broadcastEnable, sizeof(broadcastEnable));
@@ -257,12 +282,23 @@ void DiscoveryEngine::broadcastLoop() {
     localPeer.appVersion = "1.0.0";
     localPeer.port = m_listenPort;
 
+    AERO_LOG_I("[DISCOVERY_STARTED] Beacon loop active for device %s (%s)", m_localDeviceName.c_str(), m_localDeviceId.c_str());
+
     while (m_running) {
         localPeer.lastSeenMs = getCurrentTimeMs();
         std::string jsonPacket = ProtocolSerializer::serializeDiscoveryBeacon(localPeer);
 
         // 1. Send UDP beacons across all active network adapters and gateways
         auto targets = getBroadcastAndGatewayTargets();
+        {
+            std::lock_guard<std::mutex> lock(m_targetsMutex);
+            for (const auto& ct : m_customTargets) {
+                targets.push_back(ct);
+            }
+        }
+        std::sort(targets.begin(), targets.end());
+        targets.erase(std::unique(targets.begin(), targets.end()), targets.end());
+
         for (const auto& targetIp : targets) {
             sockaddr_in addr{};
             addr.sin_family = AF_INET;
@@ -277,6 +313,8 @@ void DiscoveryEngine::broadcastLoop() {
         sendto(sendSock, jsonPacket.c_str(), static_cast<int>(jsonPacket.length()), 0,
                (sockaddr*)&mdnsAddr, sizeof(mdnsAddr));
 
+        AERO_LOG_I("[DISCOVERY_BEACON_SENT] sent to %zu subnet/gateway targets", targets.size());
+
         // Maintain peer table and enforce 5-second timeout for offline peers
         PeerDiscoveredCallback cbToCall = nullptr;
         std::vector<PeerInfo> activePeers;
@@ -287,6 +325,7 @@ void DiscoveryEngine::broadcastLoop() {
             for (auto& kv : m_peersMap) {
                 if (now - kv.second.lastSeenMs > PEER_OFFLINE_TIMEOUT_MS) {
                     toRemove.push_back(kv.first);
+                    AERO_LOG_I("[PEER_REMOVED] %s (%s) timed out", kv.second.deviceName.c_str(), kv.first.c_str());
                 }
             }
             bool changed = false;
@@ -311,7 +350,10 @@ void DiscoveryEngine::broadcastLoop() {
 
 void DiscoveryEngine::listenLoop() {
     socket_t listenSock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (listenSock == INVALID_SOCKET) return;
+    if (listenSock == INVALID_SOCKET) {
+        AERO_LOG_E("[DISCOVERY_ERROR] Failed to create UDP listen socket");
+        return;
+    }
 
     int reuse = 1;
     setsockopt(listenSock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse));
@@ -337,9 +379,12 @@ void DiscoveryEngine::listenLoop() {
     listenAddr.sin_addr.s_addr = INADDR_ANY;
 
     if (bind(listenSock, (sockaddr*)&listenAddr, sizeof(listenAddr)) == SOCKET_ERROR) {
+        AERO_LOG_E("[DISCOVERY_ERROR] Failed to bind discovery UDP port %d", DISCOVERY_UDP_PORT);
         CLOSE_SOCKET(listenSock);
         return;
     }
+
+    AERO_LOG_I("[DISCOVERY_SOCKET_BOUND] Bound discovery UDP port %d successfully", DISCOVERY_UDP_PORT);
 
     // Join local multicast group for robust hotspot discovery
     ip_mreq mreq{};
@@ -396,6 +441,12 @@ void DiscoveryEngine::parseBeacon(const std::string& data, const std::string& se
                        (it->second.ipAddress != peer.ipAddress) ||
                        (it->second.port != peer.port) ||
                        (it->second.deviceType != peer.deviceType);
+
+        if (isNew) {
+            AERO_LOG_I("[PEER_FOUND] %s (%s) at %s:%d [%s]", peer.deviceName.c_str(), peer.deviceId.c_str(), peer.ipAddress.c_str(), peer.port, peer.platform.c_str());
+        } else if (changed) {
+            AERO_LOG_I("[PEER_UPDATED] %s (%s) at %s:%d", peer.deviceName.c_str(), peer.deviceId.c_str(), peer.ipAddress.c_str(), peer.port);
+        }
 
         m_peersMap[peer.deviceId] = peer;
 
