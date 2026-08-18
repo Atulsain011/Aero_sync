@@ -98,19 +98,17 @@ jobs:
         working-directory: platform/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon || ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon
 
       - name: Prepare Android Release Binary
         run: |
           mkdir -p artifacts
-          if [ -f "platform/android/app/build/outputs/apk/release/app-release-unsigned.apk" ]; then
-            cp platform/android/app/build/outputs/apk/release/app-release-unsigned.apk artifacts/AeroSync.apk
-          elif [ -f "platform/android/app/build/outputs/apk/release/app-release.apk" ]; then
+          if [ -f "platform/android/app/build/outputs/apk/release/app-release.apk" ]; then
             cp platform/android/app/build/outputs/apk/release/app-release.apk artifacts/AeroSync.apk
-          elif [ -f "platform/android/app/build/outputs/apk/debug/app-debug.apk" ]; then
-            cp platform/android/app/build/outputs/apk/debug/app-debug.apk artifacts/AeroSync.apk
+          elif [ -f "platform/android/app/build/outputs/apk/release/app-release-unsigned.apk" ]; then
+            cp platform/android/app/build/outputs/apk/release/app-release-unsigned.apk artifacts/AeroSync.apk
           else
-            echo "Error: No APK file generated!" >&2
+            echo "Error: Release APK not found!" >&2
             exit 1
           fi
 
