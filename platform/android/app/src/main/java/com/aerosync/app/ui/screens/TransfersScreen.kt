@@ -223,14 +223,18 @@ fun TransfersScreen(
                                     text = "${"%.1f".format(active.speedMbps)} MB/s",
                                     fontSize = 12.5.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF10B981)
+                                    color = Color(0xFF10B981),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 if (active.etaSeconds > 0) {
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = "• ETA: ${active.etaSeconds}s",
                                         fontSize = 10.5.sp,
-                                        color = textMuted
+                                        color = textMuted,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }

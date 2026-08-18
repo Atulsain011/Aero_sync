@@ -399,7 +399,7 @@ void ConnectionManager::handleClientConnection(int clientSockFd) {
 }
 
 bool ConnectionManager::connectToPeer(const PeerInfo& targetPeer, const ConnectRequest& localReq) {
-    int clientSock = SocketTransport::connectTcpClient(targetPeer.ipAddress, targetPeer.port, 3000);
+    int clientSock = SocketTransport::connectTcpClient(targetPeer.ipAddress, targetPeer.port, 5000);
     if (clientSock < 0) return false;
 
     m_pairingStateMachine.initiatePairing(targetPeer.deviceId, localReq.pairingPin);

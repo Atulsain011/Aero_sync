@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aerosync.app.ui.components.AeroSyncTopAppBar
@@ -119,9 +120,9 @@ fun DevicesScreen(
                                 Icon(Icons.Default.Smartphone, contentDescription = null, tint = Color(0xFF3B82F6), modifier = Modifier.size(22.dp))
                             }
                             Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(uiState.deviceName, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = textPrimary)
-                                Text("${uiState.connectionTypeLabel} • Port 48124 • Beacon Active", fontSize = 10.5.sp, color = textSecondary)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(uiState.deviceName, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("${uiState.connectionTypeLabel} • Port 48124 • Beacon Active", fontSize = 10.5.sp, color = textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                         IconButton(
@@ -235,9 +236,9 @@ fun DevicesScreen(
                                                     )
                                                 }
                                                 Spacer(modifier = Modifier.width(10.dp))
-                                                Column {
+                                                Column(modifier = Modifier.weight(1f)) {
                                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Text(peer.deviceName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                                                        Text(peer.deviceName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                                                         if (isSelected) {
                                                             Spacer(modifier = Modifier.width(6.dp))
                                                             Surface(
@@ -248,7 +249,7 @@ fun DevicesScreen(
                                                             }
                                                         }
                                                     }
-                                                    Text("${peer.ipAddress} • ${peer.deviceType}", fontSize = 10.5.sp, color = textSecondary)
+                                                    Text("${peer.ipAddress} • ${peer.deviceType}", fontSize = 10.5.sp, color = textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                 }
                                             }
 

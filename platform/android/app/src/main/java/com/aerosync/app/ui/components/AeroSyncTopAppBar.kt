@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.sp
 import com.aerosync.app.data.preferences.ThemeMode
 import com.aerosync.app.ui.theme.AeroBrandGradient
 
+import androidx.compose.ui.text.style.TextOverflow
+
 @Composable
 fun AeroSyncTopAppBar(
     title: String = "AeroSync",
@@ -46,14 +48,16 @@ fun AeroSyncTopAppBar(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(end = 4.dp)
         ) {
-            AeroSyncLogoIcon(size = 32.dp)
-            Spacer(modifier = Modifier.width(8.dp))
+            AeroSyncLogoIcon(size = 30.dp)
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = title,
-                fontSize = 20.sp,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = textPrimary,
-                letterSpacing = (-0.3).sp
+                letterSpacing = (-0.3).sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
 
@@ -86,24 +90,26 @@ fun AeroSyncTopAppBar(
                                 else Modifier.background(Color.Transparent)
                             )
                             .clickable { onSelectTab(tabIndex) }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                            .padding(horizontal = 8.dp, vertical = 5.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
                             Icon(
                                 imageVector = icon,
                                 contentDescription = name,
                                 tint = if (isSelected) Color.White else textSecondary,
-                                modifier = Modifier.size(13.dp)
+                                modifier = Modifier.size(12.dp)
                             )
                             Text(
                                 text = name,
-                                fontSize = 11.5.sp,
+                                fontSize = 11.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) Color.White else textSecondary
+                                color = if (isSelected) Color.White else textSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }

@@ -244,12 +244,16 @@ fun HomeScreen(
                                                 text = "High-speed",
                                                 fontSize = 10.5.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = textPrimary
+                                                color = textPrimary,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                             Text(
                                                 text = "transfer",
                                                 fontSize = 9.5.sp,
-                                                color = textSecondary
+                                                color = textSecondary,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                         }
                                     }
@@ -276,12 +280,16 @@ fun HomeScreen(
                                                 text = "Multi-gigabyte",
                                                 fontSize = 10.5.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = textPrimary
+                                                color = textPrimary,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                             Text(
                                                 text = "support",
                                                 fontSize = 9.5.sp,
-                                                color = textSecondary
+                                                color = textSecondary,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                         }
                                     }
@@ -308,12 +316,16 @@ fun HomeScreen(
                                                 text = "Direct",
                                                 fontSize = 10.5.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = textPrimary
+                                                color = textPrimary,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                             Text(
                                                 text = "Wi-Fi",
                                                 fontSize = 9.5.sp,
-                                                color = textSecondary
+                                                color = textSecondary,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                         }
                                     }

@@ -347,6 +347,31 @@ class AeroSyncTransferService : Service() {
                     }
                 }
             }
+
+            // Fallback: Check local network interface names for AP/Tethering
+            if (transport == "Wi-Fi / LAN" || linkSpeedMbps == 0) {
+                try {
+                    val ifaces = java.net.NetworkInterface.getNetworkInterfaces()
+                    if (ifaces != null) {
+                        for (iface in ifaces.asSequence()) {
+                            if (!iface.isUp || iface.isLoopback) continue
+                            val name = iface.name.lowercase()
+                            if (name.startsWith("rndis") || name.startsWith("usb") || name.startsWith("ncm")) {
+                                transport = "USB Tethering (RNDIS)"
+                                linkSpeedMbps = 480
+                                isHighSpeed = true
+                                break
+                            } else if (name.startsWith("ap") || name.startsWith("swlan") || name.startsWith("softap")) {
+                                transport = "Wi-Fi Hotspot"
+                                linkSpeedMbps = 300
+                                isHighSpeed = true
+                                break
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+
             return NetworkDiagnostics(transport, linkSpeedMbps, isHighSpeed)
         }
     }

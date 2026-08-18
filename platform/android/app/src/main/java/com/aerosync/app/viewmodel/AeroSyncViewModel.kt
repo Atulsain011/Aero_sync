@@ -205,15 +205,56 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
     fun discoverAndRegisterBroadcastTargets() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                // Register common hotspot & USB tethering fallback targets
+                val defaultTargets = listOf(
+                    "192.168.42.255", "192.168.42.1", "192.168.42.129",
+                    "192.168.43.255", "192.168.43.1",
+                    "192.168.49.255", "192.168.49.1",
+                    "192.168.137.255", "192.168.137.1",
+                    "255.255.255.255"
+                )
+                for (t in defaultTargets) {
+                    nativeBridge.nativeAddBroadcastTarget(t)
+                }
+
                 val ifaces = java.net.NetworkInterface.getNetworkInterfaces() ?: return@launch
                 for (iface in ifaces.asSequence()) {
                     if (!iface.isUp || iface.isLoopback) continue
                     for (addr in iface.interfaceAddresses) {
-                        val bcast = addr.broadcast
-                        if (bcast != null) {
-                            val ipStr = bcast.hostAddress
-                            if (!ipStr.isNullOrBlank() && !ipStr.contains(":")) {
-                                nativeBridge.nativeAddBroadcastTarget(ipStr)
+                        val ip = addr.address
+                        if (ip is java.net.Inet4Address) {
+                            val bcast = addr.broadcast
+                            if (bcast != null) {
+                                val ipStr = bcast.hostAddress
+                                if (!ipStr.isNullOrBlank()) {
+                                    nativeBridge.nativeAddBroadcastTarget(ipStr)
+                                }
+                            } else {
+                                // Compute subnet broadcast dynamically when bcast is null (common on Android AP/USB tethering)
+                                val rawBytes = ip.address
+                                val prefixLen = addr.networkPrefixLength.toInt().coerceIn(1, 31)
+                                val maskInt = (0xFFFFFFFF.toLong() shl (32 - prefixLen)).toInt()
+                                val ipInt = ((rawBytes[0].toInt() and 0xFF) shl 24) or
+                                        ((rawBytes[1].toInt() and 0xFF) shl 16) or
+                                        ((rawBytes[2].toInt() and 0xFF) shl 8) or
+                                        (rawBytes[3].toInt() and 0xFF)
+                                val bcastInt = ipInt or maskInt.inv()
+                                val bcastBytes = byteArrayOf(
+                                    ((bcastInt ushr 24) and 0xFF).toByte(),
+                                    ((bcastInt ushr 16) and 0xFF).toByte(),
+                                    ((bcastInt ushr 8) and 0xFF).toByte(),
+                                    (bcastInt and 0xFF).toByte()
+                                )
+                                val calculatedBcast = java.net.InetAddress.getByAddress(bcastBytes).hostAddress
+                                if (!calculatedBcast.isNullOrBlank()) {
+                                    nativeBridge.nativeAddBroadcastTarget(calculatedBcast)
+                                }
+                                // Also add gateway .1 host IP
+                                val gwBytes = byteArrayOf(rawBytes[0], rawBytes[1], rawBytes[2], 1.toByte())
+                                val calculatedGw = java.net.InetAddress.getByAddress(gwBytes).hostAddress
+                                if (!calculatedGw.isNullOrBlank()) {
+                                    nativeBridge.nativeAddBroadcastTarget(calculatedGw)
+                                }
                             }
                         }
                     }

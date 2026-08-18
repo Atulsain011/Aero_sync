@@ -62,6 +62,9 @@ static std::vector<std::string> getBroadcastAndGatewayTargets() {
     targets.push_back(DISCOVERY_MULTICAST_IP); // Site-local Multicast
 
     // Common mobile hotspot & tethering subnet broadcasts and gateways
+    targets.push_back("192.168.42.255");  // Android USB Tethering (RNDIS/NCM) broadcast
+    targets.push_back("192.168.42.1");    // Android USB Tethering gateway
+    targets.push_back("192.168.42.129");  // Android USB Tethering host IP
     targets.push_back("192.168.137.255"); // Windows Mobile Hotspot broadcast
     targets.push_back("192.168.137.1");   // Windows Mobile Hotspot gateway
     targets.push_back("192.168.43.255");  // Android default hotspot broadcast
