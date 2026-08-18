@@ -61,6 +61,7 @@ Cargo.lock.bak
 **/.cxx/
 local.properties
 *.keystore
+!platform/android/release.keystore
 *.jks
 captures/
 .externalNativeBuild/

@@ -28,11 +28,10 @@ android {
 
     signingConfigs {
         create("release") {
-            val debugStore = getByName("debug")
-            storeFile = debugStore.storeFile
-            storePassword = debugStore.storePassword
-            keyAlias = debugStore.keyAlias
-            keyPassword = debugStore.keyPassword
+            storeFile = rootProject.file("release.keystore")
+            storePassword = "aerosync123"
+            keyAlias = "aerosync"
+            keyPassword = "aerosync123"
             enableV1Signing = true
             enableV2Signing = true
             enableV3Signing = true
