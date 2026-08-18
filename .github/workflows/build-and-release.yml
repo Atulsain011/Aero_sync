@@ -69,11 +69,22 @@ jobs:
           Copy-Item $sourceExe "artifacts/AeroSync.exe" -Force
           $setupExe = Get-ChildItem "platform/windows/desktop_tauri/src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
           if ($setupExe) {
-            Copy-Item $setupExe.FullName "artifacts/AeroSync-Setup-v1.0.4.exe" -Force
+            Copy-Item $setupExe.FullName "artifacts/AeroSync-Setup-v1.0.5.exe" -Force
           } else {
             Write-Error "NSIS setup executable not found!"
             exit 1
           }
+
+          # Create Portable Zip Bundle
+          $portableDir = "artifacts/AeroSync-Windows-Portable"
+          New-Item -ItemType Directory -Force -Path $portableDir
+          Copy-Item $sourceExe "$portableDir/AeroSync.exe" -Force
+          $dllPath = "platform/windows/desktop_tauri/src-tauri/target/release/WebView2Loader.dll"
+          if (Test-Path $dllPath) {
+            Copy-Item $dllPath "$portableDir/WebView2Loader.dll" -Force
+          }
+          Compress-Archive -Path $portableDir -DestinationPath "artifacts/AeroSync-Windows-Portable.zip" -Force
+          Remove-Item -Recurse -Force $portableDir
 
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
@@ -156,16 +167,20 @@ jobs:
 
             High-speed peer-to-peer file transfer over local Wi-Fi and hotspot.
 
-            ### Direct Downloads
-            - **Windows Installer (Recommended)**: `AeroSync-Setup-v1.0.4.exe`
-            - **Windows Portable Executable**: `AeroSync.exe`
-            - **Android Mobile App**: `AeroSync.apk`
+            ### Windows
+            - **Installer (Recommended)**: `AeroSync-Setup-v1.0.5.exe`
+            - **Portable Package**: `AeroSync-Windows-Portable.zip`
+            - **Standalone Executable**: `AeroSync.exe`
+
+            ### Android
+            - **Mobile App**: `AeroSync.apk`
 
             ### Key Highlights
             - Zero-cloud, 100% peer-to-peer file transfer over local network
             - High-speed peer-to-peer file transfer over local Wi-Fi and hotspot
             - Peer discovery and secure PIN pairing
           files: |
-            release-assets/AeroSync-Setup-v1.0.4.exe
+            release-assets/AeroSync-Setup-v1.0.5.exe
+            release-assets/AeroSync-Windows-Portable.zip
             release-assets/AeroSync.exe
             release-assets/AeroSync.apk

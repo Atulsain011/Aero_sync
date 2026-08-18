@@ -20,17 +20,19 @@
 
 ### Downloads
 
-| Platform          | Binary         | Download                                                                                               | Version  |
-| :---------------- | :------------- | :----------------------------------------------------------------------------------------------------- | :------- |
-| Windows 10/11 x64 | `AeroSync.exe` | [Download Windows App](https://github.com/Atulsain011/Aero_sync/releases/latest/download/AeroSync.exe) | `Latest` |
-| Android 8.0+      | `AeroSync.apk` | [Download Android App](https://github.com/Atulsain011/Aero_sync/releases/latest/download/AeroSync.apk) | `Latest` |
-| All Platforms     | Releases       | [Browse GitHub Releases](https://github.com/Atulsain011/Aero_sync/releases)                            | `Latest` |
+| Platform | Package | Download | Version |
+| :--- | :--- | :--- | :--- |
+| **Windows (Installer)** | `AeroSync-Setup-v1.0.5.exe` | [**Download Windows Installer (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/latest/download/AeroSync-Setup-v1.0.5.exe) | `v1.0.5` |
+| **Windows (Portable)** | `AeroSync-Windows-Portable.zip` | [Download Windows Portable (.zip)](https://github.com/Atulsain011/Aero_sync/releases/latest/download/AeroSync-Windows-Portable.zip) | `v1.0.5` |
+| **Windows (Standalone)** | `AeroSync.exe` | [Download Windows Executable](https://github.com/Atulsain011/Aero_sync/releases/latest/download/AeroSync.exe) | `v1.0.5` |
+| **Android 8.0+** | `AeroSync.apk` | [**Download Android APK**](https://github.com/Atulsain011/Aero_sync/releases/latest/download/AeroSync.apk) | `v1.0.5` |
+| All Releases | GitHub Releases | [Browse All Releases](https://github.com/Atulsain011/Aero_sync/releases) | `Latest` |
 
 <br>
 
-[![Download Windows App](https://img.shields.io/badge/Download_Windows_App-AeroSync.exe-0078D6?style=for-the-badge\&logo=windows\&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/latest/download/AeroSync.exe)
-  
-[![Download Android App](https://img.shields.io/badge/Download_Android_App-AeroSync.apk-3DDC84?style=for-the-badge\&logo=android\&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/latest/download/AeroSync.apk)
+[![Download Windows Installer](https://img.shields.io/badge/Download_Windows_Installer-AeroSync--Setup-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/latest/download/AeroSync-Setup-v1.0.5.exe)
+  
+[![Download Android App](https://img.shields.io/badge/Download_Android_App-AeroSync.apk-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/latest/download/AeroSync.apk)
 
 </div>
 
