@@ -28,6 +28,7 @@ class AeroSyncNativeBridge(private val listener: NativeListener) {
     external fun nativeConnectToPeer(targetIp: String, targetPort: Int, pin: String): Boolean
     external fun nativeSendFiles(targetIp: String, targetPort: Int, filePaths: Array<String>): Boolean
     external fun nativeCancelTransfer()
+    external fun nativeDisconnect()
     external fun nativeRespondPairing(accept: Boolean)
     external fun nativeSetDownloadDirectory(downloadDir: String)
     external fun nativeAddBroadcastTarget(ip: String)

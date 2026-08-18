@@ -40,6 +40,7 @@ public:
                    TransferProgressCallback progressCb);
 
     void cancelTransfer();
+    void disconnect();
 
     PairingStateMachine& getPairingStateMachine();
 

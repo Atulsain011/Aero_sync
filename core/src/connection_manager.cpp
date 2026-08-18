@@ -99,6 +99,7 @@ void ConnectionManager::cancelActiveTransfer() {
     m_cancelRequested = true;
     int sock = m_activeTransferSock.exchange(-1);
     if (sock >= 0) {
+        SocketTransport::sendControlFrame(sock, ControlMessageType::FILE_CANCEL, 999, "CANCEL");
 #ifdef _WIN32
         shutdown(static_cast<SOCKET>(sock), SD_BOTH);
         closesocket(static_cast<SOCKET>(sock));
@@ -107,6 +108,8 @@ void ConnectionManager::cancelActiveTransfer() {
         close(sock);
 #endif
     }
+    m_pairingStateMachine.disconnect("Transfer cancelled");
+    m_pairingStateMachine.reset();
 }
 
 void ConnectionManager::serverLoop() {
@@ -277,6 +280,8 @@ void ConnectionManager::handleClientConnection(int clientSockFd) {
                             SocketTransport::sendControlFrame(clientSockFd, ControlMessageType::FILE_COMPLETE, nextSeq + 2, manifest.batchId + "|OK");
                         } else {
                             SocketTransport::sendControlFrame(clientSockFd, ControlMessageType::FILE_ERROR, nextSeq + 2, manifest.batchId + "|FAILED");
+                            m_pairingStateMachine.disconnect("Transfer cancelled or disconnected");
+                            m_pairingStateMachine.reset();
                         }
                     }
                 }
@@ -382,6 +387,8 @@ void ConnectionManager::handleClientConnection(int clientSockFd) {
                 SocketTransport::sendControlFrame(clientSockFd, ControlMessageType::FILE_COMPLETE, seq + 2, manifest.batchId + "|OK");
             } else {
                 SocketTransport::sendControlFrame(clientSockFd, ControlMessageType::FILE_ERROR, seq + 2, manifest.batchId + "|FAILED");
+                m_pairingStateMachine.disconnect("Transfer cancelled or disconnected");
+                m_pairingStateMachine.reset();
             }
         } else {
             SocketTransport::sendControlFrame(clientSockFd, ControlMessageType::FILE_ERROR, seq + 1, "Transfer declined");
@@ -478,6 +485,9 @@ bool ConnectionManager::requestTransfer(const PeerInfo& targetPeer,
         uint32_t compSeq = 0;
         std::string compPayload;
         SocketTransport::recvControlFrame(clientSock, compType, compSeq, compPayload);
+    } else {
+        m_pairingStateMachine.disconnect("Transfer cancelled or disconnected");
+        m_pairingStateMachine.reset();
     }
 
     CLOSE_SOCKET(clientSock);

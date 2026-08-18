@@ -131,7 +131,13 @@ bool AeroSyncApp::sendFiles(const PeerInfo& targetPeer,
 }
 
 void AeroSyncApp::cancelTransfer() {
-    if (m_connection) m_connection->cancelActiveTransfer();
+    if (m_connection) {
+        m_connection->cancelActiveTransfer();
+    }
+}
+
+void AeroSyncApp::disconnect() {
+    cancelTransfer();
 }
 
 } // namespace aerosync

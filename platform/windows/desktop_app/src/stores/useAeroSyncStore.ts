@@ -82,6 +82,7 @@ export function useAeroSyncStore() {
   // Throttling and state refs
   const lastActiveFileRef = useRef<string>('');
   const lastHistorySyncRef = useRef<number>(0);
+  const latestTransferringRef = useRef<boolean>(false);
 
   // Save history to localStorage
   useEffect(() => {
@@ -135,16 +136,9 @@ export function useAeroSyncStore() {
     let peer = targetPeer || selectedPeer;
     if (!peer && peers.length > 0) {
       peer = peers[0];
-      setSelectedPeer(peer);
     }
 
-    if (!peer) {
-      setCurrentTab('devices');
-      setStatusMessage('Files selected. Click Send Files on any discovered device below.');
-      return;
-    }
-
-    // 1. INSTANT OPTIMISTIC UI: Immediately add items to queue without waiting for IPC
+    // 1. INSTANT OPTIMISTIC UI: Immediately add items to queue without waiting for IPC or network
     const now = Date.now();
     const newItems: QueueItem[] = filePaths.map((filePath, index) => {
       const fileName = getFileName(filePath);
@@ -153,9 +147,9 @@ export function useAeroSyncStore() {
         name: fileName,
         path: filePath,
         size: 0,
-        targetDeviceName: peer.deviceName,
-        targetIp: peer.ipAddress,
-        status: 'transferring',
+        targetDeviceName: peer ? peer.deviceName : 'Select Device',
+        targetIp: peer ? peer.ipAddress : '',
+        status: peer ? 'transferring' : 'waiting',
         progressPercent: 0,
         transferredBytes: 0,
         speedBytesPerSec: 0,
@@ -166,12 +160,9 @@ export function useAeroSyncStore() {
     // 2. Switch tab to transfers IMMEDIATELY on the same frame (<1ms)
     setQueue(prev => [...prev, ...newItems]);
     setCurrentTab('transfers');
-    setIsTransferring(true);
-    latestTransferringRef.current = true;
-    setStatusMessage(`Transferring ${filePaths.length} file(s) to ${peer.deviceName}...`);
+    setStatusMessage(`${filePaths.length} file(s) selected.`);
 
-    // 3. Retrieve exact file metadata and initiate transfer in background
-    const targetPeerObj = peer;
+    // 3. Retrieve exact file metadata in background
     tauriBridge.getFilesMetadata(filePaths).then(metaList => {
       setQueue(prev => prev.map(item => {
         const meta = metaList.find(m => m.path === item.path);
@@ -179,18 +170,25 @@ export function useAeroSyncStore() {
       }));
     }).catch(() => {});
 
-    // 4. Trigger daemon transfer API & immediate poll
-    daemonService.sendTransfer(targetPeerObj.ipAddress, targetPeerObj.port || 48124, filePaths)
-      .then(res => {
-        if (res.success) {
-          setStatusMessage(`Streaming ${filePaths.length} file(s) to ${targetPeerObj.deviceName}`);
-        }
-        if (pollTriggerRef.current) pollTriggerRef.current();
-      })
-      .catch(err => {
-        console.error('Failed to trigger transfer via daemon:', err);
-        setStatusMessage(`Transfer error: ${err.message}`);
-      });
+    // 4. If peer available, trigger daemon transfer API & immediate poll
+    if (peer) {
+      setSelectedPeer(peer);
+      setIsTransferring(true);
+      latestTransferringRef.current = true;
+      setStatusMessage(`Transferring ${filePaths.length} file(s) to ${peer.deviceName}...`);
+      const targetPeerObj = peer;
+      daemonService.sendTransfer(targetPeerObj.ipAddress, targetPeerObj.port || 48124, filePaths)
+        .then(res => {
+          if (res.success) {
+            setStatusMessage(`Streaming ${filePaths.length} file(s) to ${targetPeerObj.deviceName}`);
+          }
+          if (pollTriggerRef.current) pollTriggerRef.current();
+        })
+        .catch(err => {
+          console.error('Failed to trigger transfer via daemon:', err);
+          setStatusMessage(`Transfer error: ${err.message}`);
+        });
+    }
   }, [selectedPeer, peers]);
 
   // Cancel active transfer
@@ -199,7 +197,8 @@ export function useAeroSyncStore() {
     setQueue(prev => prev.map(item => item.status === 'transferring' ? { ...item, status: 'cancelled' } : item));
     setIsTransferring(false);
     latestTransferringRef.current = false;
-    setStatusMessage('Transfer cancelled');
+    setSelectedPeer(null);
+    setStatusMessage('Transfer cancelled. Device disconnected.');
     if (pollTriggerRef.current) pollTriggerRef.current();
   }, []);
 
@@ -257,6 +256,21 @@ export function useAeroSyncStore() {
 
         if (data.statusMessage) {
           setStatusMessage(data.statusMessage);
+        }
+
+        // Handle cancellation from either device
+        if (data.currentProgress && data.currentProgress.state === 7 /* CANCELLED */) {
+          if (latestTransferringRef.current) {
+            setIsTransferring(false);
+            latestTransferringRef.current = false;
+            setSelectedPeer(null);
+            setQueue(prev => prev.map(item => item.status === 'transferring' ? { ...item, status: 'cancelled' } : item));
+            setStatusMessage('Transfer cancelled by peer. Device disconnected.');
+          }
+        } else if (!data.isTransferring && latestTransferringRef.current) {
+          setIsTransferring(false);
+          latestTransferringRef.current = false;
+          setSelectedPeer(null);
         }
 
         // Handle completed transfer migration from queue to history

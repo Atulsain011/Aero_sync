@@ -708,7 +708,7 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun cancelActiveTransfer() {
-        // 1. Instant UI update
+        // 1. Instant UI update - Clear active transfer and disconnect connected peer immediately
         _uiState.update { state ->
             val activeId = state.activeTransfer?.queueItemId
             val updatedQueue = state.transferQueue.map {
@@ -719,9 +719,14 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
             state.copy(
                 isTransferring = false,
                 activeTransfer = null,
+                selectedPeer = null,
+                isPaired = false,
+                isWaitingForAcceptance = false,
+                activePin = "",
+                pairingState = "UNPAIRED",
                 transferQueue = updatedQueue,
                 transferRateText = "0.0 MB/s",
-                statusMessage = "Transfer cancelled."
+                statusMessage = "Transfer cancelled. Device disconnected."
             )
         }
 
@@ -785,11 +790,34 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
     }
 
     override fun onPairingStateChanged(state: String, reason: String) {
-        _uiState.update {
-            it.copy(
-                pairingState = state,
-                statusMessage = if (reason.isNotEmpty()) reason else "State: $state"
-            )
+        _uiState.update { current ->
+            if (state == "DISCONNECTED" || state == "UNPAIRED") {
+                val updatedQueue = current.transferQueue.map {
+                    if (it.status == QueueItemStatus.TRANSFERRING) {
+                        it.copy(status = QueueItemStatus.CANCELLED)
+                    } else it
+                }
+                current.copy(
+                    pairingState = state,
+                    selectedPeer = null,
+                    isPaired = false,
+                    isWaitingForAcceptance = false,
+                    activePin = "",
+                    isTransferring = false,
+                    activeTransfer = null,
+                    transferQueue = updatedQueue,
+                    transferRateText = "0.0 MB/s",
+                    statusMessage = if (reason.isNotEmpty()) reason else "Disconnected"
+                )
+            } else {
+                current.copy(
+                    pairingState = state,
+                    statusMessage = if (reason.isNotEmpty()) reason else "State: $state"
+                )
+            }
+        }
+        if (state == "DISCONNECTED" || state == "UNPAIRED") {
+            AeroSyncTransferService.stopTransfer(getApplication())
         }
     }
 

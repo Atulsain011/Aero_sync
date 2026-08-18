@@ -442,34 +442,66 @@ fun HomeScreen(
                                                     imageVector = Icons.Default.InsertDriveFile,
                                                     contentDescription = null,
                                                     tint = Color(0xFF3B82F6),
-                                                    modifier = Modifier.size(18.dp)
+                                                    modifier = Modifier.size(20.dp)
                                                 )
                                                 Column(modifier = Modifier.weight(1f)) {
                                                     Text(
                                                         text = file.fileName,
-                                                        fontSize = 12.sp,
+                                                        fontSize = 12.5.sp,
                                                         fontWeight = FontWeight.SemiBold,
                                                         color = textPrimary,
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis
                                                     )
-                                                    Text(
-                                                        text = file.formattedSize,
-                                                        fontSize = 10.5.sp,
-                                                        color = textSecondary
-                                                    )
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = file.formattedSize,
+                                                            fontSize = 10.5.sp,
+                                                            color = textSecondary
+                                                        )
+                                                        val ext = file.fileName.substringAfterLast('.', "").uppercase()
+                                                        if (ext.isNotBlank() && ext.length <= 5) {
+                                                            Surface(
+                                                                shape = RoundedCornerShape(4.dp),
+                                                                color = Color(0xFF3B82F6).copy(alpha = 0.12f)
+                                                            ) {
+                                                                Text(
+                                                                    text = ext,
+                                                                    fontSize = 9.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = Color(0xFF3B82F6),
+                                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                                )
+                                                            }
+                                                        }
+                                                        Surface(
+                                                            shape = RoundedCornerShape(4.dp),
+                                                            color = Color(0xFF10B981).copy(alpha = 0.12f)
+                                                        ) {
+                                                            Text(
+                                                                text = "Selected",
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = Color(0xFF10B981),
+                                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                             }
 
                                             IconButton(
                                                 onClick = { onRemoveSelectedFile(file.id) },
-                                                modifier = Modifier.size(24.dp)
+                                                modifier = Modifier.size(28.dp)
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.Close,
                                                     contentDescription = "Remove file",
-                                                    tint = Color(0xFF9CA3AF),
-                                                    modifier = Modifier.size(15.dp)
+                                                    tint = Color(0xFFEF4444),
+                                                    modifier = Modifier.size(16.dp)
                                                 )
                                             }
                                         }

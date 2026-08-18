@@ -381,6 +381,14 @@ Java_com_aerosync_app_nativebridge_AeroSyncNativeBridge_nativeCancelTransfer(JNI
 }
 
 JNIEXPORT void JNICALL
+Java_com_aerosync_app_nativebridge_AeroSyncNativeBridge_nativeDisconnect(JNIEnv* env, jobject thiz) {
+    auto app = getAppInstance();
+    if (app) {
+        app->disconnect();
+    }
+}
+
+JNIEXPORT void JNICALL
 Java_com_aerosync_app_nativebridge_AeroSyncNativeBridge_nativeAddBroadcastTarget(JNIEnv* env, jobject thiz, jstring ipStr) {
     if (!ipStr) return;
     auto app = getAppInstance();
