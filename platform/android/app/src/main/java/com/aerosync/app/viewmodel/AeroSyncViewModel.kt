@@ -942,8 +942,8 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
         val rateText = if (mbPerSec >= 0.1) "%.1f MB/s".format(mbPerSec) else "${"%.1f".format(mbpsVal)} Mbps"
         val pct = if (total > 0) ((transferred * 100) / total).toInt().coerceIn(0, 100) else 0
 
-        // Update foreground notification every ~250ms or at completion
-        if (now - lastServiceNotificationMs >= 250 || transferred >= total) {
+        // Update foreground notification periodically (~800ms) or at completion to minimize IPC load
+        if (now - lastServiceNotificationMs >= 800 || transferred >= total) {
             lastServiceNotificationMs = now
             AeroSyncTransferService.updateProgress(
                 context = getApplication(),

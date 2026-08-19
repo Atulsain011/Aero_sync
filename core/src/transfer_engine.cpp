@@ -276,7 +276,7 @@ bool TransferEngine::sendFileBatch(int sockFd,
         std::filesystem::path journalPath = localPath.string() + ".aerosync.journal";
         std::set<uint32_t> completedChunks = loadResumeJournal(journalPath);
 
-        std::vector<char> fileStreamBuf(4 * 1024 * 1024);
+        std::vector<char> fileStreamBuf(2 * 1024 * 1024);
         std::ifstream file;
         file.rdbuf()->pubsetbuf(fileStreamBuf.data(), fileStreamBuf.size());
         file.open(localPath, std::ios::binary);
@@ -421,8 +421,8 @@ bool TransferEngine::receiveFileBatch(int sockFd,
 
     size_t chunkSize = manifest.chunkSize > 0 ? manifest.chunkSize : LARGE_CHUNK_SIZE;
     
-    // Fixed Pool of 8 Pre-allocated 4MB chunk buffers (32MB RAM max)
-    const size_t POOL_SIZE = 8;
+    // Fixed Pool of 16 Pre-allocated 1MB chunk buffers (16MB RAM max)
+    const size_t POOL_SIZE = 16;
     BufferPool bufferPool(POOL_SIZE, chunkSize);
 
     for (size_t i = 0; i < manifest.files.size(); ++i) {
@@ -458,30 +458,15 @@ bool TransferEngine::receiveFileBatch(int sockFd,
         if (fd < 0) {
             return false;
         }
-
-        // Upfront block pre-allocation on Android/Linux to eliminate FUSE filesystem thrashing
-        if (fileMeta.fileSize > 0 && fileBytesTransferred == 0) {
-#if defined(FALLOC_FL_KEEP_SIZE)
-            fallocate(fd, 0, 0, static_cast<off_t>(fileMeta.fileSize));
 #else
-            posix_fallocate(fd, 0, static_cast<off_t>(fileMeta.fileSize));
-#endif
-#ifdef POSIX_FADV_SEQUENTIAL
-            posix_fadvise(fd, 0, static_cast<off_t>(fileMeta.fileSize), POSIX_FADV_SEQUENTIAL);
-#endif
-        }
-#else
-        std::vector<char> fileStreamBuf(4 * 1024 * 1024);
+        std::vector<char> fileStreamBuf(2 * 1024 * 1024);
         std::fstream file;
         file.rdbuf()->pubsetbuf(fileStreamBuf.data(), fileStreamBuf.size());
 
         if (fileBytesTransferred > 0 && std::filesystem::exists(partPath)) {
             file.open(partPath, std::ios::binary | std::ios::in | std::ios::out);
-        }
-        if (!file.is_open()) {
+        } else {
             file.open(partPath, std::ios::binary | std::ios::out | std::ios::trunc);
-            file.close();
-            file.open(partPath, std::ios::binary | std::ios::in | std::ios::out);
         }
         if (!file.is_open()) return false;
         file.seekp(static_cast<std::streamoff>(fileBytesTransferred));

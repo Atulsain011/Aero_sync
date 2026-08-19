@@ -32,12 +32,12 @@ namespace aerosync {
 void SocketTransport::configureHighThroughputSocket(int sockFd, size_t bufferSize) {
     socket_t s = static_cast<socket_t>(sockFd);
 
-    // Socket buffer scaling: 16 MB SO_SNDBUF and SO_RCVBUF for ultra-high throughput saturation
-    int bufSize = static_cast<int>(bufferSize > 0 ? bufferSize : (16 * 1024 * 1024));
+    // Socket buffer scaling: 4 MB SO_SNDBUF and SO_RCVBUF for optimal Wi-Fi BDP saturation
+    int bufSize = static_cast<int>(bufferSize > 0 ? bufferSize : (4 * 1024 * 1024));
     setsockopt(s, SOL_SOCKET, SO_SNDBUF, (const char*)&bufSize, sizeof(bufSize));
     setsockopt(s, SOL_SOCKET, SO_RCVBUF, (const char*)&bufSize, sizeof(bufSize));
 
-    // Disable Nagle's Algorithm (TCP_NODELAY) for ultra-low latency chunk dispatch
+    // Disable Nagle's Algorithm (TCP_NODELAY) for immediate packet dispatch
     int nodelay = 1;
     setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (const char*)&nodelay, sizeof(nodelay));
 
