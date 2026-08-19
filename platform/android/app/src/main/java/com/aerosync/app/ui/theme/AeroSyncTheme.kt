@@ -133,7 +133,10 @@ fun AeroSyncTheme(
     themeMode: ThemeMode = ThemeMode.DARK,
     content: @Composable () -> Unit
 ) {
-    val isDark = themeMode == ThemeMode.DARK
+    val isDark = when (themeMode) {
+        ThemeMode.DARK -> true
+        ThemeMode.LIGHT -> false
+    }
 
     val colorScheme = if (isDark) DarkColorScheme else LightColorScheme
     val view = LocalView.current

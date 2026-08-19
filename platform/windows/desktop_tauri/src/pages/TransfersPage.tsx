@@ -2,9 +2,9 @@ import React from 'react';
 import {
   X,
   Plus,
+  FilePlus,
   Trash2,
   FileText,
-  FilePlus,
   Activity,
   Zap,
   Clock,
@@ -23,11 +23,11 @@ interface TransfersPageProps {
   queue: QueueItem[];
   currentProgress: DaemonStatusResponse['currentProgress'];
   isTransferring: boolean;
-  historyCount?: number;
   onAddFiles: () => void;
   onNewFile?: () => void;
   onCancelTransfer: () => void;
-  onClearQueue: () => void;
+  onClearQueue?: () => void;
+  onClearCompleted?: () => void;
   onClearHistory?: () => void;
 }
 
@@ -35,11 +35,11 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
   queue,
   currentProgress,
   isTransferring,
-  historyCount = 0,
   onAddFiles,
   onNewFile,
   onCancelTransfer,
   onClearQueue,
+  onClearCompleted,
   onClearHistory
 }) => {
   const activeFileName = currentProgress?.currentFileName || (queue[0]?.name ?? 'Preparing files...');
@@ -49,8 +49,6 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
   const transferredBytes = currentProgress?.fileBytesTransferred || 0;
   const totalBytes = currentProgress?.fileSize || 0;
 
-  const handleNewFileClick = onNewFile || onAddFiles;
-
   return (
     <div className="page-container">
       <div className="page-header">
@@ -58,44 +56,40 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
           <h2 className="page-title">Transfer Queue</h2>
           <p className="page-subtitle">Real-time parallel multi-stream transmission progress.</p>
         </div>
-        <div className="page-header-actions queue-action-bar">
-          <button
-            className="btn btn-action btn-secondary"
-            onClick={onClearQueue}
-            disabled={queue.length === 0}
-            title={queue.length === 0 ? "Queue is already empty" : "Clear all queued files"}
-          >
-            <Trash2 size={15} />
-            <span>Clear Queue</span>
-          </button>
-
+        <div className="page-header-actions">
           {onClearHistory && (
             <button
-              className="btn btn-action btn-secondary"
+              className="btn btn-secondary"
               onClick={onClearHistory}
-              disabled={historyCount === 0}
-              title={historyCount === 0 ? "History is already empty" : "Clear completed transfer history"}
+              title="Clear completed transmission logs"
             >
               <Trash2 size={15} />
               <span>Clear History</span>
             </button>
           )}
-
           <button
-            className="btn btn-action btn-secondary"
-            onClick={handleNewFileClick}
-            title="Select a new single file to send"
+            className="btn btn-secondary"
+            onClick={onClearQueue || onClearCompleted}
+            title="Clear all transfer queue items"
+            disabled={queue.length === 0 && !isTransferring}
+          >
+            <Trash2 size={15} />
+            <span>Clear Queue</span>
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={onNewFile || onAddFiles}
+            title="Select a single new file to transmit"
           >
             <FilePlus size={15} />
             <span>New File</span>
           </button>
-
           <button
-            className="btn btn-action btn-primary"
+            className="btn btn-primary"
             onClick={onAddFiles}
-            title="Open file picker to add files to queue"
+            title="Add files to the active queue"
           >
-            <Plus size={16} />
+            <Plus size={15} />
             <span>Add Files</span>
           </button>
         </div>
@@ -184,12 +178,10 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
             <h3 className="idle-title">No Active Transfers</h3>
             <p className="idle-desc">Pick files or select a discovered peer to begin high-speed transmission.</p>
           </div>
-          <div className="idle-actions">
-            <button className="btn btn-action btn-primary" onClick={onAddFiles}>
-              <Plus size={16} />
-              <span>Add Files</span>
-            </button>
-          </div>
+          <button className="btn btn-primary" onClick={onAddFiles}>
+            <Plus size={16} />
+            <span>Send New Files</span>
+          </button>
         </div>
       )}
 
@@ -216,7 +208,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
                     <div className="queue-file-meta">
                       <span className="queue-file-name">{item.name}</span>
                       <span className="queue-file-details">
-                        {item.targetDeviceName} ({item.targetIp || 'Local LAN'})
+                        {item.targetDeviceName} ({item.targetIp})
                       </span>
                     </div>
                   </div>

@@ -24,6 +24,30 @@
 
 namespace aerosync {
 
+static std::string sanitizeFilename(const std::string& rawPath) {
+    std::string s = rawPath;
+    size_t lastSlash = s.find_last_of("/\\");
+    if (lastSlash != std::string::npos) {
+        s = s.substr(lastSlash + 1);
+    }
+    size_t colon = s.find_last_of(':');
+    if (colon != std::string::npos) {
+        s = s.substr(colon + 1);
+    }
+    if (s.empty() || s == "." || s == "..") {
+        return "unnamed_file";
+    }
+    std::string clean;
+    for (char c : s) {
+        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|') {
+            clean += '_';
+        } else {
+            clean += c;
+        }
+    }
+    return clean;
+}
+
 struct ConsentState {
     std::mutex mtx;
     std::condition_variable cv;
@@ -237,11 +261,10 @@ void ConnectionManager::handleClientConnection(int clientSockFd) {
                         uint64_t resumeOffset = 0;
                         uint32_t resumeChunkIdx = 0;
                         if (!manifest.files.empty()) {
-                            std::filesystem::path partPath = downloadDir / (manifest.files[0].relativePath + ".aerosync.part");
-                            std::filesystem::path journalPath = downloadDir / (manifest.files[0].relativePath + ".aerosync.journal");
+                            std::string safeName = sanitizeFilename(manifest.files[0].relativePath);
+                            std::filesystem::path partPath = downloadDir / (safeName + ".aerosync.part");
+                            std::filesystem::path journalPath = downloadDir / (safeName + ".aerosync.journal");
                             size_t cSize = manifest.chunkSize > 0 ? manifest.chunkSize : LARGE_CHUNK_SIZE;
-                            uint64_t targetSize = manifest.files[0].fileSize;
-
                             if (std::filesystem::exists(partPath)) {
                                 uint64_t partSize = std::filesystem::file_size(partPath);
                                 if (std::filesystem::exists(journalPath)) {
@@ -258,11 +281,10 @@ void ConnectionManager::handleClientConnection(int clientSockFd) {
                                     uint64_t verified = static_cast<uint64_t>(exp) * cSize;
                                     resumeOffset = std::min(verified, partSize);
                                     resumeChunkIdx = exp;
-                                } else {
-                                    // Align to chunk boundary for clean stream resume
-                                    uint64_t verified = (partSize / cSize) * cSize;
-                                    resumeOffset = std::min(verified, targetSize);
-                                    resumeChunkIdx = static_cast<uint32_t>(resumeOffset / cSize);
+                                } else if (partSize > 0) {
+                                    uint32_t fullChunks = static_cast<uint32_t>(partSize / cSize);
+                                    resumeOffset = static_cast<uint64_t>(fullChunks) * cSize;
+                                    resumeChunkIdx = fullChunks;
                                 }
                             }
                         }
@@ -354,11 +376,10 @@ void ConnectionManager::handleClientConnection(int clientSockFd) {
             uint64_t resumeOffset = 0;
             uint32_t resumeChunkIdx = 0;
             if (!manifest.files.empty()) {
-                std::filesystem::path partPath = downloadDir / (manifest.files[0].relativePath + ".aerosync.part");
-                std::filesystem::path journalPath = downloadDir / (manifest.files[0].relativePath + ".aerosync.journal");
+                std::string safeName = sanitizeFilename(manifest.files[0].relativePath);
+                std::filesystem::path partPath = downloadDir / (safeName + ".aerosync.part");
+                std::filesystem::path journalPath = downloadDir / (safeName + ".aerosync.journal");
                 size_t cSize = manifest.chunkSize > 0 ? manifest.chunkSize : LARGE_CHUNK_SIZE;
-                uint64_t targetSize = manifest.files[0].fileSize;
-
                 if (std::filesystem::exists(partPath)) {
                     uint64_t partSize = std::filesystem::file_size(partPath);
                     if (std::filesystem::exists(journalPath)) {
@@ -375,11 +396,10 @@ void ConnectionManager::handleClientConnection(int clientSockFd) {
                         uint64_t verified = static_cast<uint64_t>(exp) * cSize;
                         resumeOffset = std::min(verified, partSize);
                         resumeChunkIdx = exp;
-                    } else {
-                        // Align to chunk boundary for clean stream resume
-                        uint64_t verified = (partSize / cSize) * cSize;
-                        resumeOffset = std::min(verified, targetSize);
-                        resumeChunkIdx = static_cast<uint32_t>(resumeOffset / cSize);
+                    } else if (partSize > 0) {
+                        uint32_t fullChunks = static_cast<uint32_t>(partSize / cSize);
+                        resumeOffset = static_cast<uint64_t>(fullChunks) * cSize;
+                        resumeChunkIdx = fullChunks;
                     }
                 }
             }

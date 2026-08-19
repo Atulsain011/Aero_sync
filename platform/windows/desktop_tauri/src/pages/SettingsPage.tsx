@@ -65,7 +65,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             </div>
             <div>
               <h3 className="settings-card-title">Appearance Theme</h3>
-              <p className="settings-card-desc">Choose between Light or Dark theme appearance.</p>
+              <p className="settings-card-desc">Choose between Light or Dark theme mode.</p>
             </div>
           </div>
 

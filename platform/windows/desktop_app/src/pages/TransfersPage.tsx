@@ -1,17 +1,15 @@
 import React from 'react';
 import {
-  Pause,
-  Play,
   X,
   Plus,
+  FilePlus,
   Trash2,
   FileText,
   Activity,
   Zap,
   Clock,
   ArrowDownCircle,
-  CheckCircle2,
-  AlertCircle
+  CheckCircle2
 } from 'lucide-react';
 import { QueueItem, DaemonStatusResponse } from '../types/aerosync';
 import {
@@ -26,8 +24,10 @@ interface TransfersPageProps {
   currentProgress: DaemonStatusResponse['currentProgress'];
   isTransferring: boolean;
   onAddFiles: () => void;
+  onNewFile?: () => void;
   onCancelTransfer: () => void;
-  onClearCompleted: () => void;
+  onClearQueue?: () => void;
+  onClearCompleted?: () => void;
   onClearHistory?: () => void;
 }
 
@@ -36,7 +36,9 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
   currentProgress,
   isTransferring,
   onAddFiles,
+  onNewFile,
   onCancelTransfer,
+  onClearQueue,
   onClearCompleted,
   onClearHistory
 }) => {
@@ -56,16 +58,37 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
         </div>
         <div className="page-header-actions">
           {onClearHistory && (
-            <button className="btn btn-secondary" onClick={onClearHistory} title="Clear completed transmission logs">
+            <button
+              className="btn btn-secondary"
+              onClick={onClearHistory}
+              title="Clear completed transmission logs"
+            >
               <Trash2 size={15} />
               <span>Clear History</span>
             </button>
           )}
-          <button className="btn btn-secondary" onClick={onClearCompleted} title="Clear pending queue items">
+          <button
+            className="btn btn-secondary"
+            onClick={onClearQueue || onClearCompleted}
+            title="Clear all transfer queue items"
+            disabled={queue.length === 0 && !isTransferring}
+          >
             <Trash2 size={15} />
             <span>Clear Queue</span>
           </button>
-          <button className="btn btn-primary" onClick={onAddFiles}>
+          <button
+            className="btn btn-secondary"
+            onClick={onNewFile || onAddFiles}
+            title="Select a single new file to transmit"
+          >
+            <FilePlus size={15} />
+            <span>New File</span>
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={onAddFiles}
+            title="Add files to the active queue"
+          >
             <Plus size={15} />
             <span>Add Files</span>
           </button>

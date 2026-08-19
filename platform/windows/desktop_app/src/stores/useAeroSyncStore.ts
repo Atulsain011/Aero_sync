@@ -106,14 +106,9 @@ export function useAeroSyncStore() {
     if (settings.theme === 'light') {
       root.classList.remove('dark');
       root.classList.add('light');
-    } else if (settings.theme === 'dark') {
+    } else {
       root.classList.remove('light');
       root.classList.add('dark');
-    } else {
-      // System theme detection
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      root.classList.toggle('dark', prefersDark);
-      root.classList.toggle('light', !prefersDark);
     }
   }, [settings]);
 
@@ -198,19 +193,29 @@ export function useAeroSyncStore() {
     } catch (err) {
       console.warn('Error cancelling transfer:', err);
     }
-    setQueue(prev => prev.map(item => item.status === 'transferring' ? { ...item, status: 'cancelled' } : item));
+    // Remove cancelled items immediately from UI queue
+    setQueue(prev => prev.filter(item => item.status !== 'transferring'));
     setIsTransferring(false);
     latestTransferringRef.current = false;
-    setCurrentProgress(prev => ({
-      ...prev,
-      state: 3,
+    setCurrentProgress({
+      state: 0,
+      currentFileName: '',
+      fileSize: 0,
+      fileBytesTransferred: 0,
+      totalBytesTransferred: 0,
       speedBytesPerSec: 0,
       progressPercent: 0,
-      etaSeconds: 0
-    }));
+      etaSeconds: 0,
+      errorCode: 0
+    });
     setSelectedPeer(null);
-    setStatusMessage('Transfer cancelled. Device disconnected.');
+    setStatusMessage('Transfer cancelled.');
     if (pollTriggerRef.current) pollTriggerRef.current();
+  }, []);
+
+  // Clear all queue items
+  const clearQueue = useCallback(() => {
+    setQueue([]);
   }, []);
 
   // Clear non-active queue items
@@ -369,6 +374,7 @@ export function useAeroSyncStore() {
     setIsDirectIpModalOpen,
     enqueueFiles,
     cancelTransfer,
+    clearQueue,
     clearCompletedQueue,
     clearHistory,
     updateSettings,

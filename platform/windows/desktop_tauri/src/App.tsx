@@ -34,6 +34,7 @@ export const App: React.FC = () => {
     enqueueFiles,
     cancelTransfer,
     clearQueue,
+    clearCompletedQueue,
     clearHistory,
     updateSettings,
     refreshStorage
@@ -124,11 +125,11 @@ export const App: React.FC = () => {
               queue={queue}
               currentProgress={currentProgress}
               isTransferring={isTransferring}
-              historyCount={history.length}
               onAddFiles={handlePickAndSendFiles}
               onNewFile={handlePickAndSendFiles}
               onCancelTransfer={cancelTransfer}
               onClearQueue={clearQueue}
+              onClearCompleted={clearCompletedQueue}
               onClearHistory={clearHistory}
             />
           )}

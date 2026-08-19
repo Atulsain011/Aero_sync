@@ -135,7 +135,10 @@ fun AeroSyncTopAppBar(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = if (themeMode == ThemeMode.LIGHT) Icons.Default.WbSunny else Icons.Default.DarkMode,
+                        imageVector = when (themeMode) {
+                            ThemeMode.LIGHT -> Icons.Default.WbSunny
+                            ThemeMode.DARK -> Icons.Default.DarkMode
+                        },
                         contentDescription = "Toggle Theme",
                         tint = if (isDark) Color(0xFFFBBF24) else Color(0xFF6366F1),
                         modifier = Modifier.size(16.dp)

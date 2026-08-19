@@ -193,13 +193,12 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun toggleTheme() {
-        val nextMode = if (_uiState.value.themeMode == com.aerosync.app.data.preferences.ThemeMode.DARK) {
-            com.aerosync.app.data.preferences.ThemeMode.LIGHT
-        } else {
-            com.aerosync.app.data.preferences.ThemeMode.DARK
+        val nextMode = when (_uiState.value.themeMode) {
+            com.aerosync.app.data.preferences.ThemeMode.DARK -> com.aerosync.app.data.preferences.ThemeMode.LIGHT
+            com.aerosync.app.data.preferences.ThemeMode.LIGHT -> com.aerosync.app.data.preferences.ThemeMode.DARK
         }
         prefs.themeMode = nextMode
-        _uiState.update { it.copy(themeMode = nextMode, isDarkTheme = nextMode == com.aerosync.app.data.preferences.ThemeMode.DARK) }
+        _uiState.update { it.copy(themeMode = nextMode, isDarkTheme = prefs.isDarkTheme) }
     }
 
     fun discoverAndRegisterBroadcastTargets() {
@@ -765,13 +764,11 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun cancelActiveTransfer() {
-        // 1. Instant UI update - Clear active transfer and disconnect connected peer immediately
+        // 1. Instant UI update - Clear active transfer and remove transferring items immediately
         _uiState.update { state ->
             val activeId = state.activeTransfer?.queueItemId
-            val updatedQueue = state.transferQueue.map {
-                if (it.id == activeId || it.status == QueueItemStatus.TRANSFERRING) {
-                    it.copy(status = QueueItemStatus.CANCELLED)
-                } else it
+            val updatedQueue = state.transferQueue.filter {
+                it.id != activeId && it.status != QueueItemStatus.TRANSFERRING
             }
             state.copy(
                 isTransferring = false,
@@ -783,7 +780,7 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
                 pairingState = "UNPAIRED",
                 transferQueue = updatedQueue,
                 transferRateText = "0.0 MB/s",
-                statusMessage = "Transfer cancelled. Device disconnected."
+                statusMessage = "Transfer cancelled."
             )
         }
 
@@ -793,11 +790,10 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
             nativeBridge.nativeCancelTransfer()
             val activeId = _uiState.value.activeTransfer?.queueItemId
             if (!activeId.isNullOrEmpty()) {
-                val item = dbHelper.getAllQueueItems().firstOrNull { it.id == activeId }
-                if (item != null) {
-                    dbHelper.insertOrUpdateQueueItem(item.copy(status = QueueItemStatus.CANCELLED))
-                }
+                dbHelper.deleteQueueItem(activeId)
             }
+            val transferring = dbHelper.getAllQueueItems().filter { it.status == QueueItemStatus.TRANSFERRING }
+            transferring.forEach { dbHelper.deleteQueueItem(it.id) }
             val updatedQueue = dbHelper.getAllQueueItems()
             _uiState.update { state ->
                 state.copy(
@@ -849,10 +845,8 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
     override fun onPairingStateChanged(state: String, reason: String) {
         _uiState.update { current ->
             if (state == "DISCONNECTED" || state == "UNPAIRED") {
-                val updatedQueue = current.transferQueue.map {
-                    if (it.status == QueueItemStatus.TRANSFERRING) {
-                        it.copy(status = QueueItemStatus.CANCELLED)
-                    } else it
+                val updatedQueue = current.transferQueue.filter {
+                    it.status != QueueItemStatus.TRANSFERRING
                 }
                 current.copy(
                     pairingState = state,

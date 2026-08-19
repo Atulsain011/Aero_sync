@@ -101,7 +101,7 @@ export function useAeroSyncStore() {
       console.warn('Failed to save settings:', err);
     }
 
-    // Apply theme to document root (strictly Light or Dark)
+    // Apply theme to document root
     const root = document.documentElement;
     if (settings.theme === 'light') {
       root.classList.remove('dark');
@@ -193,7 +193,8 @@ export function useAeroSyncStore() {
     } catch (err) {
       console.warn('Error cancelling transfer:', err);
     }
-    setQueue([]);
+    // Remove cancelled items immediately from UI queue
+    setQueue(prev => prev.filter(item => item.status !== 'transferring'));
     setIsTransferring(false);
     latestTransferringRef.current = false;
     setCurrentProgress({
@@ -208,16 +209,18 @@ export function useAeroSyncStore() {
       errorCode: 0
     });
     setSelectedPeer(null);
-    setStatusMessage('Transfer cancelled. Device disconnected.');
+    setStatusMessage('Transfer cancelled.');
     if (pollTriggerRef.current) pollTriggerRef.current();
   }, []);
 
-  // Clear non-active queue items
+  // Clear all queue items
   const clearQueue = useCallback(() => {
+    setQueue([]);
+  }, []);
+
+  // Clear non-active queue items
+  const clearCompletedQueue = useCallback(() => {
     setQueue(prev => prev.filter(item => item.status === 'transferring'));
-    if (!latestTransferringRef.current) {
-      setQueue([]);
-    }
   }, []);
 
   // Clear all history
@@ -372,7 +375,7 @@ export function useAeroSyncStore() {
     enqueueFiles,
     cancelTransfer,
     clearQueue,
-    clearCompletedQueue: clearQueue,
+    clearCompletedQueue,
     clearHistory,
     updateSettings,
     refreshStorage
