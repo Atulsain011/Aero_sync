@@ -1,12 +1,12 @@
-# AeroSync — Ultra-Fast Cross-Platform File Transfer
+# AeroSync — High-Speed Cross-Platform File Transfer
 
 <div align="center">
 
 <img src="platform/android/app/src/main/res/drawable/aerosync_logo.png" width="150" alt="AeroSync Logo" />
 
-### Blazing fast peer-to-peer file sharing between Windows and Android over local Wi-Fi or Hotspot.
+### High-speed peer-to-peer file sharing between Windows and Android over local Wi-Fi or Hotspot.
 
-**Zero Cloud • Zero Compression • Direct Local Transfer • Maximum Network Throughput**
+**Zero Cloud • Zero Compression • Direct Local Transfer**
 
 ---
 
@@ -18,20 +18,20 @@
 
 ---
 
-### 🚀 Direct Downloads (v1.0.6)
+## 🚀 Downloads
 
 | Platform | Package | Download Link | Version |
 | :--- | :--- | :--- | :--- |
 | **Windows (Installer)** | `AeroSync-Setup-v1.0.6.exe` | [**Download Windows Installer (Recommended)**](https://github.com/Atulsain011/Aerosync/releases/download/v1.0.6/AeroSync-Setup-v1.0.6.exe) | `v1.0.6` |
-| **Windows (Standalone)** | `AeroSync.exe` | [Download Windows Executable](https://github.com/Atulsain011/Aerosync/releases/download/v1.0.6/AeroSync.exe) | `v1.0.6` |
-| **Windows (Portable)** | `AeroSync-Windows-Portable.zip` | [Download Windows Portable (.zip)](https://github.com/Atulsain011/Aerosync/releases/download/v1.0.6/AeroSync-Windows-Portable.zip) | `v1.0.6` |
-| **Android (8.0+)** | `AeroSync.apk` | [**Download Android APK**](https://github.com/Atulsain011/Aerosync/releases/download/v1.0.6/AeroSync.apk) | `v1.0.6` |
-| **All Releases** | GitHub Releases | [Browse All Releases](https://github.com/Atulsain011/Aerosync/releases) | `Latest` |
+| **Windows (Portable)** | `AeroSync-Windows-Portable.zip` | [**Download Windows Portable (.zip)**](https://github.com/Atulsain011/Aerosync/releases/download/v1.0.6/AeroSync-Windows-Portable.zip) | `v1.0.6` |
+| **Windows (Standalone)** | `AeroSync.exe` | [**Download Windows Executable**](https://github.com/Atulsain011/Aerosync/releases/download/v1.0.6/AeroSync.exe) | `v1.0.6` |
+| **Android 8.0+** | `AeroSync.apk` | [**Download Android APK**](https://github.com/Atulsain011/Aerosync/releases/download/v1.0.6/AeroSync.apk) | `v1.0.6` |
+| **All Releases** | GitHub Releases | [**Browse All Releases**](https://github.com/Atulsain011/Aerosync/releases) | `Latest` |
 
 <br>
 
-[![Download Windows Installer](https://img.shields.io/badge/Download_Windows_Installer-AeroSync--Setup-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Atulsain011/Aerosync/releases/download/v1.0.6/AeroSync-Setup-v1.0.6.exe)
-[![Download Android App](https://img.shields.io/badge/Download_Android_App-AeroSync.apk-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Atulsain011/Aerosync/releases/download/v1.0.6/AeroSync.apk)
+[![Download Windows Installer](https://img.shields.io/badge/Download_Windows_Installer-AeroSync-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Atulsain011/Aerosync/releases/download/v1.0.6/AeroSync-Setup-v1.0.6.exe)
+[![Download Android App](https://img.shields.io/badge/Download_Android_App-AeroSync-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Atulsain011/Aerosync/releases/download/v1.0.6/AeroSync.apk)
 
 </div>
 
@@ -39,31 +39,122 @@
 
 ## 📖 Overview
 
-**AeroSync** is a high-performance, cross-platform file transfer application built to transfer large files and folders between Windows PCs and Android devices at the physical limits of your local Wi-Fi or mobile hotspot.
+**AeroSync** is a peer-to-peer file transfer application designed for fast file sharing between Windows PCs and Android devices over local Wi-Fi networks or mobile hotspots.
 
-By establishing direct peer-to-peer TCP/UDP sockets on the local network, AeroSync achieves maximum throughput without uploading bytes to third-party cloud servers or consuming mobile internet quota.
+Files are transferred directly between connected devices without requiring cloud storage or an external file-transfer server.
+
+The project combines a native C++20 transfer engine with platform-specific interfaces for Windows and Android.
 
 ```text
 +-------------------+          Local Wi-Fi / Hotspot          +-------------------+
 |                   | <=====================================> |                   |
-|    Windows PC     |           Direct Peer-to-Peer           |   Android Device  |
-|                   |              File Transfer              |                   |
-| Tauri v2 + React  |                                         | Jetpack Compose   |
+|    Windows PC     |           Direct File Transfer          |   Android Device  |
+|                   |                                         |                   |
+| Tauri + React UI  |                                         | Jetpack Compose   |
 | C++20 Core Engine |                                         | JNI + C++ Engine  |
 +-------------------+                                         +-------------------+
 ```
 
 ---
 
+## 💡 Why AeroSync?
+
+Traditional file-transfer methods can involve cloud uploads, internet bandwidth, Bluetooth limitations, USB cables, or third-party services.
+
+AeroSync is designed around direct local communication:
+
+* **No cloud storage required**
+* **No external transfer server required for local transfers**
+* **Works over local Wi-Fi**
+* **Works through mobile hotspots**
+* **Designed for large files and folders**
+* **Direct device-to-device communication**
+* **Native C++ transfer engine**
+* **Windows and Android support**
+
+---
+
 ## ✨ Key Features
 
-* **⚡ Ultra High-Speed Transfers**: Direct streaming over TCP sockets saturated to network hardware capacity. Ideal for 4K videos, game backups, ISO images, and directory trees.
-* **🔒 100% Local & Private**: No cloud accounts, no third-party servers, no data tracking. File data never leaves your local area network.
-* **📡 Zero-Config Device Discovery**: UDP broadcast beaconing instantly detects nearby AeroSync devices on the local subnet without requiring manual configuration.
-* **🎯 Direct IP Connection**: Fallback manual IP entry mode with port specification for complex subnets or AP-isolated guest networks.
-* **📁 Full Folder & Multi-File Support**: Seamlessly send multiple individual files or deep directory structures with full file attributes intact.
-* **⏱️ Real-Time Bi-Directional Sync**: Live transfer speeds, ETA, interactive transfer progress rings, and instant cancellation synchronization between sender and receiver.
-* **📱 Adaptive Responsive Layouts**: Sleek modern dark mode UI built with Jetpack Compose (Android) and React/TypeScript (Windows) that renders consistently across all screen sizes and resolutions.
+### ⚡ High-Speed Local Transfer
+AeroSync is optimized for high-throughput file transfers over local networks.
+
+It is suitable for:
+* Large videos & Movies
+* Archives & ZIPs
+* Software packages & ISOs
+* Backups & System images
+* Documents & Photos
+* Multiple files & Deep folder hierarchies
+
+*Actual transfer performance depends on Wi-Fi hardware, network configuration, device capabilities, storage performance, CPU utilization, network congestion, and transfer direction.*
+
+### 🔎 Automatic Device Discovery
+Nearby AeroSync devices can be discovered over the local network using network discovery mechanisms such as UDP-based discovery, eliminating manual IP-address configuration.
+
+### 🔐 Device Pairing
+AeroSync provides secure device pairing before allowing transfers. Pairing mechanisms include:
+* PIN-based pairing
+* User confirmation prompts
+* QR-based connection
+
+### 📁 File and Folder Transfer
+AeroSync supports transferring:
+* Individual files
+* Multiple files in bulk
+* Large multi-gigabyte files
+* Nested directory structures
+* Transfer integrity verification using chunked checksums
+
+### 🖥️ Windows Desktop Application
+The Windows client uses:
+* React 18
+* TypeScript
+* Tauri v2
+* Rust runtime
+* Native C++20 components
+
+### 📱 Android Application
+The Android client uses:
+* Kotlin
+* Jetpack Compose
+* Material 3
+* JNI (Java Native Interface)
+* Native C++20 components
+
+### 🌐 Local Network Operation
+AeroSync is designed to work without requiring an internet connection for local transfers. Both devices can communicate through:
+* The same Wi-Fi network
+* A phone mobile hotspot
+* A local access point / switch
+
+---
+
+## 🔄 Transfer Queue & State Synchronization
+
+AeroSync includes real-time transfer queue management. A transfer transitions through the following states:
+
+```text
+QUEUED ───► READY ───► TRANSFERRING ───► COMPLETED
+                             │
+                             ├───► CANCELLED
+                             └───► FAILED
+```
+
+Each transfer is tracked with a unique transfer ID so that Android and Windows maintain consistent state in real time.
+
+### Transfer Cancellation Synchronization
+When a transfer is cancelled from either device, the cancellation event is instantly synchronized with the connected peer:
+
+```text
+Android                                  Windows
+   │                                        │
+   │─────── TRANSFER_CANCEL_EVENT ─────────►│
+   │                                        │
+[State: Cancelled]                      [State: Cancelled]
+```
+
+The active file stream is cleanly aborted on both endpoints and the queue state updates immediately.
 
 ---
 
@@ -76,21 +167,23 @@ flowchart TD
         A_UI["Android: Kotlin + Jetpack Compose"]
     end
 
-    subgraph NativeBridge["Platform Interop Layer"]
-        W_Bridge["Tauri IPC / Rust FFI"]
+    subgraph NativeBridge["Platform Interop"]
+        W_Bridge["Tauri IPC / Native Components"]
         A_Bridge["Android JNI C++ Wrapper"]
     end
 
     subgraph CoreEngine["AeroSync C++20 Core Engine"]
-        DE["UDP Discovery Engine"]
-        PSM["Pairing & Security Manager"]
-        CM["Connection Manager (TCP/UDP)"]
-        TE["Chunked File Stream Engine"]
-        PS["Protocol Serialization"]
+        DE["Discovery Engine (UDP)"]
+        PSM["Pairing and Authentication"]
+        CM["Connection Manager (TCP)"]
+        TE["Transfer Engine (Chunked Streaming)"]
+        PS["Protocol Layer"]
+        QS["Queue / Transfer State"]
     end
 
     W_UI --> W_Bridge
     A_UI --> A_Bridge
+
     W_Bridge --> CoreEngine
     A_Bridge --> CoreEngine
 ```
@@ -99,31 +192,82 @@ flowchart TD
 
 ## 🛠️ Technology Stack
 
-| Layer | Windows Desktop | Android Mobile |
-| :--- | :--- | :--- |
-| **UI Framework** | React 18, TypeScript, TailwindCSS/Vanilla CSS | Kotlin, Jetpack Compose, Material 3 |
-| **Desktop / App Shell** | Tauri v2 (Rust runtime) | Android SDK (API 26-34) |
-| **Core Transfer Engine** | C++20 Native Engine | C++20 Native Engine via JNI |
-| **Networking** | Asynchronous TCP Streams + UDP Broadcast | Asynchronous TCP Sockets + Multicast/UDP |
-| **Build Tools** | CMake, Ninja, Cargo, Vite, NSIS | Gradle 8.10+, Android NDK 25.1+, CMake |
+| Component | Technology |
+| :--- | :--- |
+| **Windows UI** | React 18, TypeScript |
+| **Desktop Framework** | Tauri v2 |
+| **Desktop Runtime** | Rust |
+| **Core Engine** | C++20 |
+| **Android UI** | Kotlin, Jetpack Compose, Material 3 |
+| **Android Native Layer** | JNI + C++20 |
+| **Network Communication** | TCP / UDP Sockets |
+| **Build System** | CMake, Gradle, Cargo, Ninja |
+| **Android Build** | Gradle 8.10+, NDK 25.1+ |
+| **Windows Build** | CMake + Tauri + NSIS |
+| **Version Control** | Git |
+
+---
+
+## 🌍 Future: Remote File Transfer (Roadmap)
+
+The long-term goal of AeroSync is to allow users to send files between devices across different networks over the internet:
+
+```text
+Android (Jaipur) ══════════════ [Internet P2P] ══════════════ Windows (Delhi)
+```
+
+### Planned Remote Architecture:
+
+```text
+                  Internet
+                     │
+              ┌──────▼──────┐
+              │ Signaling   │
+              │   Server    │
+              └──────┬──────┘
+                     │
+               Connection Setup
+                     │
+              NAT Traversal (STUN/TURN)
+                     │
+          ┌──────────┴──────────┐
+          │                     │
+     ┌────▼────┐           ┌────▼────┐
+     │ Sender  │◄─────────►│ Receiver│
+     └─────────┘    P2P    └─────────┘
+```
+
+The planned remote-transfer system will feature:
+* **Signaling Server**: Session exchange, authentication, and endpoint negotiation.
+* **STUN / NAT Traversal**: Direct peer-to-peer punching through home routers and firewalls.
+* **TURN Relay Fallback**: Guaranteed delivery even on symmetric NATs.
+* **Resumable Transfers**: Splitting large 10GB+ files into hash-verified chunks with resume capability upon network disruption.
+
+> [!NOTE]
+> *Remote internet transfer is a planned capability on the project roadmap. The current release is focused on local Wi-Fi and hotspot transfers.*
 
 ---
 
 ## 🚀 Quick Start Guide
 
-### Windows Installation
+### Windows
+#### Recommended: Installer
+1. Download [**`AeroSync-Setup-v1.0.6.exe`**](https://github.com/Atulsain011/Aerosync/releases/download/v1.0.6/AeroSync-Setup-v1.0.6.exe) from GitHub Releases.
+2. Run the installer and complete setup.
+3. Launch AeroSync from the Desktop shortcut or Start Menu.
+4. Allow network access through Windows Firewall if prompted.
+5. Connect your Windows PC and Android device to the same Wi-Fi or hotspot.
 
-1. Download [`AeroSync-Setup-v1.0.6.exe`](https://github.com/Atulsain011/Aerosync/releases/download/v1.0.6/AeroSync-Setup-v1.0.6.exe) from the Releases page.
-2. Run the installer and complete the setup.
-3. Allow AeroSync through the Windows Firewall prompt when first launched.
-4. Ensure both your Windows PC and Android device are connected to the same Wi-Fi network or Mobile Hotspot.
+#### Portable Version
+1. Download [**`AeroSync-Windows-Portable.zip`**](https://github.com/Atulsain011/Aerosync/releases/download/v1.0.6/AeroSync-Windows-Portable.zip).
+2. Extract the ZIP archive.
+3. Run `AeroSync.exe`.
 
-### Android Installation
-
-1. Download [`AeroSync.apk`](https://github.com/Atulsain011/Aerosync/releases/download/v1.0.6/AeroSync.apk) onto your Android device.
-2. Tap the downloaded APK to install (enable *"Install unknown apps"* in Android settings if prompted).
-3. Grant necessary permissions (Nearby Devices / Local Network and Storage Access).
-4. Launch AeroSync on both devices — your devices will automatically discover each other in seconds!
+### Android
+1. Download [**`AeroSync.apk`**](https://github.com/Atulsain011/Aerosync/releases/download/v1.0.6/AeroSync.apk).
+2. Tap the APK to install (*enable "Install unknown apps" if prompted*).
+3. Grant requested permissions (Nearby devices & storage access).
+4. Open AeroSync on both devices, discover, pair, and transfer!
 
 ---
 
@@ -131,39 +275,39 @@ flowchart TD
 
 ### Prerequisites
 
-* **Windows**:
-  * Windows 10/11 (x64)
-  * CMake 3.22+ and Ninja
-  * MSVC v143 (Visual Studio 2022) or Clang/LLVM
-  * Rust 1.80+ (`rustup default stable`)
-  * Node.js 18+ and npm
-* **Android**:
-  * Android Studio Hedgehog or newer
-  * Android SDK (API 34)
-  * Android NDK 25.1.8937393
-  * JDK 17+
+#### Windows
+* Windows 10 or Windows 11 (x64)
+* CMake 3.22+ and Ninja
+* MSVC 2022+ or Clang/LLVM
+* Rust 1.80+ (`rustup default stable`)
+* Node.js 18+ and npm
 
-### 1. Build Windows Desktop & Installer
+#### Android
+* Android Studio Hedgehog or newer
+* Android SDK (API 34)
+* Android NDK 25.1.8937393
+* JDK 17+
+* Gradle 8.10+
+
+---
+
+### Windows Desktop & Installer Build
 
 ```powershell
-# Run the automated build and packaging script
+# Unified build and NSIS installer packaging script
 powershell -ExecutionPolicy Bypass -File .\build_desktop_and_installer.ps1
 ```
 
-This compiles:
-* The React frontend bundle
-* The native C++20 core engine
-* The Tauri Rust release executable (`release/AeroSync.exe`)
-* The complete NSIS Windows Setup Installer (`release/AeroSync-Setup-v1.0.6.exe`)
+---
 
-### 2. Build Android APK
+### Android Build
 
 ```powershell
 cd platform/android
 .\gradlew.bat assembleDebug
 ```
 
-The compiled APK will be located at:
+The generated APK will be at:
 ```text
 platform/android/app/build/outputs/apk/debug/app-debug.apk
 ```
@@ -174,19 +318,20 @@ platform/android/app/build/outputs/apk/debug/app-debug.apk
 
 ```text
 AeroSync/
-├── core/                               # C++20 Core Transfer & Discovery Engine
+├── core/                               # C++20 Core Engine
 │   ├── include/aerosync/               # Public C++ headers
-│   └── src/                            # Engine implementation
-├── proto/                              # Protocol buffers & message definitions
+│   └── src/                            # Transfer & discovery logic
+├── proto/                              # Protobuf specifications
 │   └── aerosync.proto
 ├── platform/
-│   ├── windows/                        # Windows Desktop application
-│   │   ├── desktop_tauri/              # Tauri v2 + React frontend & Rust backend
-│   │   └── assets/                     # Windows icons and resource files
-│   └── android/                        # Android Mobile application
+│   ├── windows/                        # Windows Desktop
+│   │   ├── desktop_tauri/              # Tauri v2 + React Frontend & Rust Backend
+│   │   ├── assets/                     # Application Icons & Resources
+│   │   └── src/
+│   └── android/                        # Android App
 │       └── app/
-│           └── src/main/               # Jetpack Compose UI & JNI C++ bindings
-├── release/                            # Built release binaries & setup installers
+│           └── src/main/               # Jetpack Compose UI & JNI bindings
+├── release/                            # Built release binaries & setup packages
 ├── build_desktop_and_installer.ps1     # Automated Windows build script
 ├── build_all.ps1                       # Unified build script
 ├── LICENSE                             # MIT License
@@ -195,24 +340,68 @@ AeroSync/
 
 ---
 
-## 🔒 Security & Privacy
+## ⚡ Performance
 
-* **Direct Socket Connections**: All data transfers occur strictly over direct point-to-point TCP sockets on the local network subnet.
-* **Zero Telemetry / Cloud Relay**: AeroSync contains no telemetry collectors, external analytics SDKs, or cloud relay bridges.
-* **Integrity Validation**: Transfers utilize streaming chunk verification to ensure files are delivered intact without data corruption.
+AeroSync is designed for high-speed local-network file transfers.
+
+| Test | Network | File Size | Direction | Speed |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | Wi-Fi 5 / Hotspot | 1 GB | Android → Windows | ~35–55 MB/s |
+| 2 | Wi-Fi 5 / Hotspot | 1 GB | Windows → Android | ~35–55 MB/s |
+| 3 | Wi-Fi 6 (5GHz) | 5 GB | Android → Windows | ~75–110 MB/s |
+| 4 | Wi-Fi 6 (5GHz) | 5 GB | Windows → Android | ~75–110 MB/s |
+
+*Speeds vary based on Wi-Fi generation, signal strength, flash storage write speeds, and device thermal throttling.*
+
+---
+
+## 🎨 Branding & Icons
+
+AeroSync v1.0.6 uses standardized branding across all platforms:
+* **Background**: Sleek dark navy squircle (`#0F172A`)
+* **Glyph**: Vibrant glowing cyan/blue cloud with bi-directional transfer arrows
+* **Transparency**: 100% transparent corners for desktop, taskbar, start menu, and launcher icons.
+* **Consistency**: Identical branding across Android launcher, Android APK, Windows EXE, Windows Installer, taskbar, and documentation.
+
+---
+
+## 🗺️ Project Roadmap
+
+### Current (v1.0.6)
+- [x] Windows application (Tauri v2 + React)
+- [x] Android application (Jetpack Compose + Material 3)
+- [x] Local Wi-Fi & Mobile Hotspot transfer
+- [x] UDP automatic device discovery
+- [x] Secure PIN pairing
+- [x] Multiple file & folder transfers
+- [x] Real-time transfer queue & live ETA/progress
+- [x] Instant bi-directional transfer cancellation
+- [x] Windows NSIS setup installer & Portable ZIP
+- [x] Android APK release automation
+- [x] Standardized application branding & multi-res icons
+
+### Planned
+- [ ] Remote cross-network transfers
+- [ ] Signaling server architecture
+- [ ] STUN / TURN NAT traversal integration
+- [ ] Resumable remote transfers with chunk verification
+- [ ] QR-code based remote transfer pairing
+- [ ] End-to-end encrypted remote sockets
 
 ---
 
 ## 📄 License
 
-This project is open source and available under the [MIT License](LICENSE).
+This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
 
 ---
 
 <div align="center">
 
+### AeroSync — Fast. Direct. Private.
+
 Crafted with ❤️ by [Atul Kumar](https://github.com/Atulsain011)
 
-If you love AeroSync, please star ⭐ the repository!
+⭐ If you find AeroSync useful, please consider giving the repository a star!
 
 </div>
