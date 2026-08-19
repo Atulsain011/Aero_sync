@@ -67,7 +67,7 @@ Section "MainSection" SEC01
     ; 1. Copy Main Executable and Critical Runtime DLLs
     File "..\..\..\release\AeroSync.exe"
     File "..\..\..\release\WebView2Loader.dll"
-    File /nonfatal "..\..\..\build_windows\aerosync_daemon.exe"
+    File "..\..\..\release\aerosync_daemon.exe"
 
     ; 2. Create Start Menu Shortcuts
     CreateDirectory "$SMPROGRAMS\AeroSync"

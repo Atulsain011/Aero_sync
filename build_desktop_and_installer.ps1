@@ -13,17 +13,11 @@ Remove-Item -Recurse -Force "$env:TEMP\aerosync_cargo_target\release\build\aeros
 Remove-Item -Recurse -Force "$env:TEMP\aerosync_cargo_target\release\deps\aerosync_desktop-*" -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force "$env:TEMP\aerosync_cargo_target\release\aerosync-desktop.exe" -ErrorAction SilentlyContinue
 
-Write-Host "0. Building Windows Native Core Daemon (aerosync_daemon.exe)..." -ForegroundColor Cyan
-$cmake = "$root\.tools\cmake-3.30.0-windows-x86_64\bin\cmake.exe"
-$ninja = "$root\.tools\ninja-win\ninja.exe"
-if ((Test-Path $cmake) -and (Test-Path $ninja)) {
-    & $cmake -B "$root\build_windows" -S "$root\platform\windows" -G "Ninja" `
-        "-DCMAKE_MAKE_PROGRAM=$ninja" `
-        "-DCMAKE_CXX_COMPILER=$toolBin\clang++.exe" `
-        "-DCMAKE_C_COMPILER=$toolBin\clang.exe" `
-        "-DCMAKE_BUILD_TYPE=Release"
-    & $cmake --build "$root\build_windows"
-}
+Write-Host "0. Building Standalone Static Native Core Daemon (aerosync_daemon.exe)..." -ForegroundColor Cyan
+& "$toolBin\g++.exe" -O3 -std=c++17 -static -I"$root\core\include" -I"$root\platform\windows\include" "$root\platform\windows\src\daemon_main.cpp" "$root\core\core_build\libaerosync_core.a" -lws2_32 -lmswsock -liphlpapi -lshell32 -lole32 -luuid -o "$root\build_windows\aerosync_daemon.exe"
+Copy-Item "$root\build_windows\aerosync_daemon.exe" "$root\release\aerosync_daemon.exe" -Force
+Copy-Item "$root\build_windows\aerosync_daemon.exe" "$root\platform\windows\desktop_tauri\aerosync_daemon.exe" -Force
+Copy-Item "$root\build_windows\aerosync_daemon.exe" "$root\platform\windows\desktop_tauri\src-tauri\aerosync_daemon.exe" -Force
 
 Write-Host "1. Building Web Assets..." -ForegroundColor Cyan
 Push-Location "$root\platform\windows\desktop_tauri"
@@ -56,7 +50,7 @@ if (Test-Path $dllSrc) {
     Copy-Item $dllSrc "$root\release\WebView2Loader.dll" -Force
 }
 
-Write-Host "4. Building NSIS Setup Installer with Bundled WebView2Loader.dll..." -ForegroundColor Cyan
+Write-Host "4. Building NSIS Setup Installer with Bundled WebView2Loader.dll and aerosync_daemon.exe..." -ForegroundColor Cyan
 $makensisPath = "C:\Users\Atul\AppData\Local\tauri\NSIS\Bin\makensis.exe"
 if (Test-Path $makensisPath) {
     & $makensisPath "$root\platform\windows\installer\AeroSync_Installer.nsi"
@@ -69,6 +63,7 @@ Write-Host "5. Creating Windows Portable Zip..." -ForegroundColor Cyan
 $portableDir = "$root\release\AeroSync-Windows-Portable"
 if (!(Test-Path $portableDir)) { New-Item -ItemType Directory -Path $portableDir -Force }
 Copy-Item "$root\release\AeroSync.exe" "$portableDir\AeroSync.exe" -Force
+Copy-Item "$root\release\aerosync_daemon.exe" "$portableDir\aerosync_daemon.exe" -Force
 Copy-Item "$root\release\WebView2Loader.dll" "$portableDir\WebView2Loader.dll" -Force
 Compress-Archive -Path "$portableDir\*" -DestinationPath "$root\release\AeroSync-Windows-Portable.zip" -Force
 
