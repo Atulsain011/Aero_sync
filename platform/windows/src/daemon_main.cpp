@@ -441,7 +441,7 @@ static void handleHttpClient(socket_t clientSock) {
 int main(int argc, char** argv) {
 #ifdef _WIN32
     // Enforce Single-Instance Core Daemon to prevent duplicate discovery beacons
-    HANDLE hMutex = CreateMutexA(NULL, TRUE, "Global\\AeroSync_Core_Daemon_SingleInstance");
+    HANDLE hMutex = CreateMutexA(NULL, TRUE, "AeroSync_Core_Daemon_Mutex_v2");
     if (hMutex == NULL || GetLastError() == ERROR_ALREADY_EXISTS) {
         std::cout << "[Daemon] Another AeroSync Core Daemon is already running. Exiting cleanly." << std::endl;
         return 0;

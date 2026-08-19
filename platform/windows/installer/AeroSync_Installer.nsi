@@ -11,7 +11,7 @@
 ; ------------------------------------------------------------------------------
 !define PRODUCT_NAME "AeroSync"
 !define PRODUCT_VERSION "1.0.6"
-!define PRODUCT_PUBLISHER "AeroSync Team"
+!define PRODUCT_PUBLISHER "AeroSync"
 !define PRODUCT_WEB_SITE "https://github.com/Atulsain011/Aero_sync"
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\AeroSync.exe"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
@@ -22,7 +22,19 @@ OutFile "..\..\..\release\AeroSync-Setup-v1.0.6.exe"
 InstallDir "$LOCALAPPDATA\Programs\AeroSync"
 InstallDirRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_DIR_REGKEY}" ""
 RequestExecutionLevel user
-SetCompressor /SOLID lzma
+SetCompressor zlib
+
+; ------------------------------------------------------------------------------
+; Version Information Resource (PE Header)
+; ------------------------------------------------------------------------------
+VIProductVersion "1.0.6.0"
+VIAddVersionKey "ProductName" "AeroSync"
+VIAddVersionKey "Comments" "High-Speed Peer-to-Peer Local Network File Transfer"
+VIAddVersionKey "CompanyName" "AeroSync"
+VIAddVersionKey "LegalCopyright" "Copyright (C) 2026 AeroSync"
+VIAddVersionKey "FileDescription" "AeroSync Setup Installer"
+VIAddVersionKey "FileVersion" "1.0.6.0"
+VIAddVersionKey "ProductVersion" "1.0.6.0"
 
 ; ------------------------------------------------------------------------------
 ; Interface Configuration & Branding
@@ -52,12 +64,6 @@ Section "MainSection" SEC01
     SetOutPath "$INSTDIR"
     SetOverwrite on
 
-    ; 0. Close existing running instance so files are not locked
-    nsExec::Exec 'taskkill /F /IM AeroSync.exe /T'
-    nsExec::Exec 'taskkill /F /IM aerosync-desktop.exe /T'
-    nsExec::Exec 'taskkill /F /IM aerosync_daemon.exe /T'
-    Sleep 500
-
     ; 1. Copy Main Executable and Critical Runtime DLLs
     File "..\..\..\release\AeroSync.exe"
     File "..\..\..\release\WebView2Loader.dll"
@@ -71,13 +77,10 @@ Section "MainSection" SEC01
     ; 3. Create Desktop Shortcut
     CreateShortcut "$DESKTOP\AeroSync.lnk" "$INSTDIR\AeroSync.exe" "" "$INSTDIR\AeroSync.exe" 0
 
-    ; 4. Add Windows Firewall Rule for Local P2P Transfer (User level / Best effort)
-    ExecShell "open" "powershell" "-WindowStyle Hidden -Command New-NetFirewallRule -DisplayName 'AeroSync P2P Engine' -Direction Inbound -Program '$INSTDIR\AeroSync.exe' -Action Allow -Profile Private,Public -ErrorAction SilentlyContinue"
-
-    ; 5. Write Uninstaller
+    ; 4. Write Uninstaller
     WriteUninstaller "$INSTDIR\uninstall.exe"
 
-    ; 6. Registry Keys for Windows Add/Remove Programs
+    ; 5. Registry Keys for Windows Add/Remove Programs
     WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\AeroSync.exe"
     WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
     WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\uninstall.exe"
@@ -92,9 +95,6 @@ SectionEnd
 ; Uninstaller Section
 ; ------------------------------------------------------------------------------
 Section Uninstall
-    ; Remove Firewall Rule
-    ExecShell "open" "powershell" "-WindowStyle Hidden -Command Remove-NetFirewallRule -DisplayName 'AeroSync P2P Engine' -ErrorAction SilentlyContinue"
-
     ; Remove Shortcuts
     Delete "$DESKTOP\AeroSync.lnk"
     Delete "$SMPROGRAMS\AeroSync\AeroSync.lnk"
@@ -104,6 +104,7 @@ Section Uninstall
     ; Remove Files
     Delete "$INSTDIR\AeroSync.exe"
     Delete "$INSTDIR\WebView2Loader.dll"
+    Delete "$INSTDIR\aerosync_daemon.exe"
     Delete "$INSTDIR\uninstall.exe"
 
     ; Remove Directory
