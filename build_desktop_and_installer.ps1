@@ -39,23 +39,21 @@ if (Test-Path $dllSrc) {
     Copy-Item $dllSrc "$root\release\WebView2Loader.dll" -Force
 }
 
-Write-Host "4. Building NSIS Setup Installer..." -ForegroundColor Cyan
-Push-Location "$root\platform\windows\desktop_tauri"
-try {
-    & npx @tauri-apps/cli build --bundles nsis
-} finally {
-    Pop-Location
-}
-
-$setupExe = Get-ChildItem "$env:TEMP\aerosync_cargo_target\release\bundle\nsis\*-setup.exe", "$root\platform\windows\desktop_tauri\src-tauri\target\release\bundle\nsis\*-setup.exe" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-
-if ($setupExe) {
-    Write-Host "Found NSIS installer: $($setupExe.FullName)" -ForegroundColor Green
-    Copy-Item $setupExe.FullName "$root\release\AeroSync-Setup-v1.0.6.exe" -Force
-    Copy-Item $setupExe.FullName "$root\release\AeroSync-Setup-v1.0.5.exe" -Force
-    Copy-Item $setupExe.FullName "$root\release\AeroSync-Setup.exe" -Force
+Write-Host "4. Building NSIS Setup Installer with Bundled WebView2Loader.dll..." -ForegroundColor Cyan
+$makensisPath = "C:\Users\Atul\AppData\Local\tauri\NSIS\Bin\makensis.exe"
+if (Test-Path $makensisPath) {
+    & $makensisPath "$root\platform\windows\installer\AeroSync_Installer.nsi"
+    Copy-Item "$root\release\AeroSync-Setup-v1.0.6.exe" "$root\release\AeroSync-Setup-v1.0.5.exe" -Force
+    Copy-Item "$root\release\AeroSync-Setup-v1.0.6.exe" "$root\release\AeroSync-Setup.exe" -Force
+    Write-Host "Successfully generated AeroSync-Setup-v1.0.6.exe with all runtime dependencies." -ForegroundColor Green
 } else {
-    Write-Host "Warning: NSIS installer not found in expected folder." -ForegroundColor Yellow
+    Write-Host "Makensis not found at $makensisPath, falling back to tauri build..." -ForegroundColor Yellow
+    Push-Location "$root\platform\windows\desktop_tauri"
+    try {
+        & npx @tauri-apps/cli build --bundles nsis
+    } finally {
+        Pop-Location
+    }
 }
 
 Write-Host "BUILD AND PACKAGING COMPLETED SUCCESSFULLY!" -ForegroundColor Green

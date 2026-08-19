@@ -30,6 +30,9 @@
   },
   "bundle": {
     "active": true,
+    "resources": [
+      "WebView2Loader.dll"
+    ],
     "icon": [
       "icons/icon.ico",
       "icons/16x16.png",
