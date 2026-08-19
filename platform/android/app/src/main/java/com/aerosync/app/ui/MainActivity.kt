@@ -193,6 +193,7 @@ class MainActivity : ComponentActivity() {
                         onCancelTransfer = { viewModel.cancelActiveTransfer() },
                         onSelectTab = { viewModel.setSelectedTab(it) },
                         onRemoveQueueItem = { viewModel.removeQueueItem(it) },
+                        onClearQueue = { viewModel.clearCompletedQueue() },
                         onClearHistory = { viewModel.clearHistory() },
                         onChangeDownloadLocation = { folderPickerLauncher.launch(null) },
                         onToggleTheme = { viewModel.toggleTheme() }

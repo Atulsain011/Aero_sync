@@ -692,6 +692,22 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun clearCompletedQueue() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val activeId = _uiState.value.activeTransfer?.queueItemId
+            val pendingItems = dbHelper.getAllQueueItems().filter { it.id != activeId && it.status != QueueItemStatus.TRANSFERRING }
+            pendingItems.forEach { dbHelper.deleteQueueItem(it.id) }
+            val updated = dbHelper.getAllQueueItems()
+            _uiState.update { state ->
+                state.copy(
+                    transferQueue = updated,
+                    statusMessage = "Queue cleared."
+                )
+            }
+            checkAndStopServiceIfQueueEmpty()
+        }
+    }
+
     fun clearHistory() {
         viewModelScope.launch(Dispatchers.IO) {
             dbHelper.clearHistory()

@@ -193,23 +193,37 @@ export function useAeroSyncStore() {
 
   // Cancel active transfer
   const cancelTransfer = useCallback(async () => {
-    await daemonService.cancelTransfer();
+    try {
+      await daemonService.cancelTransfer();
+    } catch (err) {
+      console.warn('Error cancelling transfer:', err);
+    }
     setQueue(prev => prev.map(item => item.status === 'transferring' ? { ...item, status: 'cancelled' } : item));
     setIsTransferring(false);
     latestTransferringRef.current = false;
+    setCurrentProgress(prev => ({
+      ...prev,
+      state: 3,
+      speedBytesPerSec: 0,
+      progressPercent: 0,
+      etaSeconds: 0
+    }));
     setSelectedPeer(null);
     setStatusMessage('Transfer cancelled. Device disconnected.');
     if (pollTriggerRef.current) pollTriggerRef.current();
   }, []);
 
-  // Clear completed/cancelled queue items
+  // Clear non-active queue items
   const clearCompletedQueue = useCallback(() => {
-    setQueue(prev => prev.filter(item => item.status === 'transferring' || item.status === 'waiting'));
+    setQueue(prev => prev.filter(item => item.status === 'transferring'));
   }, []);
 
   // Clear all history
   const clearHistory = useCallback(() => {
     setHistory([]);
+    try {
+      localStorage.removeItem(STORAGE_KEY_HISTORY);
+    } catch {}
   }, []);
 
   // Update Settings

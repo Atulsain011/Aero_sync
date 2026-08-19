@@ -225,13 +225,14 @@ fun HomeScreen(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 8.dp, vertical = 10.dp),
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                        .padding(horizontal = 4.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Row(
+                                        modifier = Modifier.weight(1f),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                        horizontalArrangement = Arrangement.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Bolt,
@@ -239,6 +240,7 @@ fun HomeScreen(
                                             tint = Color(0xFF2563EB),
                                             modifier = Modifier.size(15.dp)
                                         )
+                                        Spacer(modifier = Modifier.width(4.dp))
                                         Column(horizontalAlignment = Alignment.Start) {
                                             Text(
                                                 text = "High-speed",
@@ -260,14 +262,15 @@ fun HomeScreen(
 
                                     Box(
                                         modifier = Modifier
-                                            .height(24.dp)
+                                            .height(20.dp)
                                             .width(1.dp)
                                             .background(borderColor)
                                     )
 
                                     Row(
+                                        modifier = Modifier.weight(1.1f),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                        horizontalArrangement = Arrangement.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Storage,
@@ -275,9 +278,10 @@ fun HomeScreen(
                                             tint = Color(0xFF10B981),
                                             modifier = Modifier.size(15.dp)
                                         )
+                                        Spacer(modifier = Modifier.width(4.dp))
                                         Column(horizontalAlignment = Alignment.Start) {
                                             Text(
-                                                text = "Multi-gigabyte",
+                                                text = "Gigabyte+",
                                                 fontSize = 10.5.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = textPrimary,
@@ -296,14 +300,15 @@ fun HomeScreen(
 
                                     Box(
                                         modifier = Modifier
-                                            .height(24.dp)
+                                            .height(20.dp)
                                             .width(1.dp)
                                             .background(borderColor)
                                     )
 
                                     Row(
+                                        modifier = Modifier.weight(1f),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                        horizontalArrangement = Arrangement.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Wifi,
@@ -311,6 +316,7 @@ fun HomeScreen(
                                             tint = Color(0xFF8B5CF6),
                                             modifier = Modifier.size(15.dp)
                                         )
+                                        Spacer(modifier = Modifier.width(4.dp))
                                         Column(horizontalAlignment = Alignment.Start) {
                                             Text(
                                                 text = "Direct",
@@ -430,75 +436,93 @@ fun HomeScreen(
                             }
 
                             // Selected Files List
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 uiState.selectedFiles.forEach { file ->
                                     Surface(
                                         modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(10.dp),
+                                        shape = RoundedCornerShape(12.dp),
                                         color = cardBgAlt,
                                         border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
                                     ) {
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                                                .padding(horizontal = 12.dp, vertical = 10.dp),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp),
                                                 modifier = Modifier.weight(1f)
                                             ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.InsertDriveFile,
-                                                    contentDescription = null,
-                                                    tint = Color(0xFF3B82F6),
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                                Column(modifier = Modifier.weight(1f)) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(36.dp)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(Color(0xFF3B82F6).copy(alpha = 0.12f)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.InsertDriveFile,
+                                                        contentDescription = null,
+                                                        tint = Color(0xFF3B82F6),
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                }
+
+                                                Column(
+                                                    modifier = Modifier.weight(1f),
+                                                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                                                ) {
                                                     Text(
                                                         text = file.fileName,
-                                                        fontSize = 12.5.sp,
+                                                        fontSize = 13.sp,
                                                         fontWeight = FontWeight.SemiBold,
                                                         color = textPrimary,
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis
                                                     )
+
                                                     Row(
                                                         verticalAlignment = Alignment.CenterVertically,
                                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                                     ) {
                                                         Text(
                                                             text = file.formattedSize,
-                                                            fontSize = 10.5.sp,
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Normal,
                                                             color = textSecondary
                                                         )
+
                                                         val ext = file.fileName.substringAfterLast('.', "").uppercase()
-                                                        if (ext.isNotBlank() && ext.length <= 5) {
+                                                        if (ext.isNotBlank() && ext.length <= 6) {
                                                             Surface(
                                                                 shape = RoundedCornerShape(4.dp),
-                                                                color = Color(0xFF3B82F6).copy(alpha = 0.12f)
+                                                                color = Color(0xFF3B82F6).copy(alpha = 0.15f)
                                                             ) {
                                                                 Text(
                                                                     text = ext,
-                                                                    fontSize = 9.sp,
+                                                                    fontSize = 10.sp,
                                                                     fontWeight = FontWeight.Bold,
                                                                     color = Color(0xFF3B82F6),
-                                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                                    maxLines = 1
                                                                 )
                                                             }
                                                         }
+
                                                         Surface(
                                                             shape = RoundedCornerShape(4.dp),
-                                                            color = Color(0xFF10B981).copy(alpha = 0.12f)
+                                                            color = Color(0xFF10B981).copy(alpha = 0.15f)
                                                         ) {
                                                             Text(
                                                                 text = "Selected",
-                                                                fontSize = 9.sp,
+                                                                fontSize = 10.sp,
                                                                 fontWeight = FontWeight.Bold,
                                                                 color = Color(0xFF10B981),
-                                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                                maxLines = 1
                                                             )
                                                         }
                                                     }
@@ -507,7 +531,7 @@ fun HomeScreen(
 
                                             IconButton(
                                                 onClick = { onRemoveSelectedFile(file.id) },
-                                                modifier = Modifier.size(28.dp)
+                                                modifier = Modifier.size(32.dp)
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.Close,

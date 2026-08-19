@@ -39,6 +39,7 @@ fun TransfersScreen(
     onCancelTransfer: () -> Unit,
     onSelectTab: (Int) -> Unit,
     onRemoveQueueItem: (String) -> Unit = {},
+    onClearQueue: () -> Unit = {},
     onClearHistory: () -> Unit = {},
     onChangeDownloadLocation: () -> Unit = {},
     onToggleTheme: () -> Unit = {}
@@ -56,6 +57,10 @@ fun TransfersScreen(
     val textMuted = if (isDark) Color(0xFF6B7280) else Color(0xFF94A3B8)
 
     val dateFormat = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
+
+    val pendingQueueCount = uiState.transferQueue.count {
+        it.status == QueueItemStatus.QUEUED || it.status == QueueItemStatus.PAUSED || it.status == QueueItemStatus.FAILED
+    }
 
     Box(
         modifier = Modifier
@@ -77,19 +82,19 @@ fun TransfersScreen(
                 rightActionContent = {
                     Surface(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(34.dp)
                             .clip(CircleShape)
                             .border(1.dp, borderColor, CircleShape)
                             .clickable { showClearHistoryDialog = true },
                         color = if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF),
-                        shadowElevation = 2.dp
+                        shadowElevation = if (isDark) 0.dp else 2.dp
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.DeleteSweep,
                                 contentDescription = "Clear History",
                                 tint = Color(0xFFEF4444),
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
@@ -162,7 +167,7 @@ fun TransfersScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = active.fileName,
-                                    fontSize = 14.5.sp,
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = textPrimary,
                                     maxLines = 1,
@@ -274,7 +279,7 @@ fun TransfersScreen(
                 }
             }
 
-            // 4. Section Title with Clear History Action
+            // 4. Section Title with Action Buttons
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -289,30 +294,38 @@ fun TransfersScreen(
                     color = textPrimary
                 )
 
-                if (uiState.history.isNotEmpty()) {
-                    Surface(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { showClearHistoryDialog = true },
-                        color = Color(0xFFEF4444).copy(alpha = 0.12f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.25f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (pendingQueueCount > 0) {
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable { onClearQueue() },
+                            color = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.DeleteSweep,
-                                contentDescription = "Clear History",
-                                tint = Color(0xFFEF4444),
-                                modifier = Modifier.size(13.dp)
+                            Text(
+                                text = "Clear Queue",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = textSecondary,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                             )
+                        }
+                    }
+
+                    if (uiState.history.isNotEmpty()) {
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable { showClearHistoryDialog = true },
+                            color = Color(0xFFEF4444).copy(alpha = 0.12f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.25f))
+                        ) {
                             Text(
                                 text = "Clear History",
-                                fontSize = 11.sp,
+                                fontSize = 10.5.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFFEF4444)
+                                color = Color(0xFFEF4444),
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                             )
                         }
                     }
@@ -360,7 +373,7 @@ fun TransfersScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = item.fileName,
-                                    fontSize = 12.5.sp,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = textPrimary,
                                     maxLines = 1,
@@ -368,11 +381,11 @@ fun TransfersScreen(
                                 )
                                 Text(
                                     text = "${item.fileSize / (1024 * 1024)} MB • ${item.status.name}",
-                                    fontSize = 10.5.sp,
+                                    fontSize = 11.sp,
                                     color = textMuted
                                 )
                             }
-                            IconButton(onClick = { onRemoveQueueItem(item.id) }, modifier = Modifier.size(26.dp)) {
+                            IconButton(onClick = { onRemoveQueueItem(item.id) }, modifier = Modifier.size(28.dp)) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
                                     contentDescription = "Remove",
@@ -420,7 +433,7 @@ fun TransfersScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = item.fileName,
-                                    fontSize = 12.5.sp,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = textPrimary,
                                     maxLines = 1,
@@ -428,13 +441,13 @@ fun TransfersScreen(
                                 )
                                 Text(
                                     text = "${item.fileSize / (1024 * 1024)} MB • ${item.peerName} • ${dateFormat.format(Date(item.timestamp))}",
-                                    fontSize = 10.5.sp,
+                                    fontSize = 11.sp,
                                     color = textMuted
                                 )
                             }
                             Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = Color(0xFF10B981).copy(alpha = 0.12f)
+                                shape = RoundedCornerShape(4.dp),
+                                color = Color(0xFF10B981).copy(alpha = 0.14f)
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -449,7 +462,7 @@ fun TransfersScreen(
                                     Spacer(modifier = Modifier.width(3.dp))
                                     Text(
                                         text = "Verified",
-                                        fontSize = 9.5.sp,
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF10B981)
                                     )

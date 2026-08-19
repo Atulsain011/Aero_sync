@@ -15,12 +15,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aerosync.app.data.preferences.ThemeMode
 import com.aerosync.app.ui.theme.AeroBrandGradient
-
-import androidx.compose.ui.text.style.TextOverflow
 
 @Composable
 fun AeroSyncTopAppBar(
@@ -43,16 +42,18 @@ fun AeroSyncTopAppBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left: Project Logo + Brand
+        // Left: Project Logo + Brand (with flexible shrink)
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(end = 4.dp)
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .padding(end = 6.dp)
         ) {
-            AeroSyncLogoIcon(size = 30.dp)
+            AeroSyncLogoIcon(size = 28.dp)
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = title,
-                fontSize = 18.sp,
+                fontSize = 17.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = textPrimary,
                 letterSpacing = (-0.3).sp,
@@ -67,11 +68,11 @@ fun AeroSyncTopAppBar(
                 .clip(RoundedCornerShape(24.dp))
                 .border(1.dp, borderColor, RoundedCornerShape(24.dp)),
             color = if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF),
-            shadowElevation = 2.dp
+            shadowElevation = if (isDark) 0.dp else 2.dp
         ) {
             Row(
-                modifier = Modifier.padding(3.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.padding(2.5.dp),
+                horizontalArrangement = Arrangement.spacedBy(1.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val tabs = listOf(
@@ -84,13 +85,13 @@ fun AeroSyncTopAppBar(
                     val isSelected = selectedTab == tabIndex
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(18.dp))
                             .then(
                                 if (isSelected) Modifier.background(AeroBrandGradient)
                                 else Modifier.background(Color.Transparent)
                             )
                             .clickable { onSelectTab(tabIndex) }
-                            .padding(horizontal = 8.dp, vertical = 5.dp),
+                            .padding(horizontal = 7.dp, vertical = 4.5.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Row(
@@ -117,18 +118,20 @@ fun AeroSyncTopAppBar(
             }
         }
 
+        Spacer(modifier = Modifier.width(6.dp))
+
         // Right Action: Custom Action or Theme Toggle
         if (rightActionContent != null) {
             rightActionContent()
         } else {
             Surface(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(34.dp)
                     .clip(CircleShape)
                     .border(1.dp, borderColor, CircleShape)
                     .clickable { onToggleTheme() },
                 color = if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF),
-                shadowElevation = 2.dp
+                shadowElevation = if (isDark) 0.dp else 2.dp
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -139,7 +142,7 @@ fun AeroSyncTopAppBar(
                         },
                         contentDescription = "Toggle Theme",
                         tint = if (isDark) Color(0xFFFBBF24) else Color(0xFF6366F1),
-                        modifier = Modifier.size(17.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }

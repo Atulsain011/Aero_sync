@@ -238,18 +238,18 @@ fun DevicesScreen(
                                                 Spacer(modifier = Modifier.width(10.dp))
                                                 Column(modifier = Modifier.weight(1f)) {
                                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Text(peer.deviceName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                                                        Text(peer.deviceName, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                                                         if (isSelected) {
                                                             Spacer(modifier = Modifier.width(6.dp))
                                                             Surface(
-                                                                shape = RoundedCornerShape(6.dp),
+                                                                shape = RoundedCornerShape(4.dp),
                                                                 color = Color(0xFF2563EB).copy(alpha = 0.15f)
                                                             ) {
-                                                                Text("Selected", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2563EB), modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp))
+                                                                Text("Selected", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2563EB), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), maxLines = 1)
                                                             }
                                                         }
                                                     }
-                                                    Text("${peer.ipAddress} • ${peer.deviceType}", fontSize = 10.5.sp, color = textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                    Text("${peer.ipAddress} • ${peer.deviceType}", fontSize = 11.sp, color = textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                 }
                                             }
 
