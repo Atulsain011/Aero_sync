@@ -33,7 +33,7 @@ export const App: React.FC = () => {
     setIsDirectIpModalOpen,
     enqueueFiles,
     cancelTransfer,
-    clearCompletedQueue,
+    clearQueue,
     clearHistory,
     updateSettings,
     refreshStorage
@@ -124,9 +124,11 @@ export const App: React.FC = () => {
               queue={queue}
               currentProgress={currentProgress}
               isTransferring={isTransferring}
+              historyCount={history.length}
               onAddFiles={handlePickAndSendFiles}
+              onNewFile={handlePickAndSendFiles}
               onCancelTransfer={cancelTransfer}
-              onClearCompleted={clearCompletedQueue}
+              onClearQueue={clearQueue}
               onClearHistory={clearHistory}
             />
           )}

@@ -540,7 +540,7 @@ body {
 }
 
 /* ==========================================================================
-   BUTTONS
+   BUTTONS & ACTIONS
    ========================================================================== */
 .btn {
   display: inline-flex;
@@ -551,41 +551,71 @@ body {
   border-radius: var(--radius-md);
   font-size: 13px;
   font-weight: 600;
-  border: none;
+  font-family: inherit;
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: all 120ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+  transition: all 120ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed !important;
+  pointer-events: none;
+  box-shadow: none !important;
 }
 
 .btn-primary {
   background: var(--accent-gradient);
   color: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 210, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 10px rgba(0, 210, 255, 0.3);
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   opacity: 0.92;
-  box-shadow: 0 4px 14px rgba(0, 210, 255, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 210, 255, 0.45);
+  transform: translateY(-1px);
 }
 
 .btn-secondary {
   background-color: var(--bg-surface-elevated);
   border: 1px solid var(--border-medium);
   color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
 }
 
-.btn-secondary:hover {
+.btn-secondary:hover:not(:disabled) {
   background-color: var(--bg-surface-hover);
+  border-color: var(--border-focus);
+  color: var(--accent-cyan);
+  transform: translateY(-1px);
+}
+
+.btn-action {
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
 }
 
 .btn-danger {
   background-color: var(--color-danger-bg);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid rgba(239, 68, 68, 0.35);
   color: var(--color-danger);
 }
 
-.btn-danger:hover {
+.btn-danger:hover:not(:disabled) {
   background-color: var(--color-danger);
   color: #ffffff;
+  border-color: var(--color-danger);
 }
 
 .btn-ghost {
@@ -594,7 +624,7 @@ body {
   border: 1px solid var(--border-subtle);
 }
 
-.btn-ghost:hover {
+.btn-ghost:hover:not(:disabled) {
   background-color: var(--bg-surface-hover);
   border-color: var(--accent-cyan);
 }
@@ -611,6 +641,13 @@ body {
 
 .btn-full {
   width: 100%;
+}
+
+.queue-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 /* ==========================================================================

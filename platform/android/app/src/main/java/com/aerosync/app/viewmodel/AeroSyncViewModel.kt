@@ -193,13 +193,13 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun toggleTheme() {
-        val nextMode = when (_uiState.value.themeMode) {
-            com.aerosync.app.data.preferences.ThemeMode.DARK -> com.aerosync.app.data.preferences.ThemeMode.LIGHT
-            com.aerosync.app.data.preferences.ThemeMode.LIGHT -> com.aerosync.app.data.preferences.ThemeMode.SYSTEM
-            com.aerosync.app.data.preferences.ThemeMode.SYSTEM -> com.aerosync.app.data.preferences.ThemeMode.DARK
+        val nextMode = if (_uiState.value.themeMode == com.aerosync.app.data.preferences.ThemeMode.DARK) {
+            com.aerosync.app.data.preferences.ThemeMode.LIGHT
+        } else {
+            com.aerosync.app.data.preferences.ThemeMode.DARK
         }
         prefs.themeMode = nextMode
-        _uiState.update { it.copy(themeMode = nextMode, isDarkTheme = prefs.isDarkTheme) }
+        _uiState.update { it.copy(themeMode = nextMode, isDarkTheme = nextMode == com.aerosync.app.data.preferences.ThemeMode.DARK) }
     }
 
     fun discoverAndRegisterBroadcastTargets() {

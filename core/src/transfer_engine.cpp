@@ -289,6 +289,23 @@ bool TransferEngine::sendFileBatch(int sockFd,
             fileBytesTransferred = resumeByteOffset;
             chunkIndex = static_cast<uint32_t>(resumeByteOffset / chunkSize);
             file.seekg(static_cast<std::streamoff>(fileBytesTransferred));
+
+            if (progressCb) {
+                TransferProgress initProg;
+                initProg.batchId = manifest.batchId;
+                initProg.currentFileIndex = 0;
+                initProg.currentFileName = fileMeta.relativePath;
+                initProg.fileBytesTransferred = fileBytesTransferred;
+                initProg.fileSize = fileMeta.fileSize;
+                initProg.batchBytesTransferred = batchBytesTransferred;
+                initProg.batchTotalBytes = manifest.totalBytes;
+                initProg.speedBytesPerSec = 0.0;
+                initProg.speedMbps = 0.0;
+                initProg.state = TransferState::TRANSFERRING;
+                initProg.activeStreams = manifest.streamCount;
+                initProg.etaSeconds = 0.0;
+                progressCb(initProg);
+            }
         }
 
         while (fileBytesTransferred < fileMeta.fileSize) {
@@ -475,7 +492,7 @@ bool TransferEngine::receiveFileBatch(int sockFd,
         std::fstream file;
         file.rdbuf()->pubsetbuf(fileStreamBuf.data(), fileStreamBuf.size());
 
-        if (fileBytesTransferred > 0 && std::filesystem::exists(partPath)) {
+        if (std::filesystem::exists(partPath)) {
             file.open(partPath, std::ios::binary | std::ios::in | std::ios::out);
         }
         if (!file.is_open()) {
@@ -486,6 +503,23 @@ bool TransferEngine::receiveFileBatch(int sockFd,
         if (!file.is_open()) return false;
         file.seekp(static_cast<std::streamoff>(fileBytesTransferred));
 #endif
+
+        if (progressCb && resumeByteOffset > 0 && i == 0) {
+            TransferProgress initProg;
+            initProg.batchId = manifest.batchId;
+            initProg.currentFileIndex = 0;
+            initProg.currentFileName = fileMeta.relativePath;
+            initProg.fileBytesTransferred = fileBytesTransferred;
+            initProg.fileSize = fileMeta.fileSize;
+            initProg.batchBytesTransferred = batchBytesTransferred;
+            initProg.batchTotalBytes = manifest.totalBytes;
+            initProg.speedBytesPerSec = 0.0;
+            initProg.speedMbps = 0.0;
+            initProg.state = TransferState::TRANSFERRING;
+            initProg.activeStreams = manifest.streamCount;
+            initProg.etaSeconds = 0.0;
+            progressCb(initProg);
+        }
 
         // 2. Launch Background Asynchronous Disk Writer Worker Thread
         AsyncChunkQueue chunkQueue(POOL_SIZE);
@@ -537,6 +571,7 @@ bool TransferEngine::receiveFileBatch(int sockFd,
                 }
 #endif
 
+                appendResumeJournal(journalPath, static_cast<uint32_t>(packet.header.offset / chunkSize));
                 currentFileWritten += packet.header.length;
                 bufferPool.release(std::move(packet.buffer));
             }

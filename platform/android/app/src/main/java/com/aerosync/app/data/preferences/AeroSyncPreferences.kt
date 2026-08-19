@@ -7,7 +7,6 @@ import android.os.Environment
 import java.io.File
 
 enum class ThemeMode {
-    SYSTEM,
     LIGHT,
     DARK
 }
@@ -32,12 +31,12 @@ class AeroSyncPreferences(private val context: Context) {
         set(value) {
             prefs.edit()
                 .putString(KEY_THEME_MODE, value.name)
-                .putBoolean(KEY_IS_DARK_THEME, value != ThemeMode.LIGHT)
+                .putBoolean(KEY_IS_DARK_THEME, value == ThemeMode.DARK)
                 .apply()
         }
 
     var isDarkTheme: Boolean
-        get() = themeMode != ThemeMode.LIGHT
+        get() = themeMode == ThemeMode.DARK
         set(value) {
             themeMode = if (value) ThemeMode.DARK else ThemeMode.LIGHT
         }

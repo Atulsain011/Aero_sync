@@ -71,7 +71,7 @@ export interface DaemonStatusResponse {
 }
 
 export interface SettingsState {
-  theme: 'system' | 'dark' | 'light';
+  theme: 'dark' | 'light';
   downloadDirectory: string;
   deviceName: string;
   startWithWindows: boolean;

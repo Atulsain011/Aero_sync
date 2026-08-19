@@ -4,6 +4,7 @@ import {
   Plus,
   Trash2,
   FileText,
+  FilePlus,
   Activity,
   Zap,
   Clock,
@@ -22,9 +23,11 @@ interface TransfersPageProps {
   queue: QueueItem[];
   currentProgress: DaemonStatusResponse['currentProgress'];
   isTransferring: boolean;
+  historyCount?: number;
   onAddFiles: () => void;
+  onNewFile?: () => void;
   onCancelTransfer: () => void;
-  onClearCompleted: () => void;
+  onClearQueue: () => void;
   onClearHistory?: () => void;
 }
 
@@ -32,9 +35,11 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
   queue,
   currentProgress,
   isTransferring,
+  historyCount = 0,
   onAddFiles,
+  onNewFile,
   onCancelTransfer,
-  onClearCompleted,
+  onClearQueue,
   onClearHistory
 }) => {
   const activeFileName = currentProgress?.currentFileName || (queue[0]?.name ?? 'Preparing files...');
@@ -44,6 +49,8 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
   const transferredBytes = currentProgress?.fileBytesTransferred || 0;
   const totalBytes = currentProgress?.fileSize || 0;
 
+  const handleNewFileClick = onNewFile || onAddFiles;
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -51,19 +58,44 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
           <h2 className="page-title">Transfer Queue</h2>
           <p className="page-subtitle">Real-time parallel multi-stream transmission progress.</p>
         </div>
-        <div className="page-header-actions">
+        <div className="page-header-actions queue-action-bar">
+          <button
+            className="btn btn-action btn-secondary"
+            onClick={onClearQueue}
+            disabled={queue.length === 0}
+            title={queue.length === 0 ? "Queue is already empty" : "Clear all queued files"}
+          >
+            <Trash2 size={15} />
+            <span>Clear Queue</span>
+          </button>
+
           {onClearHistory && (
-            <button className="btn btn-secondary" onClick={onClearHistory} title="Clear completed transmission logs">
+            <button
+              className="btn btn-action btn-secondary"
+              onClick={onClearHistory}
+              disabled={historyCount === 0}
+              title={historyCount === 0 ? "History is already empty" : "Clear completed transfer history"}
+            >
               <Trash2 size={15} />
               <span>Clear History</span>
             </button>
           )}
-          <button className="btn btn-secondary" onClick={onClearCompleted} title="Clear pending queue items">
-            <Trash2 size={15} />
-            <span>Clear Queue</span>
+
+          <button
+            className="btn btn-action btn-secondary"
+            onClick={handleNewFileClick}
+            title="Select a new single file to send"
+          >
+            <FilePlus size={15} />
+            <span>New File</span>
           </button>
-          <button className="btn btn-primary" onClick={onAddFiles}>
-            <Plus size={15} />
+
+          <button
+            className="btn btn-action btn-primary"
+            onClick={onAddFiles}
+            title="Open file picker to add files to queue"
+          >
+            <Plus size={16} />
             <span>Add Files</span>
           </button>
         </div>
@@ -152,10 +184,12 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
             <h3 className="idle-title">No Active Transfers</h3>
             <p className="idle-desc">Pick files or select a discovered peer to begin high-speed transmission.</p>
           </div>
-          <button className="btn btn-primary" onClick={onAddFiles}>
-            <Plus size={16} />
-            <span>Send New Files</span>
-          </button>
+          <div className="idle-actions">
+            <button className="btn btn-action btn-primary" onClick={onAddFiles}>
+              <Plus size={16} />
+              <span>Add Files</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -182,7 +216,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
                     <div className="queue-file-meta">
                       <span className="queue-file-name">{item.name}</span>
                       <span className="queue-file-details">
-                        {item.targetDeviceName} ({item.targetIp})
+                        {item.targetDeviceName} ({item.targetIp || 'Local LAN'})
                       </span>
                     </div>
                   </div>

@@ -101,19 +101,14 @@ export function useAeroSyncStore() {
       console.warn('Failed to save settings:', err);
     }
 
-    // Apply theme to document root
+    // Apply theme to document root (strictly Light or Dark)
     const root = document.documentElement;
     if (settings.theme === 'light') {
       root.classList.remove('dark');
       root.classList.add('light');
-    } else if (settings.theme === 'dark') {
+    } else {
       root.classList.remove('light');
       root.classList.add('dark');
-    } else {
-      // System theme detection
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      root.classList.toggle('dark', prefersDark);
-      root.classList.toggle('light', !prefersDark);
     }
   }, [settings]);
 
@@ -198,24 +193,31 @@ export function useAeroSyncStore() {
     } catch (err) {
       console.warn('Error cancelling transfer:', err);
     }
-    setQueue(prev => prev.map(item => item.status === 'transferring' ? { ...item, status: 'cancelled' } : item));
+    setQueue([]);
     setIsTransferring(false);
     latestTransferringRef.current = false;
-    setCurrentProgress(prev => ({
-      ...prev,
-      state: 3,
+    setCurrentProgress({
+      state: 0,
+      currentFileName: '',
+      fileSize: 0,
+      fileBytesTransferred: 0,
+      totalBytesTransferred: 0,
       speedBytesPerSec: 0,
       progressPercent: 0,
-      etaSeconds: 0
-    }));
+      etaSeconds: 0,
+      errorCode: 0
+    });
     setSelectedPeer(null);
     setStatusMessage('Transfer cancelled. Device disconnected.');
     if (pollTriggerRef.current) pollTriggerRef.current();
   }, []);
 
   // Clear non-active queue items
-  const clearCompletedQueue = useCallback(() => {
+  const clearQueue = useCallback(() => {
     setQueue(prev => prev.filter(item => item.status === 'transferring'));
+    if (!latestTransferringRef.current) {
+      setQueue([]);
+    }
   }, []);
 
   // Clear all history
@@ -369,7 +371,8 @@ export function useAeroSyncStore() {
     setIsDirectIpModalOpen,
     enqueueFiles,
     cancelTransfer,
-    clearCompletedQueue,
+    clearQueue,
+    clearCompletedQueue: clearQueue,
     clearHistory,
     updateSettings,
     refreshStorage

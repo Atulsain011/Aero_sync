@@ -65,18 +65,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             </div>
             <div>
               <h3 className="settings-card-title">Appearance Theme</h3>
-              <p className="settings-card-desc">Choose between Light, Dark, or match Windows system preferences.</p>
+              <p className="settings-card-desc">Choose between Light or Dark theme appearance.</p>
             </div>
           </div>
 
           <div className="theme-toggle-row">
-            <button
-              className={`theme-pill ${settings.theme === 'system' ? 'theme-pill-active' : ''}`}
-              onClick={() => onUpdateSettings({ theme: 'system' })}
-            >
-              <Laptop size={16} />
-              <span>System</span>
-            </button>
             <button
               className={`theme-pill ${settings.theme === 'light' ? 'theme-pill-active' : ''}`}
               onClick={() => onUpdateSettings({ theme: 'light' })}

@@ -239,22 +239,31 @@ void ConnectionManager::handleClientConnection(int clientSockFd) {
                         if (!manifest.files.empty()) {
                             std::filesystem::path partPath = downloadDir / (manifest.files[0].relativePath + ".aerosync.part");
                             std::filesystem::path journalPath = downloadDir / (manifest.files[0].relativePath + ".aerosync.journal");
-                            if (std::filesystem::exists(partPath) && std::filesystem::exists(journalPath)) {
-                                std::ifstream jFile(journalPath, std::ios::binary);
-                                std::set<uint32_t> completed;
-                                uint32_t idx;
-                                while (jFile.read(reinterpret_cast<char*>(&idx), sizeof(idx))) {
-                                    completed.insert(idx);
-                                }
-                                uint32_t exp = 0;
-                                while (completed.count(exp) > 0) {
-                                    exp++;
-                                }
-                                size_t cSize = manifest.chunkSize > 0 ? manifest.chunkSize : LARGE_CHUNK_SIZE;
-                                uint64_t verified = static_cast<uint64_t>(exp) * cSize;
+                            size_t cSize = manifest.chunkSize > 0 ? manifest.chunkSize : LARGE_CHUNK_SIZE;
+                            uint64_t targetSize = manifest.files[0].fileSize;
+
+                            if (std::filesystem::exists(partPath)) {
                                 uint64_t partSize = std::filesystem::file_size(partPath);
-                                resumeOffset = std::min(verified, partSize);
-                                resumeChunkIdx = exp;
+                                if (std::filesystem::exists(journalPath)) {
+                                    std::ifstream jFile(journalPath, std::ios::binary);
+                                    std::set<uint32_t> completed;
+                                    uint32_t idx;
+                                    while (jFile.read(reinterpret_cast<char*>(&idx), sizeof(idx))) {
+                                        completed.insert(idx);
+                                    }
+                                    uint32_t exp = 0;
+                                    while (completed.count(exp) > 0) {
+                                        exp++;
+                                    }
+                                    uint64_t verified = static_cast<uint64_t>(exp) * cSize;
+                                    resumeOffset = std::min(verified, partSize);
+                                    resumeChunkIdx = exp;
+                                } else {
+                                    // Align to chunk boundary for clean stream resume
+                                    uint64_t verified = (partSize / cSize) * cSize;
+                                    resumeOffset = std::min(verified, targetSize);
+                                    resumeChunkIdx = static_cast<uint32_t>(resumeOffset / cSize);
+                                }
                             }
                         }
 
@@ -347,22 +356,31 @@ void ConnectionManager::handleClientConnection(int clientSockFd) {
             if (!manifest.files.empty()) {
                 std::filesystem::path partPath = downloadDir / (manifest.files[0].relativePath + ".aerosync.part");
                 std::filesystem::path journalPath = downloadDir / (manifest.files[0].relativePath + ".aerosync.journal");
-                if (std::filesystem::exists(partPath) && std::filesystem::exists(journalPath)) {
-                    std::ifstream jFile(journalPath, std::ios::binary);
-                    std::set<uint32_t> completed;
-                    uint32_t idx;
-                    while (jFile.read(reinterpret_cast<char*>(&idx), sizeof(idx))) {
-                        completed.insert(idx);
-                    }
-                    uint32_t exp = 0;
-                    while (completed.count(exp) > 0) {
-                        exp++;
-                    }
-                    size_t cSize = manifest.chunkSize > 0 ? manifest.chunkSize : LARGE_CHUNK_SIZE;
-                    uint64_t verified = static_cast<uint64_t>(exp) * cSize;
+                size_t cSize = manifest.chunkSize > 0 ? manifest.chunkSize : LARGE_CHUNK_SIZE;
+                uint64_t targetSize = manifest.files[0].fileSize;
+
+                if (std::filesystem::exists(partPath)) {
                     uint64_t partSize = std::filesystem::file_size(partPath);
-                    resumeOffset = std::min(verified, partSize);
-                    resumeChunkIdx = exp;
+                    if (std::filesystem::exists(journalPath)) {
+                        std::ifstream jFile(journalPath, std::ios::binary);
+                        std::set<uint32_t> completed;
+                        uint32_t idx;
+                        while (jFile.read(reinterpret_cast<char*>(&idx), sizeof(idx))) {
+                            completed.insert(idx);
+                        }
+                        uint32_t exp = 0;
+                        while (completed.count(exp) > 0) {
+                            exp++;
+                        }
+                        uint64_t verified = static_cast<uint64_t>(exp) * cSize;
+                        resumeOffset = std::min(verified, partSize);
+                        resumeChunkIdx = exp;
+                    } else {
+                        // Align to chunk boundary for clean stream resume
+                        uint64_t verified = (partSize / cSize) * cSize;
+                        resumeOffset = std::min(verified, targetSize);
+                        resumeChunkIdx = static_cast<uint32_t>(resumeOffset / cSize);
+                    }
                 }
             }
 
