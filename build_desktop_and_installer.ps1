@@ -51,6 +51,7 @@ $setupExe = Get-ChildItem "$env:TEMP\aerosync_cargo_target\release\bundle\nsis\*
 
 if ($setupExe) {
     Write-Host "Found NSIS installer: $($setupExe.FullName)" -ForegroundColor Green
+    Copy-Item $setupExe.FullName "$root\release\AeroSync-Setup-v1.0.6.exe" -Force
     Copy-Item $setupExe.FullName "$root\release\AeroSync-Setup-v1.0.5.exe" -Force
     Copy-Item $setupExe.FullName "$root\release\AeroSync-Setup.exe" -Force
 } else {
