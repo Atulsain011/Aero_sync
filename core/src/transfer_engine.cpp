@@ -251,6 +251,8 @@ bool TransferEngine::sendFileBatch(int sockFd,
                                    std::atomic<bool>& cancelSignal,
                                    uint64_t resumeByteOffset) {
     uint64_t batchBytesTransferred = resumeByteOffset;
+    uint64_t lastReportBytes = resumeByteOffset;
+    double currentSmoothedSpeedBps = 0.0;
     auto startTime = std::chrono::steady_clock::now();
     auto lastReportTime = startTime;
 
@@ -351,10 +353,15 @@ bool TransferEngine::sendFileBatch(int sockFd,
             auto now = std::chrono::steady_clock::now();
             auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastReportTime).count();
             if (elapsedMs >= 100 && progressCb) {
-                double totalElapsedSec = std::chrono::duration_cast<std::chrono::microseconds>(now - startTime).count() / 1000000.0;
-                double speedBps = totalElapsedSec > 0 ? (batchBytesTransferred / totalElapsedSec) : 0.0;
+                uint64_t bytesDelta = (batchBytesTransferred >= lastReportBytes) ? (batchBytesTransferred - lastReportBytes) : 0;
+                double instantSpeedBps = (bytesDelta * 1000.0) / static_cast<double>(elapsedMs);
+                if (currentSmoothedSpeedBps <= 0.0) {
+                    currentSmoothedSpeedBps = instantSpeedBps;
+                } else {
+                    currentSmoothedSpeedBps = 0.65 * currentSmoothedSpeedBps + 0.35 * instantSpeedBps;
+                }
                 double remainingBytes = (manifest.totalBytes > batchBytesTransferred) ? (manifest.totalBytes - batchBytesTransferred) : 0;
-                double etaSec = speedBps > 0 ? (remainingBytes / speedBps) : 0.0;
+                double etaSec = currentSmoothedSpeedBps > 0 ? (remainingBytes / currentSmoothedSpeedBps) : 0.0;
 
                 TransferProgress prog;
                 prog.batchId = manifest.batchId;
@@ -364,14 +371,15 @@ bool TransferEngine::sendFileBatch(int sockFd,
                 prog.fileSize = fileMeta.fileSize;
                 prog.batchBytesTransferred = batchBytesTransferred;
                 prog.batchTotalBytes = manifest.totalBytes;
-                prog.speedBytesPerSec = speedBps;
-                prog.speedMbps = (speedBps * 8.0) / 1000000.0;
+                prog.speedBytesPerSec = currentSmoothedSpeedBps;
+                prog.speedMbps = (currentSmoothedSpeedBps * 8.0) / 1000000.0;
                 prog.state = TransferState::TRANSFERRING;
                 prog.activeStreams = manifest.streamCount;
                 prog.etaSeconds = etaSec;
 
                 progressCb(prog);
                 lastReportTime = now;
+                lastReportBytes = batchBytesTransferred;
             }
         }
 
@@ -414,6 +422,8 @@ bool TransferEngine::receiveFileBatch(int sockFd,
                                       std::atomic<bool>& cancelSignal,
                                       uint64_t resumeByteOffset) {
     uint64_t batchBytesTransferred = resumeByteOffset;
+    uint64_t lastReportBytes = resumeByteOffset;
+    double currentSmoothedSpeedBps = 0.0;
     auto startTime = std::chrono::steady_clock::now();
     auto lastReportTime = startTime;
 
@@ -599,10 +609,15 @@ bool TransferEngine::receiveFileBatch(int sockFd,
             auto now = std::chrono::steady_clock::now();
             auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastReportTime).count();
             if (elapsedMs >= 100 && progressCb) {
-                double totalElapsedSec = std::chrono::duration_cast<std::chrono::microseconds>(now - startTime).count() / 1000000.0;
-                double speedBps = totalElapsedSec > 0 ? (batchBytesTransferred / totalElapsedSec) : 0.0;
+                uint64_t bytesDelta = (batchBytesTransferred >= lastReportBytes) ? (batchBytesTransferred - lastReportBytes) : 0;
+                double instantSpeedBps = (bytesDelta * 1000.0) / static_cast<double>(elapsedMs);
+                if (currentSmoothedSpeedBps <= 0.0) {
+                    currentSmoothedSpeedBps = instantSpeedBps;
+                } else {
+                    currentSmoothedSpeedBps = 0.65 * currentSmoothedSpeedBps + 0.35 * instantSpeedBps;
+                }
                 double remainingBytes = (manifest.totalBytes > batchBytesTransferred) ? (manifest.totalBytes - batchBytesTransferred) : 0;
-                double etaSec = speedBps > 0 ? (remainingBytes / speedBps) : 0.0;
+                double etaSec = currentSmoothedSpeedBps > 0 ? (remainingBytes / currentSmoothedSpeedBps) : 0.0;
 
                 TransferProgress prog;
                 prog.batchId = manifest.batchId;
@@ -612,14 +627,15 @@ bool TransferEngine::receiveFileBatch(int sockFd,
                 prog.fileSize = fileMeta.fileSize;
                 prog.batchBytesTransferred = batchBytesTransferred;
                 prog.batchTotalBytes = manifest.totalBytes;
-                prog.speedBytesPerSec = speedBps;
-                prog.speedMbps = (speedBps * 8.0) / 1000000.0;
+                prog.speedBytesPerSec = currentSmoothedSpeedBps;
+                prog.speedMbps = (currentSmoothedSpeedBps * 8.0) / 1000000.0;
                 prog.state = TransferState::TRANSFERRING;
                 prog.activeStreams = manifest.streamCount;
                 prog.etaSeconds = etaSec;
 
                 progressCb(prog);
                 lastReportTime = now;
+                lastReportBytes = batchBytesTransferred;
             }
         }
 

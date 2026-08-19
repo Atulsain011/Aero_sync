@@ -128,7 +128,7 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
 
     private val prefs = AeroSyncPreferences.getInstance(application)
     private val dbHelper = AeroSyncDbHelper.getInstance(application)
-    private val deviceId = UUID.randomUUID().toString().take(8)
+    private val deviceId: String get() = prefs.deviceId
     private val nativeBridge = AeroSyncNativeBridge(this)
 
     private val _uiState = MutableStateFlow(
@@ -1044,6 +1044,7 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
 
     private fun refreshPeers() {
         val peerStrs = nativeBridge.nativeGetPeers() ?: return
+        val myId = deviceId
         val liveList = peerStrs.mapNotNull { str ->
             val parts = str.split("|")
             if (parts.size >= 5) {
@@ -1056,10 +1057,12 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
                     isOnline = true
                 )
             } else null
-        }
+        }.filter {
+            it.deviceId.isNotBlank() && it.deviceId != myId && it.ipAddress != "127.0.0.1" && it.ipAddress.isNotBlank()
+        }.distinctBy { it.deviceId }
 
         _uiState.update { state ->
-            state.copy(peers = liveList.distinctBy { it.deviceId })
+            state.copy(peers = liveList)
         }
     }
 

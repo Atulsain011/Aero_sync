@@ -253,7 +253,11 @@ export function useAeroSyncStore() {
         if (isCancelled) return;
 
         setIsDaemonOnline(true);
-        setPeers(data.peers || []);
+        const rawPeers = data.peers || [];
+        const filteredPeers = rawPeers
+          .filter(p => p.deviceId && p.deviceId !== data.deviceId && p.ipAddress !== '127.0.0.1')
+          .filter((p, idx, arr) => arr.findIndex(x => x.deviceId === p.deviceId) === idx);
+        setPeers(filteredPeers);
         setIsTransferring(data.isTransferring);
         latestTransferringRef.current = data.isTransferring;
         setCurrentProgress(data.currentProgress || {

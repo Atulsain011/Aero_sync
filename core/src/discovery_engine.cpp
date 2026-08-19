@@ -55,10 +55,48 @@ static void cleanupSockets() {
 #endif
 }
 
+static std::vector<std::string> getLocalIpAddresses() {
+    std::vector<std::string> ips;
+    ips.push_back("127.0.0.1");
+#ifdef _WIN32
+    ULONG bufLen = 15000;
+    std::vector<BYTE> buffer(bufLen);
+    PIP_ADAPTER_ADDRESSES pAddresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buffer.data());
+    ULONG flags = GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_MULTICAST;
+    if (GetAdaptersAddresses(AF_INET, flags, NULL, pAddresses, &bufLen) == NO_ERROR) {
+        for (PIP_ADAPTER_ADDRESSES curr = pAddresses; curr != nullptr; curr = curr->Next) {
+            if (curr->OperStatus != IfOperStatusUp) continue;
+            for (PIP_ADAPTER_UNICAST_ADDRESS uni = curr->FirstUnicastAddress; uni != nullptr; uni = uni->Next) {
+                if (uni->Address.lpSockaddr && uni->Address.lpSockaddr->sa_family == AF_INET) {
+                    sockaddr_in* sin = reinterpret_cast<sockaddr_in*>(uni->Address.lpSockaddr);
+                    char ipStr[INET_ADDRSTRLEN];
+                    if (inet_ntop(AF_INET, &(sin->sin_addr), ipStr, INET_ADDRSTRLEN)) {
+                        ips.push_back(ipStr);
+                    }
+                }
+            }
+        }
+    }
+#else
+    struct ifaddrs* ifaddr = nullptr;
+    if (getifaddrs(&ifaddr) != -1) {
+        for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+            if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET) continue;
+            sockaddr_in* sin = reinterpret_cast<sockaddr_in*>(ifa->ifa_addr);
+            char ipStr[INET_ADDRSTRLEN];
+            if (inet_ntop(AF_INET, &(sin->sin_addr), ipStr, INET_ADDRSTRLEN)) {
+                ips.push_back(ipStr);
+            }
+        }
+        freeifaddrs(ifaddr);
+    }
+#endif
+    return ips;
+}
+
 static std::vector<std::string> getBroadcastAndGatewayTargets() {
     std::vector<std::string> targets;
     targets.push_back("255.255.255.255");
-    targets.push_back("127.0.0.1");
     targets.push_back(DISCOVERY_MULTICAST_IP); // Site-local Multicast
 
     // Common mobile hotspot & tethering subnet broadcasts and gateways
@@ -432,12 +470,37 @@ void DiscoveryEngine::parseBeacon(const std::string& data, const std::string& se
         return; // Skip self
     }
 
+    // Skip loopback addresses
+    if (senderIp == "127.0.0.1" || senderIp == "localhost" || peer.ipAddress == "127.0.0.1") {
+        return;
+    }
+
+    // Skip if sender matches any local host IP address and matches local device type
+    auto localIps = getLocalIpAddresses();
+    for (const auto& lip : localIps) {
+        if ((senderIp == lip || peer.ipAddress == lip) && peer.deviceType == m_localDeviceType) {
+            return; // Ignore local machine adapter loopback
+        }
+    }
+
     peer.lastSeenMs = getCurrentTimeMs();
 
     PeerDiscoveredCallback cbToCall = nullptr;
     std::vector<PeerInfo> activePeers;
     {
         std::lock_guard<std::mutex> lock(m_peersMutex);
+
+        // Prune any old entry that had the exact same IP and port but different deviceId
+        for (auto it = m_peersMap.begin(); it != m_peersMap.end(); ) {
+            if (it->first != peer.deviceId && it->second.ipAddress == peer.ipAddress && it->second.port == peer.port) {
+                AERO_LOG_I("[PEER_PRUNED] Replacing obsolete device entry %s with %s at %s:%d",
+                           it->first.c_str(), peer.deviceId.c_str(), peer.ipAddress.c_str(), peer.port);
+                it = m_peersMap.erase(it);
+            } else {
+                ++it;
+            }
+        }
+
         auto it = m_peersMap.find(peer.deviceId);
         bool isNew = (it == m_peersMap.end());
         bool changed = isNew || (it->second.deviceName != peer.deviceName) ||

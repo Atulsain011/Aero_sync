@@ -55,11 +55,13 @@ Section "MainSection" SEC01
     ; 0. Close existing running instance so files are not locked
     nsExec::Exec 'taskkill /F /IM AeroSync.exe /T'
     nsExec::Exec 'taskkill /F /IM aerosync-desktop.exe /T'
+    nsExec::Exec 'taskkill /F /IM aerosync_daemon.exe /T'
     Sleep 500
 
     ; 1. Copy Main Executable and Critical Runtime DLLs
     File "..\..\..\release\AeroSync.exe"
     File "..\..\..\release\WebView2Loader.dll"
+    File /nonfatal "..\..\..\build_windows\aerosync_daemon.exe"
 
     ; 2. Create Start Menu Shortcuts
     CreateDirectory "$SMPROGRAMS\AeroSync"

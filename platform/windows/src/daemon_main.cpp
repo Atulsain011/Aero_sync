@@ -9,6 +9,8 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <random>
+#include <iomanip>
 
 #ifdef _WIN32
     #include <winsock2.h>
@@ -438,6 +440,13 @@ static void handleHttpClient(socket_t clientSock) {
 
 int main(int argc, char** argv) {
 #ifdef _WIN32
+    // Enforce Single-Instance Core Daemon to prevent duplicate discovery beacons
+    HANDLE hMutex = CreateMutexA(NULL, TRUE, "Global\\AeroSync_Core_Daemon_SingleInstance");
+    if (hMutex == NULL || GetLastError() == ERROR_ALREADY_EXISTS) {
+        std::cout << "[Daemon] Another AeroSync Core Daemon is already running. Exiting cleanly." << std::endl;
+        return 0;
+    }
+
     WSADATA wsa;
     WSAStartup(MAKEWORD(2, 2), &wsa);
 #endif
@@ -448,11 +457,33 @@ int main(int argc, char** argv) {
     GetComputerNameA(compName, &cSize);
 #endif
 
-    // Generate unique device ID per running instance to allow multi-PC and multi-instance P2P discovery
-    auto nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now().time_since_epoch()).count();
-    std::string uniqueSuffix = std::to_string(nowMs % 100000);
-    g_state.deviceId = "win-" + std::string(compName) + "-" + uniqueSuffix;
+    // Retrieve or persist permanent device ID for this Windows machine
+    char localAppData[MAX_PATH] = {0};
+    std::string idFilePath;
+    if (GetEnvironmentVariableA("LOCALAPPDATA", localAppData, MAX_PATH) > 0) {
+        std::string appDir = std::string(localAppData) + "\\AeroSync";
+        std::filesystem::create_directories(appDir);
+        idFilePath = appDir + "\\device_id.txt";
+    }
+
+    std::string persistentId;
+    if (!idFilePath.empty() && std::filesystem::exists(idFilePath)) {
+        std::ifstream f(idFilePath);
+        std::getline(f, persistentId);
+    }
+    if (persistentId.empty() || persistentId.length() < 5) {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<uint32_t> dis;
+        std::ostringstream ss;
+        ss << "win-" << compName << "-" << std::hex << std::setfill('0') << std::setw(8) << dis(gen);
+        persistentId = ss.str();
+        if (!idFilePath.empty()) {
+            std::ofstream f(idFilePath);
+            f << persistentId;
+        }
+    }
+    g_state.deviceId = persistentId;
     g_state.deviceName = std::string(compName) + " (Windows PC)";
 
     char userProfile[MAX_PATH] = {0};

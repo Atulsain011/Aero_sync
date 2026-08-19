@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.os.Build
 import android.os.Environment
 import java.io.File
+import java.util.UUID
 
 enum class ThemeMode {
     LIGHT,
@@ -14,6 +15,23 @@ enum class ThemeMode {
 class AeroSyncPreferences(private val context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    var deviceId: String
+        get() {
+            var id = prefs.getString(KEY_DEVICE_ID, null)
+            if (id.isNullOrBlank()) {
+                val model = (Build.MODEL ?: "Android").filter { it.isLetterOrDigit() }.take(8)
+                val rand = UUID.randomUUID().toString().take(8)
+                id = "android-$model-$rand"
+                prefs.edit().putString(KEY_DEVICE_ID, id).apply()
+            }
+            return id
+        }
+        set(value) {
+            if (value.isNotBlank()) {
+                prefs.edit().putString(KEY_DEVICE_ID, value).apply()
+            }
+        }
 
     var themeMode: ThemeMode
         get() {
@@ -83,6 +101,7 @@ class AeroSyncPreferences(private val context: Context) {
 
     companion object {
         private const val PREFS_NAME = "aerosync_user_preferences"
+        private const val KEY_DEVICE_ID = "key_device_id_v2"
         private const val KEY_THEME_MODE = "key_theme_mode"
         private const val KEY_IS_DARK_THEME = "key_is_dark_theme"
         private const val KEY_DOWNLOAD_DIRECTORY = "key_download_directory"

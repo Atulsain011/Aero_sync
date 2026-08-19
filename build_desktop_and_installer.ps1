@@ -6,12 +6,24 @@ $env:PATH = "C:\Users\Atul\.cargo\bin;$toolBin;$env:PATH"
 $env:CARGO_TARGET_DIR = "$env:TEMP\aerosync_cargo_target"
 
 # Terminate any running AeroSync instance so binaries can be overwritten
-Get-Process "AeroSync", "aerosync-desktop" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process "AeroSync", "aerosync-desktop", "aerosync_daemon" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
 # Clean target cache
 Remove-Item -Recurse -Force "$env:TEMP\aerosync_cargo_target\release\build\aerosync-desktop-*" -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force "$env:TEMP\aerosync_cargo_target\release\deps\aerosync_desktop-*" -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force "$env:TEMP\aerosync_cargo_target\release\aerosync-desktop.exe" -ErrorAction SilentlyContinue
+
+Write-Host "0. Building Windows Native Core Daemon (aerosync_daemon.exe)..." -ForegroundColor Cyan
+$cmake = "$root\.tools\cmake-3.30.0-windows-x86_64\bin\cmake.exe"
+$ninja = "$root\.tools\ninja-win\ninja.exe"
+if ((Test-Path $cmake) -and (Test-Path $ninja)) {
+    & $cmake -B "$root\build_windows" -S "$root\platform\windows" -G "Ninja" `
+        "-DCMAKE_MAKE_PROGRAM=$ninja" `
+        "-DCMAKE_CXX_COMPILER=$toolBin\clang++.exe" `
+        "-DCMAKE_C_COMPILER=$toolBin\clang.exe" `
+        "-DCMAKE_BUILD_TYPE=Release"
+    & $cmake --build "$root\build_windows"
+}
 
 Write-Host "1. Building Web Assets..." -ForegroundColor Cyan
 Push-Location "$root\platform\windows\desktop_tauri"
