@@ -12,6 +12,7 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../core" "${CMAKE_CURRENT_BINAR
 add_executable(AeroSync WIN32
     src/main.cpp
     src/app_window.cpp
+    resources.rc
 )
 
 target_include_directories(AeroSync PRIVATE
@@ -35,6 +36,7 @@ target_link_libraries(AeroSync PRIVATE
 
 add_executable(aerosync_daemon
     src/daemon_main.cpp
+    resources.rc
 )
 
 target_include_directories(aerosync_daemon PRIVATE

@@ -95,11 +95,18 @@ void AppWindow::updateNetworkInfo() {
 bool AppWindow::initialize(HINSTANCE hInstance, int nCmdShow) {
     m_hInstance = hInstance;
 
+    HICON hIconBig = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(101), IMAGE_ICON, 256, 256, LR_DEFAULTCOLOR);
+    if (!hIconBig) hIconBig = LoadIcon(hInstance, MAKEINTRESOURCE(101));
+    HICON hIconSmall = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(101), IMAGE_ICON, 32, 32, LR_DEFAULTCOLOR);
+    if (!hIconSmall) hIconSmall = LoadIcon(hInstance, MAKEINTRESOURCE(101));
+
     WNDCLASSEX wc = {0};
     wc.cbSize = sizeof(WNDCLASSEX);
     wc.style = CS_HREDRAW | CS_VREDRAW;
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
+    wc.hIcon = hIconBig;
+    wc.hIconSm = hIconSmall;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = NULL;
     wc.lpszClassName = "AeroSyncWinClass";
@@ -113,6 +120,9 @@ bool AppWindow::initialize(HINSTANCE hInstance, int nCmdShow) {
     );
 
     if (!m_hwnd) return false;
+
+    SendMessage(m_hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIconBig);
+    SendMessage(m_hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIconSmall);
 
     DragAcceptFiles(m_hwnd, TRUE);
     SetTimer(m_hwnd, 1, 50, NULL);
