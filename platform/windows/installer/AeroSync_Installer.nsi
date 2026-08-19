@@ -52,6 +52,11 @@ Section "MainSection" SEC01
     SetOutPath "$INSTDIR"
     SetOverwrite on
 
+    ; 0. Close existing running instance so files are not locked
+    nsExec::Exec 'taskkill /F /IM AeroSync.exe /T'
+    nsExec::Exec 'taskkill /F /IM aerosync-desktop.exe /T'
+    Sleep 500
+
     ; 1. Copy Main Executable and Critical Runtime DLLs
     File "..\..\..\release\AeroSync.exe"
     File "..\..\..\release\WebView2Loader.dll"

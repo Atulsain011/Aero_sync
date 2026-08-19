@@ -5,8 +5,13 @@ $toolBin = "$root\.tools\llvm-mingw-20260616-ucrt-x86_64\bin"
 $env:PATH = "C:\Users\Atul\.cargo\bin;$toolBin;$env:PATH"
 $env:CARGO_TARGET_DIR = "$env:TEMP\aerosync_cargo_target"
 
-# Clean target dir so resource.rc with new transparent icon is cleanly compiled
+# Terminate any running AeroSync instance so binaries can be overwritten
+Get-Process "AeroSync", "aerosync-desktop" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+# Clean target cache
 Remove-Item -Recurse -Force "$env:TEMP\aerosync_cargo_target\release\build\aerosync-desktop-*" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force "$env:TEMP\aerosync_cargo_target\release\deps\aerosync_desktop-*" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force "$env:TEMP\aerosync_cargo_target\release\aerosync-desktop.exe" -ErrorAction SilentlyContinue
 
 Write-Host "1. Building Web Assets..." -ForegroundColor Cyan
 Push-Location "$root\platform\windows\desktop_tauri"
@@ -46,14 +51,13 @@ if (Test-Path $makensisPath) {
     Copy-Item "$root\release\AeroSync-Setup-v1.0.6.exe" "$root\release\AeroSync-Setup-v1.0.5.exe" -Force
     Copy-Item "$root\release\AeroSync-Setup-v1.0.6.exe" "$root\release\AeroSync-Setup.exe" -Force
     Write-Host "Successfully generated AeroSync-Setup-v1.0.6.exe with all runtime dependencies." -ForegroundColor Green
-} else {
-    Write-Host "Makensis not found at $makensisPath, falling back to tauri build..." -ForegroundColor Yellow
-    Push-Location "$root\platform\windows\desktop_tauri"
-    try {
-        & npx @tauri-apps/cli build --bundles nsis
-    } finally {
-        Pop-Location
-    }
 }
+
+Write-Host "5. Creating Windows Portable Zip..." -ForegroundColor Cyan
+$portableDir = "$root\release\AeroSync-Windows-Portable"
+if (!(Test-Path $portableDir)) { New-Item -ItemType Directory -Path $portableDir -Force }
+Copy-Item "$root\release\AeroSync.exe" "$portableDir\AeroSync.exe" -Force
+Copy-Item "$root\release\WebView2Loader.dll" "$portableDir\WebView2Loader.dll" -Force
+Compress-Archive -Path "$portableDir\*" -DestinationPath "$root\release\AeroSync-Windows-Portable.zip" -Force
 
 Write-Host "BUILD AND PACKAGING COMPLETED SUCCESSFULLY!" -ForegroundColor Green
