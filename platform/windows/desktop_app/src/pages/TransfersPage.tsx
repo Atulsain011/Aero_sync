@@ -2,7 +2,6 @@ import React from 'react';
 import {
   X,
   Plus,
-  FilePlus,
   Trash2,
   FileText,
   Activity,
@@ -24,7 +23,6 @@ interface TransfersPageProps {
   currentProgress: DaemonStatusResponse['currentProgress'];
   isTransferring: boolean;
   onAddFiles: () => void;
-  onNewFile?: () => void;
   onCancelTransfer: () => void;
   onClearQueue?: () => void;
   onClearCompleted?: () => void;
@@ -36,7 +34,6 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
   currentProgress,
   isTransferring,
   onAddFiles,
-  onNewFile,
   onCancelTransfer,
   onClearQueue,
   onClearCompleted,
@@ -75,14 +72,6 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
           >
             <Trash2 size={15} />
             <span>Clear Queue</span>
-          </button>
-          <button
-            className="btn btn-secondary"
-            onClick={onNewFile || onAddFiles}
-            title="Select a single new file to transmit"
-          >
-            <FilePlus size={15} />
-            <span>New File</span>
           </button>
           <button
             className="btn btn-primary"
@@ -176,12 +165,8 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
           </div>
           <div>
             <h3 className="idle-title">No Active Transfers</h3>
-            <p className="idle-desc">Pick files or select a discovered peer to begin high-speed transmission.</p>
+            <p className="idle-desc">Pick files using '+ Add Files' or drop files into the app to begin transmission.</p>
           </div>
-          <button className="btn btn-primary" onClick={onAddFiles}>
-            <Plus size={16} />
-            <span>Send New Files</span>
-          </button>
         </div>
       )}
 

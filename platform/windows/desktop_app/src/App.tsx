@@ -126,7 +126,6 @@ export const App: React.FC = () => {
               currentProgress={currentProgress}
               isTransferring={isTransferring}
               onAddFiles={handlePickAndSendFiles}
-              onNewFile={handlePickAndSendFiles}
               onCancelTransfer={cancelTransfer}
               onClearQueue={clearQueue}
               onClearCompleted={clearCompletedQueue}
