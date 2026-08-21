@@ -10,6 +10,17 @@ export interface PeerInfo {
   lastSeenMs: number;
 }
 
+export type TransferUiState =
+  | 'IDLE'
+  | 'FILE_SELECTED'
+  | 'PREPARING'
+  | 'WAITING_FOR_DEVICE'
+  | 'WAITING_FOR_ACCEPT'
+  | 'TRANSFERRING'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'CANCELLED';
+
 export type QueueItemStatus = 'waiting' | 'connecting' | 'transferring' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
 export interface QueueItem {

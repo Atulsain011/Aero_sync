@@ -96,6 +96,18 @@ data class SelectedFileItem(
     val formattedSize: String = ""
 )
 
+enum class TransferUiState {
+    IDLE,
+    FILE_SELECTED,
+    PREPARING,
+    WAITING_FOR_DEVICE,
+    WAITING_FOR_ACCEPT,
+    TRANSFERRING,
+    COMPLETED,
+    FAILED,
+    CANCELLED
+}
+
 data class AeroSyncUiState(
     val deviceName: String = "AeroSync Device",
     val themeMode: com.aerosync.app.data.preferences.ThemeMode = com.aerosync.app.data.preferences.ThemeMode.DARK,
@@ -119,6 +131,12 @@ data class AeroSyncUiState(
     val incomingPairingPrompt: IncomingPairingPrompt? = null,
     val activeTransfer: ActiveTransfer? = null,
     val isTransferring: Boolean = false,
+    val isPreparing: Boolean = false,
+    val transferUiState: TransferUiState = TransferUiState.IDLE,
+    val lastCompletedFileName: String = "",
+    val lastCompletedFileSize: Long = 0L,
+    val lastCompletedFilePath: String = "",
+    val transferErrorMessage: String = "",
     val transferQueue: List<TransferQueueItem> = emptyList(),
     val history: List<TransferHistoryItem> = emptyList(),
     val statusMessage: String = "Ready for peer sync"
@@ -178,10 +196,12 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
                 )
             } else null
 
+            val cleanQueue = savedQueue.filter { it.status != QueueItemStatus.COMPLETED && it.id !in savedHistory.map { h -> h.id }.toSet() }
+
             _uiState.update {
                 it.copy(
-                    transferQueue = savedQueue,
-                    history = savedHistory,
+                    transferQueue = cleanQueue,
+                    history = savedHistory.distinctBy { h -> h.id },
                     isDarkTheme = prefs.isDarkTheme,
                     downloadDirectory = prefs.downloadDirectory,
                     deviceName = prefs.deviceName,
@@ -266,9 +286,14 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
         if (files.isEmpty()) return
         _uiState.update { state ->
             val updated = (state.selectedFiles + files).distinctBy { it.uriString }
+            val nextState = if (state.transferUiState == TransferUiState.IDLE || state.transferUiState == TransferUiState.CANCELLED || state.transferUiState == TransferUiState.COMPLETED || state.transferUiState == TransferUiState.FAILED) {
+                TransferUiState.FILE_SELECTED
+            } else state.transferUiState
+
             state.copy(
                 selectedFiles = updated,
-                statusMessage = "${updated.size} file(s) staged for transfer"
+                transferUiState = nextState,
+                statusMessage = "${updated.size} file(s) ready to send"
             )
         }
     }
@@ -276,8 +301,10 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
     fun removeSelectedFile(id: String) {
         _uiState.update { state ->
             val updated = state.selectedFiles.filter { it.id != id }
+            val nextState = if (updated.isEmpty() && state.transferUiState == TransferUiState.FILE_SELECTED) TransferUiState.IDLE else state.transferUiState
             state.copy(
                 selectedFiles = updated,
+                transferUiState = nextState,
                 statusMessage = if (updated.isEmpty()) "Selected files cleared" else "${updated.size} file(s) staged"
             )
         }
@@ -285,10 +312,37 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
 
     fun clearSelectedFiles() {
         _uiState.update { state ->
+            val nextState = if (state.transferUiState == TransferUiState.FILE_SELECTED) TransferUiState.IDLE else state.transferUiState
             state.copy(
                 selectedFiles = emptyList(),
+                transferUiState = nextState,
                 statusMessage = "Selected files cleared"
             )
+        }
+    }
+
+    fun resetTransferState() {
+        _uiState.update { state ->
+            state.copy(
+                transferUiState = TransferUiState.IDLE,
+                selectedFiles = emptyList(),
+                activeTransfer = null,
+                isTransferring = false,
+                isPreparing = false,
+                transferErrorMessage = "",
+                statusMessage = "Ready for peer sync"
+            )
+        }
+    }
+
+    fun retryTransfer() {
+        val state = _uiState.value
+        if (state.selectedFiles.isNotEmpty()) {
+            startTransferOfSelectedFiles()
+        } else if (state.transferQueue.isNotEmpty()) {
+            startQueueProcessor()
+        } else {
+            resetTransferState()
         }
     }
 
@@ -298,8 +352,18 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
 
         val peer = _uiState.value.selectedPeer ?: _uiState.value.peers.firstOrNull()
         if (peer == null) {
-            _uiState.update { it.copy(statusMessage = "Please select a target device in the Devices tab first.") }
+            _uiState.update { it.copy(statusMessage = "Please select a target device first.") }
             return
+        }
+
+        // Set PREPARING state immediately upon tapping Send
+        _uiState.update { state ->
+            state.copy(
+                transferUiState = TransferUiState.PREPARING,
+                isPreparing = true,
+                selectedPeer = peer,
+                statusMessage = "Preparing file..."
+            )
         }
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -313,60 +377,79 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
 
             for (item in staged) {
                 val uri = android.net.Uri.parse(item.uriString)
-                val path = com.aerosync.app.ui.MainActivity.resolveUriToFilePath(context, uri) ?: run {
-                    val tempFile = File(stagingDir, item.fileName)
-                    try {
-                        context.contentResolver.openInputStream(uri)?.use { input ->
-                            java.io.FileOutputStream(tempFile).use { output ->
-                                input.copyTo(output)
+                val directPath = com.aerosync.app.ui.MainActivity.resolveUriToFilePath(context, uri)
+                val finalPath: String
+                val fileSize: Long
+
+                if (!directPath.isNullOrBlank() && File(directPath).exists()) {
+                    finalPath = directPath
+                    fileSize = if (item.fileSize > 0) item.fileSize else File(directPath).length()
+                } else {
+                    val meta = com.aerosync.app.ui.MainActivity.getUriMetadata(context, uri)
+                    val tempFile = File(stagingDir, meta.fileName)
+                    finalPath = tempFile.absolutePath
+                    fileSize = if (item.fileSize > 0) item.fileSize else meta.fileSize
+
+                    // Asynchronous stream staging in background coroutine
+                    viewModelScope.launch(Dispatchers.IO) {
+                        try {
+                            if (!tempFile.exists() || tempFile.length() != fileSize) {
+                                context.contentResolver.openInputStream(uri)?.use { input ->
+                                    java.io.FileOutputStream(tempFile).use { output ->
+                                        val buffer = ByteArray(4 * 1024 * 1024)
+                                        var bytesRead: Int
+                                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                                            output.write(buffer, 0, bytesRead)
+                                        }
+                                        output.flush()
+                                    }
+                                }
                             }
-                        }
-                        tempFile.absolutePath
-                    } catch (_: Exception) {
-                        null
+                        } catch (_: Exception) {}
                     }
                 }
 
-                if (!path.isNullOrBlank()) {
-                    resolvedPaths.add(path)
-                    queueItems.add(
-                        TransferQueueItem(
-                            id = item.id,
-                            fileName = item.fileName,
-                            fileSize = if (item.fileSize > 0) item.fileSize else File(path).length(),
-                            filePath = path,
-                            status = QueueItemStatus.TRANSFERRING,
-                            progressPercent = 0,
-                            isReceived = false
-                        )
+                resolvedPaths.add(finalPath)
+                queueItems.add(
+                    TransferQueueItem(
+                        id = item.id,
+                        fileName = item.fileName,
+                        fileSize = fileSize,
+                        filePath = finalPath,
+                        status = QueueItemStatus.QUEUED,
+                        progressPercent = 0,
+                        isReceived = false
                     )
-                }
+                )
             }
 
             if (queueItems.isEmpty()) {
-                _uiState.update { it.copy(statusMessage = "Unable to read selected files.") }
+                _uiState.update { it.copy(transferUiState = TransferUiState.FAILED, transferErrorMessage = "Unable to read selected files.", statusMessage = "Unable to read selected files.") }
                 return@launch
             }
 
-            // Clear staged files and switch to Transfers
+            val totalBatchBytes = queueItems.sumOf { it.fileSize }
+            val firstFileName = queueItems.first().fileName
+            val batchName = if (queueItems.size == 1) firstFileName else "${queueItems.size} files batch"
+
             _uiState.update { state ->
                 state.copy(
-                    selectedFiles = emptyList(),
-                    selectedTab = 2,
+                    isPreparing = false,
+                    transferUiState = TransferUiState.WAITING_FOR_DEVICE,
                     selectedPeer = peer,
                     transferQueue = queueItems + state.transferQueue,
                     isTransferring = true,
                     activeTransfer = ActiveTransfer(
                         queueItemId = queueItems.first().id,
-                        fileName = if (queueItems.size == 1) queueItems.first().fileName else "${queueItems.size} files batch",
+                        fileName = batchName,
                         fileIndex = 0,
                         transferredBytes = 0L,
-                        totalBytes = queueItems.sumOf { it.fileSize },
+                        totalBytes = totalBatchBytes,
                         speedMbps = 0.0,
                         etaSeconds = 0,
                         isReceived = false
                     ),
-                    statusMessage = "Starting transfer of ${queueItems.size} file(s) to ${peer.deviceName}..."
+                    statusMessage = "Waiting for device ${peer.deviceName}..."
                 )
             }
 
@@ -507,7 +590,7 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
                 fileName = f.name.ifEmpty { "file_${System.currentTimeMillis()}" },
                 fileSize = if (f.exists()) f.length() else 1024L * 1024L,
                 filePath = path,
-                status = QueueItemStatus.TRANSFERRING,
+                status = QueueItemStatus.QUEUED,
                 progressPercent = 0,
                 isReceived = false
             )
@@ -553,7 +636,7 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
             }
 
             try {
-                val peer = _uiState.value.selectedPeer
+                val peer = _uiState.value.selectedPeer ?: _uiState.value.peers.firstOrNull()
                 if (peer == null) {
                     _uiState.update { state ->
                         state.copy(
@@ -564,7 +647,7 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
                 }
 
                 val queuedItems = dbHelper.getAllQueueItems().filter {
-                    it.status == QueueItemStatus.QUEUED || it.status == QueueItemStatus.PAUSED
+                    it.status == QueueItemStatus.QUEUED || it.status == QueueItemStatus.PAUSED || it.status == QueueItemStatus.TRANSFERRING
                 }
                 if (queuedItems.isEmpty()) {
                     checkAndStopServiceIfQueueEmpty()
@@ -594,6 +677,7 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
                     state.copy(
                         transferQueue = dbHelper.getAllQueueItems(),
                         isTransferring = true,
+                        transferUiState = TransferUiState.WAITING_FOR_ACCEPT,
                         activeTransfer = ActiveTransfer(
                             queueItemId = queuedItems.first().id,
                             fileName = if (queuedItems.size == 1) firstFileName else "${queuedItems.size} files batch",
@@ -605,7 +689,7 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
                             isReceived = false
                         ),
                         transferRateText = "0.0 MB/s",
-                        statusMessage = "Transferring ${queuedItems.size} file(s) to ${peer.deviceName}..."
+                        statusMessage = "Waiting for acceptance from ${peer.deviceName}..."
                     )
                 }
 
@@ -641,16 +725,30 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
                 }
 
                 val updatedQueue = dbHelper.getAllQueueItems()
-                val updatedHistory = dbHelper.getAllHistoryItems()
+                val updatedHistory = dbHelper.getAllHistoryItems().distinctBy { it.id }
+                val historyIds = updatedHistory.map { it.id }.toSet()
+                val cleanQueue = updatedQueue.filter { it.id !in historyIds && it.status != QueueItemStatus.COMPLETED }
 
                 _uiState.update { state ->
+                    val currentState = state.transferUiState
+                    val nextUiState = if (currentState == TransferUiState.CANCELLED) {
+                        TransferUiState.CANCELLED
+                    } else if (success) {
+                        TransferUiState.COMPLETED
+                    } else {
+                        TransferUiState.FAILED
+                    }
                     state.copy(
-                        transferQueue = updatedQueue,
+                        transferQueue = cleanQueue,
                         history = updatedHistory,
                         activeTransfer = null,
                         isTransferring = false,
+                        transferUiState = nextUiState,
+                        lastCompletedFileName = if (success) (if (queuedItems.size == 1) firstFileName else "${queuedItems.size} files batch") else state.lastCompletedFileName,
+                        lastCompletedFileSize = if (success) totalBatchBytes else state.lastCompletedFileSize,
+                        transferErrorMessage = if (!success && currentState != TransferUiState.CANCELLED) "Transfer interrupted or connection failed" else "",
                         transferRateText = "0.0 MB/s",
-                        statusMessage = if (success) "Completed ${queuedItems.size} file(s)!" else "Transfer interrupted"
+                        statusMessage = if (success) "Completed ${queuedItems.size} file(s)!" else if (currentState == TransferUiState.CANCELLED) "Transfer cancelled" else "Transfer interrupted"
                     )
                 }
 
@@ -764,7 +862,7 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun cancelActiveTransfer() {
-        // 1. Instant UI update - Clear active transfer and remove transferring items immediately
+        // 1. Instant UI update - Clear active transfer and update state to CANCELLED
         _uiState.update { state ->
             val activeId = state.activeTransfer?.queueItemId
             val updatedQueue = state.transferQueue.filter {
@@ -772,6 +870,8 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
             }
             state.copy(
                 isTransferring = false,
+                isPreparing = false,
+                transferUiState = TransferUiState.CANCELLED,
                 activeTransfer = null,
                 selectedPeer = null,
                 isPaired = false,
@@ -848,6 +948,7 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
                 val updatedQueue = current.transferQueue.filter {
                     it.status != QueueItemStatus.TRANSFERRING
                 }
+                val nextUiState = if (current.isTransferring || current.transferUiState == TransferUiState.TRANSFERRING || current.transferUiState == TransferUiState.WAITING_FOR_ACCEPT || current.transferUiState == TransferUiState.WAITING_FOR_DEVICE) TransferUiState.FAILED else current.transferUiState
                 current.copy(
                     pairingState = state,
                     selectedPeer = null,
@@ -856,6 +957,8 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
                     activePin = "",
                     isTransferring = false,
                     activeTransfer = null,
+                    transferUiState = nextUiState,
+                    transferErrorMessage = if (reason.isNotEmpty()) reason else "Device disconnected",
                     transferQueue = updatedQueue,
                     transferRateText = "0.0 MB/s",
                     statusMessage = if (reason.isNotEmpty()) reason else "Disconnected"
@@ -894,12 +997,12 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
             timestamp = System.currentTimeMillis()
         )
 
-        // 1. INSTANT UI UPDATE: Show item immediately in active queue and switch to Transfers view
+        // 1. INSTANT UI UPDATE: Set transferUiState to TRANSFERRING
         _uiState.update { state ->
             state.copy(
-                selectedTab = 2, // Switch directly to Transfers section so user sees it instantly
                 transferQueue = listOf(newItem) + state.transferQueue.filter { it.id != itemId },
                 isTransferring = true,
+                transferUiState = TransferUiState.TRANSFERRING,
                 activeTransfer = ActiveTransfer(
                     queueItemId = itemId,
                     fileName = fileName,
@@ -977,6 +1080,9 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
                 }
             } else state.transferQueue
 
+            val isDone = transferred >= total && total > 0
+            val nextState = if (isDone) TransferUiState.COMPLETED else TransferUiState.TRANSFERRING
+
             state.copy(
                 activeTransfer = ActiveTransfer(
                     queueItemId = activeId,
@@ -989,9 +1095,13 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
                     isReceived = state.activeTransfer?.isReceived ?: false
                 ),
                 transferQueue = updatedQueue,
-                isTransferring = transferred < total,
+                isTransferring = !isDone,
+                transferUiState = nextState,
+                lastCompletedFileName = if (isDone) fileName else state.lastCompletedFileName,
+                lastCompletedFileSize = if (isDone) total else state.lastCompletedFileSize,
+                lastCompletedFilePath = if (isDone) File(prefs.downloadDirectory, fileName).absolutePath else state.lastCompletedFilePath,
                 transferRateText = rateText,
-                statusMessage = if (transferred >= total && total > 0) "Completed $fileName!" else "Streaming $fileName ($rateText, ETA: ${etaSec}s)"
+                statusMessage = if (isDone) "Completed $fileName!" else "Streaming $fileName ($rateText, ETA: ${etaSec}s)"
             )
         }
 
@@ -1023,11 +1133,13 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
                         dbHelper.completeTransferTransaction(matchingItem.id, historyItem)
 
                         val updatedQueue = dbHelper.getAllQueueItems()
-                        val updatedHistory = dbHelper.getAllHistoryItems()
+                        val updatedHistory = dbHelper.getAllHistoryItems().distinctBy { it.id }
+                        val historyIds = updatedHistory.map { it.id }.toSet()
+                        val cleanQueue = updatedQueue.filter { it.id !in historyIds && it.status != QueueItemStatus.COMPLETED }
 
                         _uiState.update { state ->
                             state.copy(
-                                transferQueue = updatedQueue,
+                                transferQueue = cleanQueue,
                                 history = updatedHistory,
                                 activeTransfer = null,
                                 isTransferring = false,

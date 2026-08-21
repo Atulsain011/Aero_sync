@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Default permissions for AeroSync desktop","local":true,"windows":["*"],"permissions":["core:default","dialog:default","dialog:allow-open","dialog:allow-save","shell:default","shell:allow-open"]}}
+{"default":{"identifier":"default","description":"Default permissions for AeroSync desktop","local":true,"windows":["*"],"permissions":["core:default","dialog:default","dialog:allow-open","dialog:allow-save"]}}

@@ -211,7 +211,9 @@ class MainActivity : ComponentActivity() {
                         onSelectTab = { viewModel.setSelectedTab(it) },
                         onTogglePause = { viewModel.togglePauseTransfer() },
                         onCancelTransfer = { viewModel.cancelActiveTransfer() },
-                        onChangeDownloadLocation = { folderPickerLauncher.launch(null) }
+                        onChangeDownloadLocation = { folderPickerLauncher.launch(null) },
+                        onResetTransfer = { viewModel.resetTransferState() },
+                        onRetryTransfer = { viewModel.retryTransfer() }
                     )
                 }
             }
@@ -247,12 +249,43 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        data class UriMetadata(val fileName: String, val fileSize: Long)
+
+        fun getUriMetadata(context: Context, uri: Uri): UriMetadata {
+            var fileName = "file_${System.currentTimeMillis()}"
+            var fileSize = 0L
+            if (uri.scheme == "file") {
+                val f = File(uri.path ?: "")
+                if (f.exists()) {
+                    return UriMetadata(f.name, f.length())
+                }
+            }
+            try {
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    val sizeIdx = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (cursor.moveToFirst()) {
+                        if (nameIdx >= 0) {
+                            val n = cursor.getString(nameIdx)
+                            if (!n.isNullOrBlank()) fileName = n
+                        }
+                        if (sizeIdx >= 0) {
+                            fileSize = cursor.getLong(sizeIdx)
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+            return UriMetadata(fileName, fileSize)
+        }
+
         fun resolveUriToFilePath(context: Context, uri: Uri): String? {
             if (uri.scheme == "file") {
-                return uri.path
+                val p = uri.path
+                if (!p.isNullOrBlank() && File(p).exists()) return p
+                return null
             }
 
-            // 1. Direct SAF / Storage Document resolution without copying files
+            // Direct SAF / Storage Document resolution without copying files
             try {
                 if (DocumentsContract.isDocumentUri(context, uri)) {
                     val docId = DocumentsContract.getDocumentId(uri)
@@ -293,7 +326,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // 2. Direct query on general content URI
+                // Direct query on general content URI
                 context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)?.use { cursor ->
                     if (cursor.moveToFirst()) {
                         val colIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
@@ -307,34 +340,7 @@ class MainActivity : ComponentActivity() {
                 }
             } catch (_: Exception) {}
 
-            // 3. Fallback for virtual / remote streams only
-            try {
-                var fileName = "file_${System.currentTimeMillis()}"
-                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (nameIndex >= 0 && cursor.moveToFirst()) {
-                        val name = cursor.getString(nameIndex)
-                        if (!name.isNullOrBlank()) fileName = name
-                    }
-                }
-                val stagingDir = context.externalCacheDir ?: context.cacheDir
-                val stagingFolder = File(stagingDir, "transfer_staging")
-                if (!stagingFolder.exists()) stagingFolder.mkdirs()
-                val tempFile = File(stagingFolder, fileName)
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    FileOutputStream(tempFile).use { output ->
-                        val buffer = ByteArray(4 * 1024 * 1024)
-                        var bytesRead: Int
-                        while (input.read(buffer).also { bytesRead = it } != -1) {
-                            output.write(buffer, 0, bytesRead)
-                        }
-                        output.flush()
-                    }
-                }
-                return tempFile.absolutePath
-            } catch (e: Exception) {
-                return null
-            }
+            return null
         }
     }
 }

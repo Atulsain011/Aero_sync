@@ -474,7 +474,7 @@ bool ConnectionManager::requestTransfer(const PeerInfo& targetPeer,
                                         const TransferManifest& manifest,
                                         const std::vector<std::filesystem::path>& localFilePaths,
                                         TransferProgressCallback progressCb) {
-    int clientSock = SocketTransport::connectTcpClient(targetPeer.ipAddress, targetPeer.port);
+    int clientSock = SocketTransport::connectTcpClient(targetPeer.ipAddress, targetPeer.port, 2000);
     if (clientSock < 0) return false;
 
     std::string offerPayload = ProtocolSerializer::serializeTransferManifest(manifest);

@@ -18,7 +18,7 @@ constexpr uint32_t WIRE_MAGIC          = 0x4145524F; // "AERO"
 constexpr size_t   PARALLEL_STREAMS    = 4;           // 4 parallel TCP streams
 constexpr size_t   LARGE_CHUNK_SIZE    = 1024 * 1024; // 1 MB high-throughput streaming chunk
 constexpr size_t   MAX_IN_FLIGHT_BYTES = 64 * 1024 * 1024; // 64 MB ring buffer backpressure
-constexpr int      PAIRING_TIMEOUT_SEC = 30;          // 30 seconds pairing timeout
+constexpr int      PAIRING_TIMEOUT_SEC = 5;           // 5 seconds fast pairing timeout
 
 enum class DeviceType : uint8_t {
     DEVICE_UNKNOWN = 0,

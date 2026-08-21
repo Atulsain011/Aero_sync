@@ -169,10 +169,10 @@ bool AppWindow::initialize(HINSTANCE hInstance, int nCmdShow) {
             m_incomingSenderName = req.senderName.empty() ? "Mobile Device" : req.senderName;
             m_incomingSenderIp = req.senderIp;
             m_incomingPin = req.pairingPin;
-            m_pendingConnectCb = respondCb;
-            m_showPairingModal = true;
-            m_statusMessage = "Incoming connection request from " + m_incomingSenderName + " (PIN: " + req.pairingPin + ")";
+            m_showPairingModal = false;
+            m_statusMessage = "Connected with " + m_incomingSenderName;
         }
+        respondCb(true); // Instant connection & pairing without waiting 30 seconds!
         InvalidateRect(m_hwnd, NULL, FALSE);
     });
 
@@ -180,7 +180,12 @@ bool AppWindow::initialize(HINSTANCE hInstance, int nCmdShow) {
         {
             std::lock_guard<std::mutex> lock(m_uiMutex);
             m_isTransferring = true;
-            m_statusMessage = "Receiving " + std::to_string(manifest.totalFiles) + " file(s) instantly...";
+            std::string firstName = manifest.files.empty() ? "files" : manifest.files[0].relativePath;
+            if (manifest.totalFiles > 1) {
+                m_statusMessage = "Receiving " + std::to_string(manifest.totalFiles) + " files (" + firstName + " + " + std::to_string(manifest.totalFiles - 1) + " more)...";
+            } else {
+                m_statusMessage = "Receiving: " + firstName;
+            }
         }
         respondCb(true); // Instant transfer without wasting a second!
         InvalidateRect(m_hwnd, NULL, FALSE);

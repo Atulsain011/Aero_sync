@@ -13,8 +13,9 @@ Remove-Item -Recurse -Force "$env:TEMP\aerosync_cargo_target\release\build\aeros
 Remove-Item -Recurse -Force "$env:TEMP\aerosync_cargo_target\release\deps\aerosync_desktop-*" -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force "$env:TEMP\aerosync_cargo_target\release\aerosync-desktop.exe" -ErrorAction SilentlyContinue
 
-Write-Host "0. Building Standalone Static Native Core Daemon (aerosync_daemon.exe)..." -ForegroundColor Cyan
-& "$toolBin\g++.exe" -O3 -std=c++17 -static -I"$root\core\include" -I"$root\platform\windows\include" "$root\platform\windows\src\daemon_main.cpp" "$root\core\core_build\libaerosync_core.a" -lws2_32 -lmswsock -liphlpapi -lshell32 -lole32 -luuid -o "$root\build_windows\aerosync_daemon.exe"
+Write-Host "0. Building Standalone Native Core Daemon (aerosync_daemon.exe)..." -ForegroundColor Cyan
+& "$toolBin\windres.exe" "$root\platform\windows\resources.rc" -O coff -o "$root\build_windows\resources.o"
+& "$toolBin\g++.exe" -O2 -std=c++17 -I"$root\core\include" -I"$root\platform\windows\include" "$root\platform\windows\src\daemon_main.cpp" "$root\build_windows\resources.o" "$root\core\core_build\libaerosync_core.a" -lws2_32 -lmswsock -liphlpapi -lshell32 -lole32 -luuid -o "$root\build_windows\aerosync_daemon.exe"
 Copy-Item "$root\build_windows\aerosync_daemon.exe" "$root\release\aerosync_daemon.exe" -Force
 Copy-Item "$root\build_windows\aerosync_daemon.exe" "$root\platform\windows\desktop_tauri\aerosync_daemon.exe" -Force
 Copy-Item "$root\build_windows\aerosync_daemon.exe" "$root\platform\windows\desktop_tauri\src-tauri\aerosync_daemon.exe" -Force

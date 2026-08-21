@@ -6,7 +6,8 @@ import {
   SettingsState,
   DiskSpace,
   IncomingRequest,
-  DaemonStatusResponse
+  DaemonStatusResponse,
+  TransferUiState
 } from '../types/aerosync';
 import { daemonService } from '../services/daemonService';
 import { tauriBridge } from '../services/tauriBridge';
@@ -78,6 +79,17 @@ export function useAeroSyncStore() {
   // Modals
   const [incomingRequest, setIncomingRequest] = useState<IncomingRequest | null>(null);
   const [isDirectIpModalOpen, setIsDirectIpModalOpen] = useState<boolean>(false);
+
+  // Unified Big Circle State Machine
+  const [transferUiState, setTransferUiState] = useState<TransferUiState>('IDLE');
+  const [selectedFiles, setSelectedFiles] = useState<{ path: string; name: string; size: number }[]>([]);
+  const [lastCompletedFile, setLastCompletedFile] = useState<{ name: string; size: number } | null>(null);
+  const [transferErrorMessage, setTransferErrorMessage] = useState<string>('');
+  const transferUiStateRef = useRef<TransferUiState>('IDLE');
+
+  useEffect(() => {
+    transferUiStateRef.current = transferUiState;
+  }, [transferUiState]);
 
   // Throttling and state refs
   const lastActiveFileRef = useRef<string>('');
@@ -186,6 +198,79 @@ export function useAeroSyncStore() {
     }
   }, [selectedPeer, peers]);
 
+  const stageFiles = useCallback(async (filePaths: string[]) => {
+    if (!filePaths || filePaths.length === 0) return;
+    try {
+      const metaList = await tauriBridge.getFilesMetadata(filePaths);
+      const staged = metaList.map(m => ({ path: m.path, name: m.name, size: m.size }));
+      setSelectedFiles(staged);
+      setTransferUiState('FILE_SELECTED');
+    } catch {
+      const staged = filePaths.map(p => ({ path: p, name: getFileName(p), size: 0 }));
+      setSelectedFiles(staged);
+      setTransferUiState('FILE_SELECTED');
+    }
+  }, []);
+
+  const removeStagedFile = useCallback((path: string) => {
+    setSelectedFiles(prev => {
+      const next = prev.filter(f => f.path !== path);
+      if (next.length === 0) setTransferUiState('IDLE');
+      return next;
+    });
+  }, []);
+
+  const clearStagedFiles = useCallback(() => {
+    setSelectedFiles([]);
+    setTransferUiState('IDLE');
+  }, []);
+
+  const resetTransferState = useCallback(() => {
+    setSelectedFiles([]);
+    setTransferUiState('IDLE');
+    setTransferErrorMessage('');
+    setLastCompletedFile(null);
+  }, []);
+
+  const startStagedTransfer = useCallback(() => {
+    if (selectedFiles.length === 0) return;
+    let peer = selectedPeer;
+    if (!peer && peers.length > 0) {
+      peer = peers[0];
+      setSelectedPeer(peer);
+    }
+    const paths = selectedFiles.map(f => f.path);
+    setTransferUiState('PREPARING');
+    setIsTransferring(true);
+    latestTransferringRef.current = true;
+
+    if (peer) {
+      const targetPeerObj = peer;
+      daemonService.sendTransfer(targetPeerObj.ipAddress, targetPeerObj.port || 48124, paths)
+        .then(res => {
+          if (res.success) {
+            setTransferUiState('WAITING_FOR_ACCEPT');
+          }
+          if (pollTriggerRef.current) pollTriggerRef.current();
+        })
+        .catch(err => {
+          console.error('Failed to trigger transfer via daemon:', err);
+          setTransferUiState('FAILED');
+          setTransferErrorMessage(err.message || 'Transfer error');
+        });
+    } else {
+      setTransferUiState('WAITING_FOR_DEVICE');
+    }
+  }, [selectedFiles, selectedPeer, peers]);
+
+  const retryTransfer = useCallback(() => {
+    if (selectedFiles.length > 0) {
+      startStagedTransfer();
+    } else {
+      resetTransferState();
+    }
+  }, [selectedFiles, startStagedTransfer, resetTransferState]);
+
   // Cancel active transfer
   const cancelTransfer = useCallback(async () => {
     try {
@@ -193,10 +278,10 @@ export function useAeroSyncStore() {
     } catch (err) {
       console.warn('Error cancelling transfer:', err);
     }
-    // Remove cancelled items immediately from UI queue
     setQueue(prev => prev.filter(item => item.status !== 'transferring'));
     setIsTransferring(false);
     latestTransferringRef.current = false;
+    setTransferUiState('CANCELLED');
     setCurrentProgress({
       state: 0,
       currentFileName: '',
@@ -272,8 +357,29 @@ export function useAeroSyncStore() {
           errorCode: 0
         });
 
+        if (data.currentProgress) {
+          const st = data.currentProgress.state;
+          if (st === 1 /* CONNECTING */) {
+            setTransferUiState(selectedPeer ? 'WAITING_FOR_ACCEPT' : 'WAITING_FOR_DEVICE');
+          } else if (st === 2 /* TRANSFERRING */) {
+            setTransferUiState('TRANSFERRING');
+          } else if (st === 3 /* COMPLETED */) {
+            setTransferUiState('COMPLETED');
+            if (data.currentProgress.currentFileName) {
+              setLastCompletedFile({
+                name: data.currentProgress.currentFileName,
+                size: data.currentProgress.fileSize
+              });
+            }
+          } else if (st === 4 /* FAILED */) {
+            setTransferUiState('FAILED');
+            setTransferErrorMessage('Transfer failed or peer disconnected.');
+          } else if (st === 7 /* CANCELLED */) {
+            setTransferUiState('CANCELLED');
+          }
+        }
+
         if (data.downloadDir && data.downloadDir !== settings.downloadDirectory) {
-          // Sync download directory from daemon if configured
           setSettings(prev => ({ ...prev, downloadDirectory: data.downloadDir }));
         }
 
@@ -289,6 +395,7 @@ export function useAeroSyncStore() {
             setSelectedPeer(null);
             setQueue(prev => prev.map(item => item.status === 'transferring' ? { ...item, status: 'cancelled' } : item));
             setStatusMessage('Transfer cancelled by peer. Device disconnected.');
+            setTransferUiState('CANCELLED');
           }
         } else if (!data.isTransferring && latestTransferringRef.current) {
           setIsTransferring(false);
@@ -302,7 +409,6 @@ export function useAeroSyncStore() {
           if (completedName && completedName !== lastActiveFileRef.current) {
             lastActiveFileRef.current = completedName;
 
-            // Add to history
             const newRecord: TransferHistoryRecord = {
               id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
               fileName: completedName,
@@ -322,7 +428,6 @@ export function useAeroSyncStore() {
           }
         }
 
-        // Periodic completed history check from daemon array
         const now = Date.now();
         if (now - lastHistorySyncRef.current > 4000 && data.completedHistory && data.completedHistory.length > 0) {
           lastHistorySyncRef.current = now;
@@ -337,7 +442,6 @@ export function useAeroSyncStore() {
       }
 
       if (!isCancelled) {
-        // High responsiveness: 80ms when transferring, 250ms when idle, 80ms when connecting
         const interval = !isDaemonOnline ? 80 : (latestTransferringRef.current ? 80 : 250);
         timer = window.setTimeout(poll, interval);
       }
@@ -382,7 +486,17 @@ export function useAeroSyncStore() {
     clearCompletedQueue,
     clearHistory,
     updateSettings,
-    refreshStorage
+    refreshStorage,
+    transferUiState,
+    selectedFiles,
+    lastCompletedFile,
+    transferErrorMessage,
+    stageFiles,
+    removeStagedFile,
+    clearStagedFiles,
+    startStagedTransfer,
+    resetTransferState,
+    retryTransfer
   };
 }
 

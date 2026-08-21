@@ -11,7 +11,6 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = ["custom-protocol"] }
 tauri-plugin-dialog = "2"
-tauri-plugin-shell = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
@@ -20,6 +19,6 @@ rfd = "0.16"
 [profile.release]
 panic = "abort"
 codegen-units = 1
-lto = true
-opt-level = "z"
-strip = true
+lto = "thin"
+opt-level = 3
+strip = false

@@ -26,12 +26,11 @@ fn find_daemon_executable() -> Option<PathBuf> {
         return Some(candidate1);
     }
 
-    // 2. Check in build_windows directory relative to workspace
+    // 2. Check in relative build directories
     let candidates = [
         current_dir.join("build_windows").join("aerosync_daemon.exe"),
         current_dir.join("..").join("build_windows").join("aerosync_daemon.exe"),
         current_dir.join("..").join("..").join("build_windows").join("aerosync_daemon.exe"),
-        PathBuf::from("C:\\Users\\Atul\\Desktop\\Aerosync\\build_windows\\aerosync_daemon.exe"),
     ];
 
     for path in candidates.iter() {
@@ -104,9 +103,9 @@ fn show_in_folder(path: String) -> Result<(), String> {
             return Err("File path does not exist".into());
         }
         let clean_path = path.replace('/', "\\");
-        let arg = format!("/select,\"{}\"", clean_path);
         Command::new("explorer.exe")
-            .raw_arg(&arg)
+            .arg("/select,")
+            .arg(&clean_path)
             .spawn()
             .map_err(|e| e.to_string())?;
         Ok(())
@@ -260,7 +259,6 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_shell::init())
         .manage(daemon_state)
         .invoke_handler(tauri::generate_handler![
             minimize_window,

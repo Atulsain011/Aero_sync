@@ -31,26 +31,34 @@ export const App: React.FC = () => {
     setIncomingRequest,
     isDirectIpModalOpen,
     setIsDirectIpModalOpen,
-    enqueueFiles,
     cancelTransfer,
     clearQueue,
     clearCompletedQueue,
     clearHistory,
     updateSettings,
-    refreshStorage
+    refreshStorage,
+    transferUiState,
+    selectedFiles,
+    lastCompletedFile,
+    transferErrorMessage,
+    stageFiles,
+    clearStagedFiles,
+    startStagedTransfer,
+    resetTransferState,
+    retryTransfer
   } = useAeroSyncStore();
 
   const handlePickAndSendFiles = async () => {
     const files = await tauriBridge.selectFiles();
     if (files && files.length > 0) {
-      enqueueFiles(files);
+      stageFiles(files);
     }
   };
 
   const handlePickAndSendFolder = async () => {
     const folder = await tauriBridge.selectFolder();
     if (folder) {
-      enqueueFiles([folder]);
+      stageFiles([folder]);
     }
   };
 
@@ -58,7 +66,7 @@ export const App: React.FC = () => {
     setSelectedPeer(peer);
     const files = await tauriBridge.selectFiles();
     if (files && files.length > 0) {
-      enqueueFiles(files, peer);
+      stageFiles(files);
     }
   };
 
@@ -94,11 +102,17 @@ export const App: React.FC = () => {
           {currentTab === 'home' && (
             <HomePage
               peers={peers}
+              selectedPeer={selectedPeer}
               activeTransferCount={isTransferring ? 1 : 0}
               diskSpace={diskSpace}
               recentHistory={history}
               isDaemonOnline={isDaemonOnline}
               statusMessage={statusMessage}
+              transferUiState={transferUiState}
+              selectedFiles={selectedFiles}
+              lastCompletedFile={lastCompletedFile}
+              transferErrorMessage={transferErrorMessage}
+              currentProgress={currentProgress}
               onSendFiles={handlePickAndSendFiles}
               onSendFolder={handlePickAndSendFolder}
               onSelectPeer={(peer) => {
@@ -106,7 +120,12 @@ export const App: React.FC = () => {
                 setCurrentTab('devices');
               }}
               onSelectTab={setCurrentTab}
-              onFilesDropped={(files) => enqueueFiles(files)}
+              onFilesDropped={(files) => stageFiles(files)}
+              onStartTransfer={startStagedTransfer}
+              onCancelTransfer={cancelTransfer}
+              onResetTransfer={resetTransferState}
+              onRetryTransfer={retryTransfer}
+              onClearFiles={clearStagedFiles}
             />
           )}
 

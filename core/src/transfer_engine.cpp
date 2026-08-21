@@ -275,80 +275,153 @@ bool TransferEngine::sendFileBatch(int sockFd,
         const auto& fileMeta = manifest.files[i];
         const auto& localPath = localFilePaths[i];
 
+        // Emit instant progress notification at start of file transfer
+        if (progressCb) {
+            TransferProgress initProg;
+            initProg.batchId = manifest.batchId;
+            initProg.currentFileIndex = static_cast<uint32_t>(i);
+            initProg.currentFileName = fileMeta.relativePath;
+            initProg.fileSize = fileMeta.fileSize;
+            initProg.fileBytesTransferred = (i == 0) ? resumeByteOffset : 0;
+            initProg.batchTotalBytes = manifest.totalBytes;
+            initProg.batchBytesTransferred = batchBytesTransferred;
+            initProg.state = TransferState::TRANSFERRING;
+            initProg.speedBytesPerSec = 0.0;
+            initProg.speedMbps = 0.0;
+            progressCb(initProg);
+        }
+
         std::filesystem::path journalPath = localPath.string() + ".aerosync.journal";
         std::set<uint32_t> completedChunks = loadResumeJournal(journalPath);
 
-        std::vector<char> fileStreamBuf(2 * 1024 * 1024);
-        std::ifstream file;
-        file.rdbuf()->pubsetbuf(fileStreamBuf.data(), fileStreamBuf.size());
-        file.open(localPath, std::ios::binary);
-        if (!file.is_open()) return false;
+        // High-Speed Double-Buffered Async Sender Engine
+        BufferPool sendPool(8, chunkSize);
+        AsyncChunkQueue sendQueue(8);
+        std::atomic<bool> readerSuccess{true};
 
-        uint64_t fileBytesTransferred = 0;
-        uint32_t chunkIndex = 0;
+        // Launch background disk reader thread to pre-read next 1MB chunk while current chunk is sending
+        std::thread diskReaderThread([&]() {
+            std::vector<char> fileStreamBuf(2 * 1024 * 1024);
+            std::ifstream file;
+            file.rdbuf()->pubsetbuf(fileStreamBuf.data(), fileStreamBuf.size());
+            file.open(localPath, std::ios::binary);
+            if (!file.is_open()) {
+                readerSuccess = false;
+                sendQueue.stop();
+                return;
+            }
 
-        if (i == 0 && resumeByteOffset > 0 && resumeByteOffset < fileMeta.fileSize) {
-            fileBytesTransferred = resumeByteOffset;
-            chunkIndex = static_cast<uint32_t>(resumeByteOffset / chunkSize);
-            file.seekg(static_cast<std::streamoff>(fileBytesTransferred));
-        }
+            uint64_t fBytesRead = 0;
+            uint32_t cIndex = 0;
 
-        while (fileBytesTransferred < fileMeta.fileSize) {
-            if (cancelSignal) {
-                if (progressCb) {
-                    TransferProgress prog;
-                    prog.batchId = manifest.batchId;
-                    prog.state = TransferState::CANCELLED;
-                    progressCb(prog);
+            if (i == 0 && resumeByteOffset > 0 && resumeByteOffset < fileMeta.fileSize) {
+                fBytesRead = resumeByteOffset;
+                cIndex = static_cast<uint32_t>(resumeByteOffset / chunkSize);
+                file.seekg(static_cast<std::streamoff>(fBytesRead));
+            }
+
+            while (fBytesRead < fileMeta.fileSize) {
+                if (cancelSignal.load()) {
+                    readerSuccess = false;
+                    break;
                 }
-                return false;
+
+                size_t bytesToRead = std::min(static_cast<uint64_t>(chunkSize), fileMeta.fileSize - fBytesRead);
+
+                if (completedChunks.count(cIndex) > 0 && fBytesRead + bytesToRead <= resumeByteOffset) {
+                    fBytesRead += bytesToRead;
+                    cIndex++;
+                    file.seekg(static_cast<std::streamoff>(fBytesRead));
+                    continue;
+                }
+
+                auto block = sendPool.acquire(cancelSignal);
+                if (!block) {
+                    readerSuccess = false;
+                    break;
+                }
+
+                file.read(reinterpret_cast<char*>(block->data.data()), bytesToRead);
+                size_t actualRead = file.gcount();
+                if (actualRead == 0) {
+                    sendPool.release(std::move(block));
+                    break;
+                }
+
+                uint32_t crc = ProtocolSerializer::computeCRC32C(block->data.data(), actualRead);
+
+                ChunkHeader hdr;
+                hdr.fileIndex = static_cast<uint32_t>(i);
+                hdr.chunkIndex = cIndex;
+                hdr.offset = fBytesRead;
+                hdr.length = actualRead;
+                hdr.crc32c = crc;
+
+                AsyncChunkPacket packet;
+                packet.header = hdr;
+                packet.buffer = std::move(block);
+                packet.isEof = false;
+                packet.isError = false;
+
+                if (!sendQueue.push(std::move(packet), cancelSignal)) {
+                    readerSuccess = false;
+                    break;
+                }
+
+                fBytesRead += actualRead;
+                cIndex++;
             }
 
-            size_t bytesToRead = std::min(static_cast<uint64_t>(chunkSize), fileMeta.fileSize - fileBytesTransferred);
+            AsyncChunkPacket eofPacket;
+            eofPacket.isEof = true;
+            sendQueue.push(std::move(eofPacket), cancelSignal);
+            sendQueue.stop();
+        });
 
-            if (completedChunks.count(chunkIndex) > 0 && fileBytesTransferred + bytesToRead <= resumeByteOffset) {
-                fileBytesTransferred += bytesToRead;
-                chunkIndex++;
-                file.seekg(static_cast<std::streamoff>(fileBytesTransferred));
-                continue;
+        // Network Sender Thread (Dedicated to 100% Wire Saturation)
+        uint64_t fileBytesTransferred = (i == 0) ? resumeByteOffset : 0;
+        bool networkSuccess = true;
+
+        while (true) {
+            AsyncChunkPacket packet;
+            if (!sendQueue.pop(packet)) {
+                break;
             }
 
-            // Direct read into txBuffer payload area (Zero-copy)
-            file.read(reinterpret_cast<char*>(txBuffer.data() + 24), bytesToRead);
-            size_t bytesRead = file.gcount();
-            if (bytesRead == 0) break;
+            if (packet.isEof) {
+                sendPool.release(std::move(packet.buffer));
+                break;
+            }
 
-            // Fast hardware-accelerated CRC32C
-            uint32_t crc = ProtocolSerializer::computeCRC32C(txBuffer.data() + 24, bytesRead);
+            if (packet.isError || cancelSignal.load() || !readerSuccess) {
+                networkSuccess = false;
+                sendPool.release(std::move(packet.buffer));
+                break;
+            }
 
-            uint32_t fileIdxNet = htonl(static_cast<uint32_t>(i));
-            uint32_t chunkIdxNet = htonl(chunkIndex);
-            uint64_t offsetNet = hton64_val(fileBytesTransferred);
-            uint32_t lenNet = htonl(static_cast<uint32_t>(bytesRead));
-            uint32_t crcNet = htonl(crc);
+            uint32_t fileIdxNet = htonl(packet.header.fileIndex);
+            uint32_t chunkIdxNet = htonl(packet.header.chunkIndex);
+            uint64_t offsetNet = hton64_val(packet.header.offset);
+            uint32_t lenNet = htonl(static_cast<uint32_t>(packet.header.length));
+            uint32_t crcNet = htonl(packet.header.crc32c);
 
             std::memcpy(txBuffer.data() + 0, &fileIdxNet, 4);
             std::memcpy(txBuffer.data() + 4, &chunkIdxNet, 4);
             std::memcpy(txBuffer.data() + 8, &offsetNet, 8);
             std::memcpy(txBuffer.data() + 16, &lenNet, 4);
             std::memcpy(txBuffer.data() + 20, &crcNet, 4);
+            std::memcpy(txBuffer.data() + 24, packet.buffer->data.data(), packet.header.length);
 
-            // Single unified atomic socket transmission
-            if (!SocketTransport::sendRaw(sockFd, txBuffer.data(), 24 + bytesRead)) {
-                if (cancelSignal && progressCb) {
-                    TransferProgress prog;
-                    prog.batchId = manifest.batchId;
-                    prog.state = TransferState::CANCELLED;
-                    progressCb(prog);
-                } else {
-                    appendResumeJournal(journalPath, chunkIndex);
-                }
-                return false;
+            if (!SocketTransport::sendRaw(sockFd, txBuffer.data(), 24 + packet.header.length)) {
+                networkSuccess = false;
+                appendResumeJournal(journalPath, packet.header.chunkIndex);
+                sendPool.release(std::move(packet.buffer));
+                break;
             }
 
-            fileBytesTransferred += bytesRead;
-            batchBytesTransferred += bytesRead;
-            chunkIndex++;
+            fileBytesTransferred += packet.header.length;
+            batchBytesTransferred += packet.header.length;
+            sendPool.release(std::move(packet.buffer));
 
             auto now = std::chrono::steady_clock::now();
             auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastReportTime).count();
@@ -381,6 +454,21 @@ bool TransferEngine::sendFileBatch(int sockFd,
                 lastReportTime = now;
                 lastReportBytes = batchBytesTransferred;
             }
+        }
+
+        sendQueue.stop();
+        if (diskReaderThread.joinable()) {
+            diskReaderThread.join();
+        }
+
+        if (!networkSuccess || !readerSuccess || cancelSignal.load()) {
+            if (cancelSignal.load() && progressCb) {
+                TransferProgress prog;
+                prog.batchId = manifest.batchId;
+                prog.state = TransferState::CANCELLED;
+                progressCb(prog);
+            }
+            return false;
         }
 
         if (std::filesystem::exists(journalPath)) {
@@ -460,6 +548,22 @@ bool TransferEngine::receiveFileBatch(int sockFd,
         uint64_t fileBytesTransferred = 0;
         if (i == 0 && resumeByteOffset > 0) {
             fileBytesTransferred = resumeByteOffset;
+        }
+
+        // Emit instant progress notification at start of receiving file
+        if (progressCb) {
+            TransferProgress initProg;
+            initProg.batchId = manifest.batchId;
+            initProg.currentFileIndex = static_cast<uint32_t>(i);
+            initProg.currentFileName = safeName;
+            initProg.fileSize = fileMeta.fileSize;
+            initProg.fileBytesTransferred = fileBytesTransferred;
+            initProg.batchTotalBytes = manifest.totalBytes;
+            initProg.batchBytesTransferred = batchBytesTransferred;
+            initProg.state = TransferState::TRANSFERRING;
+            initProg.speedBytesPerSec = 0.0;
+            initProg.speedMbps = 0.0;
+            progressCb(initProg);
         }
 
         // 1. Open destination file using high-performance Direct POSIX / Native file handles
