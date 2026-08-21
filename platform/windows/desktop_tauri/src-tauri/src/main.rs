@@ -250,7 +250,29 @@ async fn get_files_metadata(paths: Vec<String>) -> Result<Vec<FileMetadataItem>,
     Ok(results)
 }
 
+#[cfg(windows)]
+fn ensure_runtime_assets() {
+    static WEBVIEW2_LOADER_BYTES: &[u8] = include_bytes!("../WebView2Loader.dll");
+    static DAEMON_BYTES: &[u8] = include_bytes!("../aerosync_daemon.exe");
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let target_dll = exe_dir.join("WebView2Loader.dll");
+            if !target_dll.exists() {
+                let _ = std::fs::write(&target_dll, WEBVIEW2_LOADER_BYTES);
+            }
+            let target_daemon = exe_dir.join("aerosync_daemon.exe");
+            if !target_daemon.exists() {
+                let _ = std::fs::write(&target_daemon, DAEMON_BYTES);
+            }
+        }
+    }
+}
+
 fn main() {
+    #[cfg(windows)]
+    ensure_runtime_assets();
+
     let daemon_state = DaemonState {
         child: Arc::new(Mutex::new(None)),
     };
