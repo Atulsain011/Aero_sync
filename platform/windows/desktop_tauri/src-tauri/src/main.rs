@@ -271,6 +271,12 @@ fn ensure_runtime_assets() {
     static WEBVIEW2_LOADER_BYTES: &[u8] = include_bytes!("../WebView2Loader.dll");
     static DAEMON_BYTES: &[u8] = include_bytes!("../aerosync_daemon.exe");
 
+    // 1. Terminate any running daemon process so binaries can be overwritten cleanly
+    let _ = Command::new("taskkill")
+        .args(["/F", "/IM", "aerosync_daemon.exe"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output();
+
     let mut runtime_dir = std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
         .unwrap_or_else(|| std::env::temp_dir());
@@ -283,6 +289,7 @@ fn ensure_runtime_assets() {
         let _ = std::fs::create_dir_all(&runtime_dir);
     }
 
+    // 2. Unpack current static aerosync_daemon.exe and WebView2Loader.dll
     let files: &[(&str, &[u8])] = &[
         ("WebView2Loader.dll", WEBVIEW2_LOADER_BYTES),
         ("aerosync_daemon.exe", DAEMON_BYTES),
@@ -295,16 +302,40 @@ fn ensure_runtime_assets() {
             Err(_) => true,
         };
         if write_needed {
+            let _ = std::fs::remove_file(&dest);
             let _ = std::fs::write(&dest, bytes);
+        }
+
+        // Also ensure current executable directory has aerosync_daemon.exe
+        if let Ok(current_exe) = std::env::current_exe() {
+            if let Some(current_dir) = current_exe.parent() {
+                let local_dest = current_dir.join(filename);
+                let local_write_needed = match std::fs::metadata(&local_dest) {
+                    Ok(meta) => meta.len() != bytes.len() as u64,
+                    Err(_) => true,
+                };
+                if local_write_needed {
+                    let _ = std::fs::remove_file(&local_dest);
+                    let _ = std::fs::write(&local_dest, bytes);
+                }
+            }
         }
     }
 
-    // Clean up legacy runtime DLLs if present to avoid system DLL load conflicts
+    // 3. Clean up legacy runtime DLLs if present to avoid system DLL load conflicts
     let legacy_dlls = ["libc++.dll", "libunwind.dll", "libwinpthread-1.dll"];
     for dll in legacy_dlls {
         let legacy_path = runtime_dir.join(dll);
         if legacy_path.exists() {
             let _ = std::fs::remove_file(legacy_path);
+        }
+        if let Ok(current_exe) = std::env::current_exe() {
+            if let Some(current_dir) = current_exe.parent() {
+                let local_legacy = current_dir.join(dll);
+                if local_legacy.exists() {
+                    let _ = std::fs::remove_file(local_legacy);
+                }
+            }
         }
     }
 

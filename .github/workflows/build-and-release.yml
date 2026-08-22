@@ -83,6 +83,16 @@ jobs:
             exit 1
           }
           Copy-Item $sourceExe "artifacts/AeroSync.exe" -Force
+
+          $daemonExe = "platform/windows/desktop_tauri/aerosync_daemon.exe"
+          if (Test-Path $daemonExe) {
+            Copy-Item $daemonExe "artifacts/aerosync_daemon.exe" -Force
+          }
+          $dllPath = "platform/windows/desktop_tauri/src-tauri/target/release/WebView2Loader.dll"
+          if (Test-Path $dllPath) {
+            Copy-Item $dllPath "artifacts/WebView2Loader.dll" -Force
+          }
+
           $setupExe = Get-ChildItem "platform/windows/desktop_tauri/src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
           if ($setupExe) {
             Copy-Item $setupExe.FullName "artifacts/AeroSync-Setup-v1.0.7.exe" -Force
@@ -95,11 +105,13 @@ jobs:
           $portableDir = "artifacts/AeroSync-Windows-Portable"
           New-Item -ItemType Directory -Force -Path $portableDir
           Copy-Item $sourceExe "$portableDir/AeroSync.exe" -Force
-          $dllPath = "platform/windows/desktop_tauri/src-tauri/target/release/WebView2Loader.dll"
+          if (Test-Path $daemonExe) {
+            Copy-Item $daemonExe "$portableDir/aerosync_daemon.exe" -Force
+          }
           if (Test-Path $dllPath) {
             Copy-Item $dllPath "$portableDir/WebView2Loader.dll" -Force
           }
-          Compress-Archive -Path $portableDir -DestinationPath "artifacts/AeroSync-Windows-Portable.zip" -Force
+          Compress-Archive -Path "$portableDir/*" -DestinationPath "artifacts/AeroSync-Windows-Portable.zip" -Force
           Remove-Item -Recurse -Force $portableDir
 
       - name: Upload Windows Artifacts
@@ -280,6 +292,8 @@ jobs:
             release-assets/AeroSync-Setup-v1.0.7.exe
             release-assets/AeroSync-Windows-Portable.zip
             release-assets/AeroSync.exe
+            release-assets/aerosync_daemon.exe
+            release-assets/WebView2Loader.dll
             release-assets/AeroSync-v1.0.7-x86_64.AppImage
             release-assets/aerosync_1.0.7_amd64.deb
             release-assets/AeroSync-Linux-Portable.tar.gz
