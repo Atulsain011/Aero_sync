@@ -17,7 +17,17 @@ struct DaemonState {
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 fn find_daemon_executable() -> Option<PathBuf> {
-    // 1. Check embedded unpack directory in LocalAppData/Temp (standalone path)
+    // 1. Check in same directory as current executable (Standalone / Portable location)
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(current_dir) = current_exe.parent() {
+            let candidate1 = current_dir.join("aerosync_daemon.exe");
+            if candidate1.exists() {
+                return Some(candidate1);
+            }
+        }
+    }
+
+    // 2. Check embedded unpack directory in LocalAppData/AeroSync/bin
     #[cfg(windows)]
     {
         let mut runtime_dir = std::env::var_os("LOCALAPPDATA")
@@ -28,16 +38,6 @@ fn find_daemon_executable() -> Option<PathBuf> {
         let embedded_daemon = runtime_dir.join("aerosync_daemon.exe");
         if embedded_daemon.exists() {
             return Some(embedded_daemon);
-        }
-    }
-
-    // 2. Check in same directory as current executable
-    if let Ok(current_exe) = std::env::current_exe() {
-        if let Some(current_dir) = current_exe.parent() {
-            let candidate1 = current_dir.join("aerosync_daemon.exe");
-            if candidate1.exists() {
-                return Some(candidate1);
-            }
         }
     }
 
@@ -270,9 +270,6 @@ async fn get_files_metadata(paths: Vec<String>) -> Result<Vec<FileMetadataItem>,
 fn ensure_runtime_assets() {
     static WEBVIEW2_LOADER_BYTES: &[u8] = include_bytes!("../WebView2Loader.dll");
     static DAEMON_BYTES: &[u8] = include_bytes!("../aerosync_daemon.exe");
-    static LIBCXX_BYTES: &[u8] = include_bytes!("../libc++.dll");
-    static LIBUNWIND_BYTES: &[u8] = include_bytes!("../libunwind.dll");
-    static LIBWINPTHREAD_BYTES: &[u8] = include_bytes!("../libwinpthread-1.dll");
 
     let mut runtime_dir = std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
@@ -289,9 +286,6 @@ fn ensure_runtime_assets() {
     let files: &[(&str, &[u8])] = &[
         ("WebView2Loader.dll", WEBVIEW2_LOADER_BYTES),
         ("aerosync_daemon.exe", DAEMON_BYTES),
-        ("libc++.dll", LIBCXX_BYTES),
-        ("libunwind.dll", LIBUNWIND_BYTES),
-        ("libwinpthread-1.dll", LIBWINPTHREAD_BYTES),
     ];
 
     for (filename, bytes) in files {
@@ -302,6 +296,15 @@ fn ensure_runtime_assets() {
         };
         if write_needed {
             let _ = std::fs::write(&dest, bytes);
+        }
+    }
+
+    // Clean up legacy runtime DLLs if present to avoid system DLL load conflicts
+    let legacy_dlls = ["libc++.dll", "libunwind.dll", "libwinpthread-1.dll"];
+    for dll in legacy_dlls {
+        let legacy_path = runtime_dir.join(dll);
+        if legacy_path.exists() {
+            let _ = std::fs::remove_file(legacy_path);
         }
     }
 

@@ -68,9 +68,6 @@ Section "MainSection" SEC01
     File "..\..\..\release\AeroSync.exe"
     File "..\..\..\release\WebView2Loader.dll"
     File "..\..\..\release\aerosync_daemon.exe"
-    File "..\..\..\release\libc++.dll"
-    File "..\..\..\release\libunwind.dll"
-    File "..\..\..\release\libwinpthread-1.dll"
 
     ; 2. Create Start Menu Shortcuts
     CreateDirectory "$SMPROGRAMS\AeroSync"
@@ -108,9 +105,6 @@ Section Uninstall
     Delete "$INSTDIR\AeroSync.exe"
     Delete "$INSTDIR\WebView2Loader.dll"
     Delete "$INSTDIR\aerosync_daemon.exe"
-    Delete "$INSTDIR\libc++.dll"
-    Delete "$INSTDIR\libunwind.dll"
-    Delete "$INSTDIR\libwinpthread-1.dll"
     Delete "$INSTDIR\uninstall.exe"
 
     ; Remove Directory
