@@ -266,35 +266,36 @@ jobs:
           name: AeroSync ${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}
           draft: ${{ inputs.draft || false }}
           prerelease: ${{ inputs.prerelease || false }}
+          fail_on_unmatched_files: false
           body: |
-            ## AeroSync Release
+            ## AeroSync v1.0.7 Release Assets
 
-            High-speed peer-to-peer file transfer over local Wi-Fi and hotspot.
+            High-speed peer-to-peer file transfer over local Wi-Fi and mobile hotspot. Zero cloud, 100% private.
 
-            ### Windows
-            - **Installer (Recommended)**: `AeroSync-Setup-v1.0.7.exe`
-            - **Portable Package**: `AeroSync-Windows-Portable.zip`
-            - **Standalone Executable**: `AeroSync.exe`
+            ---
 
-            ### Linux
-            - **Universal AppImage**: `AeroSync-v1.0.7-x86_64.AppImage`
-            - **Debian / Ubuntu Package**: `aerosync_1.0.7_amd64.deb`
-            - **Linux Portable Archive**: `AeroSync-Linux-Portable.tar.gz`
+            ### 🪟 Windows Release Assets
+            - [**Download Windows Setup Installer (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Setup-v1.0.7.exe) (`AeroSync-Setup-v1.0.7.exe`)
+            - [**Download Windows Portable Package (.zip)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Windows-Portable.zip) (`AeroSync-Windows-Portable.zip`)
+            - [**Download Standalone Windows Executable**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync.exe) (`AeroSync.exe`)
 
-            ### Android
-            - **Mobile App**: `AeroSync.apk`
+            ---
 
-            ### Key Highlights
+            ### 🐧 Linux Release Assets
+            - [**Download Linux AppImage Portable (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-v1.0.7-x86_64.AppImage) (`AeroSync-v1.0.7-x86_64.AppImage`)
+            - [**Download Debian / Ubuntu / Mint DEB Package**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/aerosync_1.0.7_amd64.deb) (`aerosync_1.0.7_amd64.deb`)
+            - [**Download Linux Portable Archive (.tar.gz)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Linux-Portable.tar.gz) (`AeroSync-Linux-Portable.tar.gz`)
+
+            ---
+
+            ### 📱 Android Release Assets
+            - [**Download Android Mobile App (.apk)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync.apk) (`AeroSync.apk`)
+
+            ---
+
+            ### ⚡ Key Highlights
             - Zero-cloud, 100% peer-to-peer direct local network file transfer
             - Cross-platform support (Windows, Linux, Android)
-            - Automated mDNS peer discovery & secure PIN pairing
+            - Automated mDNS / UDP peer discovery & secure PIN pairing
           files: |
-            release-assets/AeroSync-Setup-v1.0.7.exe
-            release-assets/AeroSync-Windows-Portable.zip
-            release-assets/AeroSync.exe
-            release-assets/aerosync_daemon.exe
-            release-assets/WebView2Loader.dll
-            release-assets/AeroSync-v1.0.7-x86_64.AppImage
-            release-assets/aerosync_1.0.7_amd64.deb
-            release-assets/AeroSync-Linux-Portable.tar.gz
-            release-assets/AeroSync.apk
+            release-assets/*

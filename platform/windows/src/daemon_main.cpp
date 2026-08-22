@@ -655,7 +655,11 @@ int main(int argc, char** argv) {
 
     while (g_running) {
         sockaddr_in clientAddr{};
+#ifdef _WIN32
         int clientLen = sizeof(clientAddr);
+#else
+        socklen_t clientLen = sizeof(clientAddr);
+#endif
         socket_t clientSock = accept(serverSock, (sockaddr*)&clientAddr, &clientLen);
         if (clientSock != INVALID_SOCKET) {
             std::thread(handleHttpClient, clientSock).detach();
