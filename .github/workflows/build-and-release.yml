@@ -53,6 +53,22 @@ jobs:
         working-directory: platform/windows/desktop_tauri
         run: npm run build
 
+      - name: Build Windows Native Core Daemon (aerosync_daemon.exe)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "platform/windows/desktop_tauri/aerosync_daemon.exe")) {
+            mkdir -p build_win
+            cmake -B build_win -S platform/windows -DCMAKE_BUILD_TYPE=Release
+            cmake --build build_win --config Release
+            if (Test-Path "build_win/Release/aerosync_daemon.exe") {
+              Copy-Item "build_win/Release/aerosync_daemon.exe" "platform/windows/desktop_tauri/aerosync_daemon.exe" -Force
+              Copy-Item "build_win/Release/aerosync_daemon.exe" "platform/windows/desktop_tauri/src-tauri/aerosync_daemon.exe" -Force
+            } elseif (Test-Path "build_win/aerosync_daemon.exe") {
+              Copy-Item "build_win/aerosync_daemon.exe" "platform/windows/desktop_tauri/aerosync_daemon.exe" -Force
+              Copy-Item "build_win/aerosync_daemon.exe" "platform/windows/desktop_tauri/src-tauri/aerosync_daemon.exe" -Force
+            }
+          }
+
       - name: Build Windows Executable & NSIS Installer
         working-directory: platform/windows/desktop_tauri
         run: npx @tauri-apps/cli build --bundles nsis
