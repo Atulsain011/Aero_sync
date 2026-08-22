@@ -17,17 +17,27 @@ struct DaemonState {
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 fn find_daemon_executable() -> Option<PathBuf> {
+    let exe_name = if cfg!(windows) {
+        "aerosync_daemon.exe"
+    } else {
+        "aerosync_daemon"
+    };
+
     // 1. Check in same directory as current executable (Standalone / Portable location)
     if let Ok(current_exe) = std::env::current_exe() {
         if let Some(current_dir) = current_exe.parent() {
-            let candidate1 = current_dir.join("aerosync_daemon.exe");
+            let candidate1 = current_dir.join(exe_name);
             if candidate1.exists() {
                 return Some(candidate1);
+            }
+            let candidate_res = current_dir.join("resources").join(exe_name);
+            if candidate_res.exists() {
+                return Some(candidate_res);
             }
         }
     }
 
-    // 2. Check embedded unpack directory in LocalAppData/AeroSync/bin
+    // 2. Platform-specific user/system runtime directories
     #[cfg(windows)]
     {
         let mut runtime_dir = std::env::var_os("LOCALAPPDATA")
@@ -41,17 +51,47 @@ fn find_daemon_executable() -> Option<PathBuf> {
         }
     }
 
-    // 3. Check in relative build directories
-    let current_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    let candidates = [
-        current_dir.join("build_windows").join("aerosync_daemon.exe"),
-        current_dir.join("..").join("build_windows").join("aerosync_daemon.exe"),
-        current_dir.join("..").join("..").join("build_windows").join("aerosync_daemon.exe"),
-    ];
+    #[cfg(not(windows))]
+    {
+        if let Some(home) = std::env::var_os("HOME") {
+            let user_bin = PathBuf::from(home)
+                .join(".local")
+                .join("bin")
+                .join("aerosync_daemon");
+            if user_bin.exists() {
+                return Some(user_bin);
+            }
+        }
+        let system_paths = [
+            PathBuf::from("/usr/bin/aerosync_daemon"),
+            PathBuf::from("/usr/local/bin/aerosync_daemon"),
+            PathBuf::from("/opt/aerosync/aerosync_daemon"),
+            PathBuf::from("/usr/lib/aerosync/aerosync_daemon"),
+        ];
+        for sys_path in system_paths.iter() {
+            if sys_path.exists() {
+                return Some(sys_path.clone());
+            }
+        }
+    }
 
-    for path in candidates.iter() {
-        if path.exists() {
-            return Some(path.clone());
+    // 3. Check in relative build directories
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(current_dir) = current_exe.parent() {
+            let candidates = [
+                current_dir.join("build_windows").join(exe_name),
+                current_dir.join("build_linux").join(exe_name),
+                current_dir.join("..").join("build_windows").join(exe_name),
+                current_dir.join("..").join("build_linux").join(exe_name),
+                current_dir.join("..").join("..").join("build_windows").join(exe_name),
+                current_dir.join("..").join("..").join("build_linux").join(exe_name),
+            ];
+
+            for path in candidates.iter() {
+                if path.exists() {
+                    return Some(path.clone());
+                }
+            }
         }
     }
 

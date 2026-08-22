@@ -22,6 +22,8 @@
 
 | Platform | Package | Download Link | Version |
 | :--- | :--- | :--- | :--- |
+| **Linux (AppImage Portable)** | `AeroSync-v1.0.7-x86_64.AppImage` | [**Download Linux AppImage (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-v1.0.7-x86_64.AppImage) | `v1.0.7` |
+| **Linux (Debian / Ubuntu / Mint)** | `aerosync_1.0.7_amd64.deb` | [**Download Linux DEB Package**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/aerosync_1.0.7_amd64.deb) | `v1.0.7` |
 | **Windows (Installer)** | `AeroSync-Setup-v1.0.7.exe` | [**Download Windows Installer (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Setup-v1.0.7.exe) | `v1.0.7` |
 | **Windows (Portable)** | `AeroSync-Windows-Portable.zip` | [**Download Windows Portable (.zip)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Windows-Portable.zip) | `v1.0.7` |
 | **Windows (Standalone)** | `AeroSync.exe` | [**Download Windows Executable**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync.exe) | `v1.0.7` |
@@ -30,6 +32,8 @@
 
 <br>
 
+[![Download Linux AppImage](https://img.shields.io/badge/Download_Linux_AppImage-AeroSync-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-v1.0.7-x86_64.AppImage)
+[![Download Linux DEB Package](https://img.shields.io/badge/Download_Linux_DEB-AeroSync-A81D33?style=for-the-badge&logo=debian&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/aerosync_1.0.7_amd64.deb)
 [![Download Windows Installer](https://img.shields.io/badge/Download_Windows_Installer-AeroSync-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Setup-v1.0.7.exe)
 [![Download Android App](https://img.shields.io/badge/Download_Android_App-AeroSync-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/app-debug.apk)
 
@@ -288,6 +292,39 @@ The planned remote-transfer system will feature:
 * Android NDK 25.1.8937393
 * JDK 17+
 * Gradle 8.10+
+
+---
+
+### Linux AppImage & DEB Package Build
+
+```bash
+# Make scripts executable
+chmod +x build_linux.sh package_linux.sh
+
+# Run the complete Linux production build pipeline (.AppImage & .deb)
+./build_linux.sh
+```
+
+Generated Linux packages will be located at:
+```text
+release/AeroSync-v1.0.7-x86_64.AppImage   # Portable AppImage Container (Recommended)
+release/aerosync_1.0.7_amd64.deb          # Debian / Ubuntu / Mint Installer Package
+```
+
+#### Running & Installing on Linux
+
+- **AppImage (Portable Container - Recommended)**:
+  ```bash
+  chmod +x AeroSync-v1.0.7-x86_64.AppImage
+  ./AeroSync-v1.0.7-x86_64.AppImage
+  ```
+
+- **Debian / Ubuntu / Mint Package**:
+  ```bash
+  sudo dpkg -i aerosync_1.0.7_amd64.deb
+  # or
+  sudo apt install ./aerosync_1.0.7_amd64.deb
+  ```
 
 ---
 

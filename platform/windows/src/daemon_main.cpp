@@ -499,20 +499,30 @@ int main(int argc, char** argv) {
     WSAStartup(MAKEWORD(2, 2), &wsa);
 #endif
 
-    char compName[MAX_COMPUTERNAME_LENGTH + 1] = "Windows-PC";
+    char compName[256] = "AeroSync-Device";
 #ifdef _WIN32
     DWORD cSize = sizeof(compName);
     GetComputerNameA(compName, &cSize);
+#else
+    gethostname(compName, sizeof(compName));
 #endif
 
-    // Retrieve or persist permanent device ID for this Windows machine
-    char localAppData[MAX_PATH] = {0};
+    // Retrieve or persist permanent device ID for this machine
     std::string idFilePath;
+#ifdef _WIN32
+    char localAppData[MAX_PATH] = {0};
     if (GetEnvironmentVariableA("LOCALAPPDATA", localAppData, MAX_PATH) > 0) {
         std::string appDir = std::string(localAppData) + "\\AeroSync";
         std::filesystem::create_directories(appDir);
         idFilePath = appDir + "\\device_id.txt";
     }
+#else
+    const char* home = getenv("HOME");
+    std::string homeDir = home ? home : "/tmp";
+    std::string appDir = homeDir + "/.config/AeroSync";
+    std::filesystem::create_directories(appDir);
+    idFilePath = appDir + "/device_id.txt";
+#endif
 
     std::string persistentId;
     if (!idFilePath.empty() && std::filesystem::exists(idFilePath)) {
@@ -524,7 +534,11 @@ int main(int argc, char** argv) {
         std::mt19937 gen(rd());
         std::uniform_int_distribution<uint32_t> dis;
         std::ostringstream ss;
+#ifdef _WIN32
         ss << "win-" << compName << "-" << std::hex << std::setfill('0') << std::setw(8) << dis(gen);
+#else
+        ss << "linux-" << compName << "-" << std::hex << std::setfill('0') << std::setw(8) << dis(gen);
+#endif
         persistentId = ss.str();
         if (!idFilePath.empty()) {
             std::ofstream f(idFilePath);
@@ -532,20 +546,32 @@ int main(int argc, char** argv) {
         }
     }
     g_state.deviceId = persistentId;
-    g_state.deviceName = std::string(compName) + " (Windows PC)";
 
+#ifdef _WIN32
+    g_state.deviceName = std::string(compName) + " (Windows PC)";
+    auto devType = aerosync::DeviceType::DEVICE_WINDOWS;
     char userProfile[MAX_PATH] = {0};
     if (GetEnvironmentVariableA("USERPROFILE", userProfile, MAX_PATH) > 0) {
         g_state.downloadDir = std::string(userProfile) + "\\Downloads\\AeroSync";
     } else {
         g_state.downloadDir = "C:\\AeroSync_Downloads";
     }
+#else
+    g_state.deviceName = std::string(compName) + " (Linux)";
+    auto devType = aerosync::DeviceType::DEVICE_LINUX;
+    const char* homeEnv = getenv("HOME");
+    if (homeEnv) {
+        g_state.downloadDir = std::string(homeEnv) + "/Downloads/AeroSync";
+    } else {
+        g_state.downloadDir = "/tmp/AeroSync_Downloads";
+    }
+#endif
     std::filesystem::create_directories(g_state.downloadDir);
 
     g_app = std::make_unique<aerosync::AeroSyncApp>(
         g_state.deviceId,
         g_state.deviceName,
-        aerosync::DeviceType::DEVICE_WINDOWS
+        devType
     );
     g_app->setDownloadDirectory(g_state.downloadDir);
 

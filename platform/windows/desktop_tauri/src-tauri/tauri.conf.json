@@ -30,7 +30,12 @@
   },
   "bundle": {
     "active": true,
+    "targets": "all",
+    "category": "Utility",
+    "shortDescription": "AeroSync Ultra High-Speed P2P Desktop Client",
+    "longDescription": "AeroSync is an ultra high-speed peer-to-peer file transfer desktop application built with C++ and Tauri.",
     "resources": [
+      "aerosync_daemon*",
       "WebView2Loader.dll"
     ],
     "icon": [
@@ -45,6 +50,19 @@
       "icons/256x256.png",
       "icons/icon.png"
     ],
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0 | libwebkit2gtk-4.0-37",
+          "libgtk-3-0",
+          "libayatana-appindicator3-1 | libappindicator3-1",
+          "librsvg2-2"
+        ]
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    },
     "windows": {
       "nsis": {
         "installerIcon": "icons/icon.ico",

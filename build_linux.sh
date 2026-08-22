@@ -54,20 +54,33 @@ npm install
 npm run build
 
 # 4. Build Tauri Linux Executable / AppImage / DEB Package
-echo -e "\n[4/4] Building Tauri Linux Release Executable..."
-cd "$ROOT_DIR/platform/windows/desktop_tauri/src-tauri"
-if command -v cargo >/dev/null 2>&1; then
-    cargo build --release
+echo -e "\n[4/4] Building Tauri Linux Release Packages (.AppImage & .deb)..."
+cd "$ROOT_DIR/platform/windows/desktop_tauri"
+
+if command -v cargo >/dev/null 2>&1 || command -v npx >/dev/null 2>&1; then
+    echo "Generating AppImage & DEB packages via Tauri CLI..."
+    npx tauri build --bundles appimage,deb 2>/dev/null || cargo tauri build --bundles appimage,deb 2>/dev/null || cargo build --release
+
+    # Copy output release artifacts
+    find "$ROOT_DIR/platform/windows/desktop_tauri/src-tauri/target/release/bundle/appimage" -name "*.AppImage" -exec cp {} "$ROOT_DIR/release/AeroSync-v1.0.7-x86_64.AppImage" \; 2>/dev/null || true
+    find "$ROOT_DIR/platform/windows/desktop_tauri/src-tauri/target/release/bundle/deb" -name "*.deb" -exec cp {} "$ROOT_DIR/release/aerosync_1.0.7_amd64.deb" \; 2>/dev/null || true
     cp "$ROOT_DIR/platform/windows/desktop_tauri/src-tauri/target/release/aerosync-desktop" "$ROOT_DIR/release/AeroSync" 2>/dev/null || true
-    echo "Linux binary built: $ROOT_DIR/release/AeroSync"
 else
-    echo "Note: Install Rust/Cargo to generate native Tauri Linux binary."
+    echo "Note: Install Rust/Cargo and Tauri CLI to generate native Linux AppImage and DEB packages."
+fi
+
+# Fallback: Run standalone Linux packager if available
+if [ -f "$ROOT_DIR/package_linux.sh" ]; then
+    bash "$ROOT_DIR/package_linux.sh" || true
 fi
 
 echo "=========================================================="
 echo " LINUX BUILD SUCCESSFUL! RELEASE ARTIFACTS READY:"
 echo "=========================================================="
 echo " 1. Linux Core Daemon:  $ROOT_DIR/release/aerosync_daemon"
-echo " 2. Linux Test Runner:  $ROOT_DIR/build_tests_linux/test_core_engine"
-echo " 3. Linux Benchmark:    $ROOT_DIR/build_tests_linux/aerosync_benchmark"
+echo " 2. Linux Executable:   $ROOT_DIR/release/AeroSync"
+echo " 3. AppImage Container: $ROOT_DIR/release/AeroSync-v1.0.7-x86_64.AppImage"
+echo " 4. Debian DEB Package: $ROOT_DIR/release/aerosync_1.0.7_amd64.deb"
+echo " 5. Linux Test Runner:  $ROOT_DIR/build_tests_linux/test_core_engine"
+echo " 6. Linux Benchmark:    $ROOT_DIR/build_tests_linux/aerosync_benchmark"
 echo "=========================================================="

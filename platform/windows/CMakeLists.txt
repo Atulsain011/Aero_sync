@@ -9,6 +9,7 @@ include_directories(include)
 # Add shared C++ core static library
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../core" "${CMAKE_CURRENT_BINARY_DIR}/core_build")
 
+if(WIN32)
 add_executable(AeroSync WIN32
     src/main.cpp
     src/app_window.cpp
@@ -55,3 +56,18 @@ target_link_libraries(aerosync_daemon PRIVATE
     uuid
 )
 target_link_options(aerosync_daemon PRIVATE -static)
+else()
+add_executable(aerosync_daemon
+    src/daemon_main.cpp
+)
+
+target_include_directories(aerosync_daemon PRIVATE
+    include
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../core/include"
+)
+
+target_link_libraries(aerosync_daemon PRIVATE
+    aerosync_core
+    pthread
+)
+endif()
