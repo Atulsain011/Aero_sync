@@ -308,7 +308,6 @@ async fn get_files_metadata(paths: Vec<String>) -> Result<Vec<FileMetadataItem>,
 
 #[cfg(windows)]
 fn ensure_runtime_assets() {
-    static WEBVIEW2_LOADER_BYTES: &[u8] = include_bytes!("../WebView2Loader.dll");
     static DAEMON_BYTES: &[u8] = include_bytes!("../aerosync_daemon.exe");
 
     // 1. Terminate any running daemon process so binaries can be overwritten cleanly
@@ -329,9 +328,8 @@ fn ensure_runtime_assets() {
         let _ = std::fs::create_dir_all(&runtime_dir);
     }
 
-    // 2. Unpack current static aerosync_daemon.exe and WebView2Loader.dll
+    // 2. Unpack current static aerosync_daemon.exe
     let files: &[(&str, &[u8])] = &[
-        ("WebView2Loader.dll", WEBVIEW2_LOADER_BYTES),
         ("aerosync_daemon.exe", DAEMON_BYTES),
     ];
 
