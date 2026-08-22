@@ -17,16 +17,32 @@ struct DaemonState {
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 fn find_daemon_executable() -> Option<PathBuf> {
-    let current_exe = std::env::current_exe().ok()?;
-    let current_dir = current_exe.parent()?;
-
-    // 1. Check in same directory as current executable (fast path)
-    let candidate1 = current_dir.join("aerosync_daemon.exe");
-    if candidate1.exists() {
-        return Some(candidate1);
+    // 1. Check embedded unpack directory in LocalAppData/Temp (standalone path)
+    #[cfg(windows)]
+    {
+        let mut runtime_dir = std::env::var_os("LOCALAPPDATA")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::env::temp_dir());
+        runtime_dir.push("AeroSync");
+        runtime_dir.push("bin");
+        let embedded_daemon = runtime_dir.join("aerosync_daemon.exe");
+        if embedded_daemon.exists() {
+            return Some(embedded_daemon);
+        }
     }
 
-    // 2. Check in relative build directories
+    // 2. Check in same directory as current executable
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(current_dir) = current_exe.parent() {
+            let candidate1 = current_dir.join("aerosync_daemon.exe");
+            if candidate1.exists() {
+                return Some(candidate1);
+            }
+        }
+    }
+
+    // 3. Check in relative build directories
+    let current_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
     let candidates = [
         current_dir.join("build_windows").join("aerosync_daemon.exe"),
         current_dir.join("..").join("build_windows").join("aerosync_daemon.exe"),
@@ -254,18 +270,44 @@ async fn get_files_metadata(paths: Vec<String>) -> Result<Vec<FileMetadataItem>,
 fn ensure_runtime_assets() {
     static WEBVIEW2_LOADER_BYTES: &[u8] = include_bytes!("../WebView2Loader.dll");
     static DAEMON_BYTES: &[u8] = include_bytes!("../aerosync_daemon.exe");
+    static LIBCXX_BYTES: &[u8] = include_bytes!("../libc++.dll");
+    static LIBUNWIND_BYTES: &[u8] = include_bytes!("../libunwind.dll");
+    static LIBWINPTHREAD_BYTES: &[u8] = include_bytes!("../libwinpthread-1.dll");
 
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            let target_dll = exe_dir.join("WebView2Loader.dll");
-            if !target_dll.exists() {
-                let _ = std::fs::write(&target_dll, WEBVIEW2_LOADER_BYTES);
-            }
-            let target_daemon = exe_dir.join("aerosync_daemon.exe");
-            if !target_daemon.exists() {
-                let _ = std::fs::write(&target_daemon, DAEMON_BYTES);
-            }
+    let mut runtime_dir = std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::temp_dir());
+    runtime_dir.push("AeroSync");
+    runtime_dir.push("bin");
+
+    if let Err(e) = std::fs::create_dir_all(&runtime_dir) {
+        eprintln!("[AeroSync] Warning: Failed to create runtime dir: {}", e);
+        runtime_dir = std::env::temp_dir().join("AeroSync_bin");
+        let _ = std::fs::create_dir_all(&runtime_dir);
+    }
+
+    let files: &[(&str, &[u8])] = &[
+        ("WebView2Loader.dll", WEBVIEW2_LOADER_BYTES),
+        ("aerosync_daemon.exe", DAEMON_BYTES),
+        ("libc++.dll", LIBCXX_BYTES),
+        ("libunwind.dll", LIBUNWIND_BYTES),
+        ("libwinpthread-1.dll", LIBWINPTHREAD_BYTES),
+    ];
+
+    for (filename, bytes) in files {
+        let dest = runtime_dir.join(filename);
+        let write_needed = match std::fs::metadata(&dest) {
+            Ok(meta) => meta.len() != bytes.len() as u64,
+            Err(_) => true,
+        };
+        if write_needed {
+            let _ = std::fs::write(&dest, bytes);
         }
+    }
+
+    if let Ok(current_path) = std::env::var("PATH") {
+        let new_path = format!("{};{}", runtime_dir.to_string_lossy(), current_path);
+        std::env::set_var("PATH", new_path);
     }
 }
 

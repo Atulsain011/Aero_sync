@@ -22,16 +22,16 @@
 
 | Platform | Package | Download Link | Version |
 | :--- | :--- | :--- | :--- |
-| **Windows (Installer)** | `AeroSync-Setup-v1.0.6.exe` | [**Download Windows Installer (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.6/AeroSync-Setup-v1.0.6.exe) | `v1.0.6` |
-| **Windows (Portable)** | `AeroSync-Windows-Portable.zip` | [**Download Windows Portable (.zip)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.6/AeroSync-Windows-Portable.zip) | `v1.0.6` |
-| **Windows (Standalone)** | `AeroSync.exe` | [**Download Windows Executable**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.6/AeroSync.exe) | `v1.0.6` |
-| **Android 8.0+** | `AeroSync.apk` | [**Download Android APK**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.6/AeroSync.apk) | `v1.0.6` |
+| **Windows (Installer)** | `AeroSync-Setup-v1.0.7.exe` | [**Download Windows Installer (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Setup-v1.0.7.exe) | `v1.0.7` |
+| **Windows (Portable)** | `AeroSync-Windows-Portable.zip` | [**Download Windows Portable (.zip)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Windows-Portable.zip) | `v1.0.7` |
+| **Windows (Standalone)** | `AeroSync.exe` | [**Download Windows Executable**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync.exe) | `v1.0.7` |
+| **Android 8.0+** | `AeroSync.apk` | [**Download Android APK**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/app-debug.apk) | `v1.0.7` |
 | **All Releases** | GitHub Releases | [**Browse All Releases**](https://github.com/Atulsain011/Aero_sync/releases) | `Latest` |
 
 <br>
 
-[![Download Windows Installer](https://img.shields.io/badge/Download_Windows_Installer-AeroSync-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.6/AeroSync-Setup-v1.0.6.exe)
-[![Download Android App](https://img.shields.io/badge/Download_Android_App-AeroSync-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.6/AeroSync.apk)
+[![Download Windows Installer](https://img.shields.io/badge/Download_Windows_Installer-AeroSync-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Setup-v1.0.7.exe)
+[![Download Android App](https://img.shields.io/badge/Download_Android_App-AeroSync-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/app-debug.apk)
 
 </div>
 
@@ -252,19 +252,19 @@ The planned remote-transfer system will feature:
 
 ### Windows
 #### Recommended: Installer
-1. Download [**`AeroSync-Setup-v1.0.6.exe`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.6/AeroSync-Setup-v1.0.6.exe) from GitHub Releases.
+1. Download [**`AeroSync-Setup-v1.0.7.exe`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Setup-v1.0.7.exe) from GitHub Releases.
 2. Run the installer and complete setup.
 3. Launch AeroSync from the Desktop shortcut or Start Menu.
 4. Allow network access through Windows Firewall if prompted.
 5. Connect your Windows PC and Android device to the same Wi-Fi or hotspot.
 
 #### Portable Version
-1. Download [**`AeroSync-Windows-Portable.zip`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.6/AeroSync-Windows-Portable.zip).
+1. Download [**`AeroSync-Windows-Portable.zip`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Windows-Portable.zip).
 2. Extract the ZIP archive.
 3. Run `AeroSync.exe`.
 
 ### Android
-1. Download [**`AeroSync.apk`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.6/AeroSync.apk).
+1. Download [**`AeroSync.apk`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/app-debug.apk).
 2. Tap the APK to install (*enable "Install unknown apps" if prompted*).
 3. Grant requested permissions (Nearby devices & storage access).
 4. Open AeroSync on both devices, discover, pair, and transfer!
@@ -357,7 +357,7 @@ AeroSync is designed for high-speed local-network file transfers.
 
 ## 🎨 Branding & Icons
 
-AeroSync v1.0.6 uses standardized branding across all platforms:
+AeroSync v1.0.7 uses standardized branding across all platforms:
 * **Background**: Sleek dark navy squircle (`#0F172A`)
 * **Glyph**: Vibrant glowing cyan/blue cloud with bi-directional transfer arrows
 * **Transparency**: 100% transparent corners for desktop, taskbar, start menu, and launcher icons.
@@ -367,7 +367,7 @@ AeroSync v1.0.6 uses standardized branding across all platforms:
 
 ## 🗺️ Project Roadmap
 
-### Current (v1.0.6)
+### Current (v1.0.7)
 - [x] Windows application (Tauri v2 + React)
 - [x] Android application (Jetpack Compose + Material 3)
 - [x] Local Wi-Fi & Mobile Hotspot transfer

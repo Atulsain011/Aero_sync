@@ -296,18 +296,18 @@ export function useAeroSyncStore() {
           setSelectedPeer(null);
         }
 
-        // Handle completed transfer migration from queue to history
-        if (data.currentProgress && data.currentProgress.state === 3 /* COMPLETED */) {
-          const completedName = data.currentProgress.currentFileName;
+        // Handle completed transfer migration from active queue to history immediately
+        const isProgressComplete = data.currentProgress && (data.currentProgress.state === 3 /* COMPLETED */ || data.currentProgress.progressPercent >= 100);
+        if (isProgressComplete) {
+          const completedName = data.currentProgress.currentFileName || (queue[0] ? queue[0].name : '');
           if (completedName && completedName !== lastActiveFileRef.current) {
             lastActiveFileRef.current = completedName;
 
-            // Add to history
             const newRecord: TransferHistoryRecord = {
               id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
               fileName: completedName,
               filePath: `${settings.downloadDirectory}\\${completedName}`,
-              fileSize: data.currentProgress.fileSize,
+              fileSize: data.currentProgress.fileSize || (queue[0] ? queue[0].size : 0),
               direction: 'received',
               peerName: selectedPeer ? selectedPeer.deviceName : 'Peer Device',
               peerIp: selectedPeer ? selectedPeer.ipAddress : 'LAN',
@@ -318,6 +318,21 @@ export function useAeroSyncStore() {
 
             setHistory(prev => [newRecord, ...prev.filter(h => h.fileName !== completedName || Math.abs(h.timestampMs - newRecord.timestampMs) > 2000)]);
             setQueue(prev => prev.filter(q => q.name !== completedName));
+
+            // Immediately clear active transfer state once 100% complete so card returns to idle state
+            setIsTransferring(false);
+            latestTransferringRef.current = false;
+            setCurrentProgress({
+              state: 0,
+              currentFileName: '',
+              fileSize: 0,
+              fileBytesTransferred: 0,
+              totalBytesTransferred: 0,
+              speedBytesPerSec: 0,
+              progressPercent: 0,
+              etaSeconds: 0,
+              errorCode: 0
+            });
             refreshStorage();
           }
         }

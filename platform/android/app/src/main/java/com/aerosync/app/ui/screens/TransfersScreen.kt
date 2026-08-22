@@ -445,26 +445,41 @@ fun TransfersScreen(
                                     color = textMuted
                                 )
                             }
+                            val statusColor = when (item.status) {
+                                "FAILED" -> Color(0xFFEF4444)
+                                "CANCELLED" -> Color(0xFFF59E0B)
+                                else -> Color(0xFF10B981)
+                            }
+                            val statusIcon = when (item.status) {
+                                "FAILED" -> Icons.Default.Error
+                                "CANCELLED" -> Icons.Default.Cancel
+                                else -> Icons.Default.CheckCircle
+                            }
+                            val statusLabel = when (item.status) {
+                                "FAILED" -> "Failed"
+                                "CANCELLED" -> "Cancelled"
+                                else -> "Completed"
+                            }
                             Surface(
                                 shape = RoundedCornerShape(4.dp),
-                                color = Color(0xFF10B981).copy(alpha = 0.14f)
+                                color = statusColor.copy(alpha = 0.14f)
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.CheckCircle,
+                                        imageVector = statusIcon,
                                         contentDescription = null,
-                                        tint = Color(0xFF10B981),
+                                        tint = statusColor,
                                         modifier = Modifier.size(11.dp)
                                     )
                                     Spacer(modifier = Modifier.width(3.dp))
                                     Text(
-                                        text = "Verified",
+                                        text = statusLabel,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF10B981)
+                                        color = statusColor
                                     )
                                 }
                             }

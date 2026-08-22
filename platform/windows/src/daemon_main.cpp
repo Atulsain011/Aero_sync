@@ -25,6 +25,9 @@
     #include <netinet/in.h>
     #include <arpa/inet.h>
     #include <unistd.h>
+    #include <sys/statvfs.h>
+    #include <ifaddrs.h>
+    #include <net/if.h>
     using socket_t = int;
     #define INVALID_SOCKET (-1)
     #define SOCKET_ERROR (-1)
@@ -134,6 +137,51 @@ static void updateStorageAndNetwork() {
                 }
             }
         }
+        std::lock_guard<std::mutex> lock(g_state.mtx);
+        g_state.networkType = detectedNet;
+        g_state.linkSpeedMbps = detectedSpeed;
+    }
+#else
+    std::string downloadPath = "/tmp";
+    {
+        std::lock_guard<std::mutex> lock(g_state.mtx);
+        if (!g_state.downloadDir.empty()) {
+            downloadPath = g_state.downloadDir;
+        }
+    }
+    struct statvfs statBuf;
+    if (statvfs(downloadPath.c_str(), &statBuf) == 0) {
+        std::lock_guard<std::mutex> lock(g_state.mtx);
+        g_state.storageFreeBytes = static_cast<uint64_t>(statBuf.f_bavail) * statBuf.f_frsize;
+        g_state.storageTotalBytes = static_cast<uint64_t>(statBuf.f_blocks) * statBuf.f_frsize;
+    }
+
+    struct ifaddrs* ifaddr = nullptr;
+    if (getifaddrs(&ifaddr) == 0) {
+        std::string detectedNet = "Local Network (LAN)";
+        int detectedSpeed = 1000;
+        for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+            if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET) continue;
+            if (ifa->ifa_flags & IFF_LOOPBACK) continue;
+
+            sockaddr_in* sa_in = reinterpret_cast<sockaddr_in*>(ifa->ifa_addr);
+            char ipStr[INET_ADDRSTRLEN] = {0};
+            inet_ntop(AF_INET, &(sa_in->sin_addr), ipStr, INET_ADDRSTRLEN);
+            std::string ip(ipStr);
+            if (ip.rfind("127.", 0) == 0) continue;
+
+            std::string ifName(ifa->ifa_name ? ifa->ifa_name : "");
+            if (ifName.rfind("wlan", 0) == 0 || ifName.rfind("wlp", 0) == 0) {
+                detectedNet = "Wi-Fi (" + ip + ")";
+                detectedSpeed = 433;
+            } else if (ifName.rfind("eth", 0) == 0 || ifName.rfind("eno", 0) == 0 || ifName.rfind("enp", 0) == 0) {
+                detectedNet = "Gigabit Ethernet (" + ip + ")";
+                detectedSpeed = 1000;
+            } else {
+                detectedNet = "LAN (" + ip + ")";
+            }
+        }
+        freeifaddrs(ifaddr);
         std::lock_guard<std::mutex> lock(g_state.mtx);
         g_state.networkType = detectedNet;
         g_state.linkSpeedMbps = detectedSpeed;

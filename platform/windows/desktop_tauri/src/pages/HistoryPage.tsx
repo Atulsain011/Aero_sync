@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Clock,
-  Trash2,
   FolderOpen,
   ArrowUpRight,
   ArrowDownLeft,
@@ -15,13 +14,12 @@ import { tauriBridge } from '../services/tauriBridge';
 interface HistoryPageProps {
   history: TransferHistoryRecord[];
   downloadDirectory: string;
-  onClearHistory: () => void;
+  onClearHistory?: () => void;
 }
 
 export const HistoryPage: React.FC<HistoryPageProps> = ({
   history,
-  downloadDirectory,
-  onClearHistory
+  downloadDirectory
 }) => {
   return (
     <div className="page-container">
@@ -38,12 +36,6 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
             <FolderOpen size={15} />
             <span>Open Downloads</span>
           </button>
-          {history.length > 0 && (
-            <button className="btn btn-danger" onClick={onClearHistory}>
-              <Trash2 size={15} />
-              <span>Clear History</span>
-            </button>
-          )}
         </div>
       </div>
 

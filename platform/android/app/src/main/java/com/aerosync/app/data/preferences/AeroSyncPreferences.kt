@@ -65,14 +65,14 @@ class AeroSyncPreferences(private val context: Context) {
             if (!saved.isNullOrBlank()) {
                 val f = File(saved)
                 if (f.exists() || f.mkdirs()) {
-                    if (f.canWrite()) return saved
+                    if (isWritableDirectory(f)) return saved
                 }
             }
             // Standard public Downloads/AeroSync
             try {
                 val pubDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "AeroSync")
                 if (pubDir.exists() || pubDir.mkdirs()) {
-                    if (pubDir.canWrite()) return pubDir.absolutePath
+                    if (isWritableDirectory(pubDir)) return pubDir.absolutePath
                 }
             } catch (_: Exception) {}
 
@@ -84,9 +84,24 @@ class AeroSyncPreferences(private val context: Context) {
         }
         set(value) {
             if (value.isNotBlank()) {
+                val f = File(value)
+                if (!f.exists()) f.mkdirs()
                 prefs.edit().putString(KEY_DOWNLOAD_DIRECTORY, value).apply()
             }
         }
+
+    private fun isWritableDirectory(dir: File): Boolean {
+        if (!dir.exists() && !dir.mkdirs()) return false
+        if (dir.canWrite()) return true
+        val testFile = File(dir, ".aerosync_write_test_${System.currentTimeMillis()}")
+        return try {
+            val created = testFile.createNewFile()
+            if (created) testFile.delete()
+            created
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     var deviceName: String
         get() {

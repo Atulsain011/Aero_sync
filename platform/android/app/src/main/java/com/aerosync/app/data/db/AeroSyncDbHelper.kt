@@ -269,6 +269,12 @@ class AeroSyncDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
     }
 
     @Synchronized
+    fun deleteHistoryItem(id: String) {
+        val db = writableDatabase
+        db.delete(TABLE_HISTORY, "$COL_ID = ?", arrayOf(id))
+    }
+
+    @Synchronized
     fun clearHistory() {
         val db = writableDatabase
         db.delete(TABLE_HISTORY, null, null)

@@ -159,355 +159,393 @@ fun HomeScreen(
                             )
 
                             // Central Big Circle Transfer Dashboard
-                            Box(
+                            BoxWithConstraints(
                                 modifier = Modifier
-                                    .size(205.dp)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null
-                                    ) {
-                                        if (currentTransferUiState == com.aerosync.app.viewmodel.TransferUiState.IDLE || currentTransferUiState == com.aerosync.app.viewmodel.TransferUiState.FILE_SELECTED) {
-                                            onPickFiles()
-                                        }
-                                    },
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Canvas(modifier = Modifier.fillMaxSize()) {
-                                    val strokeWidth = 3.dp.toPx()
-                                    val radius = (size.minDimension / 2) - strokeWidth
-                                    when (currentTransferUiState) {
-                                        com.aerosync.app.viewmodel.TransferUiState.IDLE -> {
-                                            val dashLength = 8.dp.toPx()
-                                            val gapLength = 6.dp.toPx()
-                                            drawCircle(
-                                                brush = circleDashedGradient,
-                                                radius = radius,
-                                                style = Stroke(
-                                                    width = strokeWidth,
-                                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(dashLength, gapLength), 0f)
-                                                )
-                                            )
-                                        }
-                                        com.aerosync.app.viewmodel.TransferUiState.FILE_SELECTED -> {
-                                            drawCircle(
-                                                brush = primaryGradient,
-                                                radius = radius,
-                                                style = Stroke(width = strokeWidth)
-                                            )
-                                        }
-                                        com.aerosync.app.viewmodel.TransferUiState.PREPARING,
-                                        com.aerosync.app.viewmodel.TransferUiState.WAITING_FOR_DEVICE,
-                                        com.aerosync.app.viewmodel.TransferUiState.WAITING_FOR_ACCEPT -> {
-                                            drawArc(
-                                                brush = circleDashedGradient,
-                                                startAngle = rotationAngle,
-                                                sweepAngle = 270f,
-                                                useCenter = false,
-                                                style = Stroke(width = strokeWidth + 1.dp.toPx())
-                                            )
-                                        }
-                                        com.aerosync.app.viewmodel.TransferUiState.TRANSFERRING -> {
-                                            val active = uiState.activeTransfer
-                                            val pct = if (active != null && active.totalBytes > 0) (active.transferredBytes.toFloat() / active.totalBytes.toFloat()).coerceIn(0f, 1f) else 0f
-                                            drawCircle(
-                                                color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0),
-                                                radius = radius,
-                                                style = Stroke(width = strokeWidth)
-                                            )
-                                            drawArc(
-                                                brush = primaryGradient,
-                                                startAngle = -90f,
-                                                sweepAngle = 360f * pct,
-                                                useCenter = false,
-                                                style = Stroke(width = strokeWidth + 2.dp.toPx())
-                                            )
-                                        }
-                                        com.aerosync.app.viewmodel.TransferUiState.COMPLETED -> {
-                                            drawCircle(
-                                                color = Color(0xFF10B981),
-                                                radius = radius,
-                                                style = Stroke(width = strokeWidth + 1.dp.toPx())
-                                            )
-                                        }
-                                        com.aerosync.app.viewmodel.TransferUiState.FAILED -> {
-                                            drawCircle(
-                                                color = Color(0xFFEF4444),
-                                                radius = radius,
-                                                style = Stroke(width = strokeWidth + 1.dp.toPx())
-                                            )
-                                        }
-                                        com.aerosync.app.viewmodel.TransferUiState.CANCELLED -> {
-                                            drawCircle(
-                                                color = Color(0xFFF59E0B),
-                                                radius = radius,
-                                                style = Stroke(width = strokeWidth + 1.dp.toPx())
-                                            )
-                                        }
-                                    }
-                                }
+                                val circleSize = (maxWidth * 0.58f).coerceIn(175.dp, 225.dp)
+                                val innerCircleSize = circleSize - 40.dp
 
-                                Surface(
+                                Box(
                                     modifier = Modifier
-                                        .size(165.dp)
-                                        .clip(CircleShape)
-                                        .shadow(elevation = 6.dp, shape = CircleShape),
-                                    color = if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF),
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        1.dp,
-                                        if (isDark) Color(0xFF334155) else Color(0xFFEFF6FF)
-                                    )
+                                        .size(circleSize)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null
+                                        ) {
+                                            if (currentTransferUiState == com.aerosync.app.viewmodel.TransferUiState.IDLE || currentTransferUiState == com.aerosync.app.viewmodel.TransferUiState.FILE_SELECTED) {
+                                                onPickFiles()
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Column(
-                                        modifier = Modifier.fillMaxSize().padding(12.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
+                                    Canvas(modifier = Modifier.fillMaxSize()) {
+                                        val strokeWidth = 3.dp.toPx()
+                                        val radius = (size.minDimension / 2) - strokeWidth
                                         when (currentTransferUiState) {
                                             com.aerosync.app.viewmodel.TransferUiState.IDLE -> {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(48.dp)
-                                                        .clip(RoundedCornerShape(14.dp))
-                                                        .background(Brush.linearGradient(listOf(Color(0xFF3B82F6).copy(alpha = 0.15f), Color(0xFF8B5CF6).copy(alpha = 0.2f)))),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.CloudUpload,
-                                                        contentDescription = "Upload",
-                                                        tint = Color(0xFF3B82F6),
-                                                        modifier = Modifier.size(28.dp)
+                                                val dashLength = 8.dp.toPx()
+                                                val gapLength = 6.dp.toPx()
+                                                drawCircle(
+                                                    brush = circleDashedGradient,
+                                                    radius = radius,
+                                                    style = Stroke(
+                                                        width = strokeWidth,
+                                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(dashLength, gapLength), 0f)
                                                     )
-                                                }
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                Text(
-                                                    text = "Drop files here",
-                                                    fontSize = 14.5.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = textPrimary
-                                                )
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = "or tap to pick files",
-                                                    fontSize = 11.sp,
-                                                    color = textSecondary
                                                 )
                                             }
                                             com.aerosync.app.viewmodel.TransferUiState.FILE_SELECTED -> {
-                                                val firstFile = uiState.selectedFiles.firstOrNull()
-                                                val fileNameText = if (uiState.selectedFiles.size == 1) (firstFile?.fileName ?: "File") else "${uiState.selectedFiles.size} Files Selected"
-                                                val totalBytes = uiState.selectedFiles.sumOf { it.fileSize }
-                                                val formattedSize = if (uiState.selectedFiles.size == 1) (firstFile?.formattedSize ?: "") else "${totalBytes / (1024 * 1024)} MB"
-
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(44.dp)
-                                                        .clip(RoundedCornerShape(12.dp))
-                                                        .background(Color(0xFF3B82F6).copy(alpha = 0.15f)),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.InsertDriveFile,
-                                                        contentDescription = "File",
-                                                        tint = Color(0xFF3B82F6),
-                                                        modifier = Modifier.size(24.dp)
-                                                    )
-                                                }
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                                Text(
-                                                    text = fileNameText,
-                                                    fontSize = 12.5.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = textPrimary,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Text(
-                                                    text = formattedSize,
-                                                    fontSize = 10.5.sp,
-                                                    color = textSecondary
-                                                )
-                                                Spacer(modifier = Modifier.height(3.dp))
-                                                Text(
-                                                    text = "Ready to send",
-                                                    fontSize = 10.5.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF10B981)
+                                                drawCircle(
+                                                    brush = primaryGradient,
+                                                    radius = radius,
+                                                    style = Stroke(width = strokeWidth)
                                                 )
                                             }
-                                            com.aerosync.app.viewmodel.TransferUiState.PREPARING -> {
-                                                Icon(
-                                                    imageVector = Icons.Default.Sync,
-                                                    contentDescription = "Preparing",
-                                                    tint = Color(0xFF3B82F6),
-                                                    modifier = Modifier.size(34.dp).rotate(rotationAngle)
-                                                )
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                Text(
-                                                    text = "Preparing file...",
-                                                    fontSize = 13.5.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = textPrimary
-                                                )
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = "Getting your file ready",
-                                                    fontSize = 10.5.sp,
-                                                    color = textSecondary
-                                                )
-                                            }
-                                            com.aerosync.app.viewmodel.TransferUiState.WAITING_FOR_DEVICE -> {
-                                                val targetName = uiState.selectedPeer?.deviceName ?: uiState.waitingPeerName.ifEmpty { "Target Device" }
-                                                Icon(
-                                                    imageVector = Icons.Default.WifiTethering,
-                                                    contentDescription = "Waiting",
-                                                    tint = Color(0xFF38BDF8),
-                                                    modifier = Modifier.size(34.dp)
-                                                )
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                                Text(
-                                                    text = "Waiting for device...",
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = textPrimary
-                                                )
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = targetName,
-                                                    fontSize = 11.sp,
-                                                    color = textSecondary,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
+                                            com.aerosync.app.viewmodel.TransferUiState.PREPARING,
+                                            com.aerosync.app.viewmodel.TransferUiState.WAITING_FOR_DEVICE,
                                             com.aerosync.app.viewmodel.TransferUiState.WAITING_FOR_ACCEPT -> {
-                                                val targetName = uiState.selectedPeer?.deviceName ?: uiState.waitingPeerName.ifEmpty { "Target Device" }
-                                                Icon(
-                                                    imageVector = Icons.Default.HourglassTop,
-                                                    contentDescription = "Acceptance",
-                                                    tint = Color(0xFF8B5CF6),
-                                                    modifier = Modifier.size(32.dp)
-                                                )
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                                Text(
-                                                    text = "Waiting for acceptance...",
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = textPrimary,
-                                                    textAlign = TextAlign.Center
-                                                )
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = targetName,
-                                                    fontSize = 10.5.sp,
-                                                    color = textSecondary,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
+                                                drawArc(
+                                                    brush = circleDashedGradient,
+                                                    startAngle = rotationAngle,
+                                                    sweepAngle = 270f,
+                                                    useCenter = false,
+                                                    style = Stroke(width = strokeWidth + 1.dp.toPx())
                                                 )
                                             }
                                             com.aerosync.app.viewmodel.TransferUiState.TRANSFERRING -> {
                                                 val active = uiState.activeTransfer
-                                                val pct = if (active != null && active.totalBytes > 0) ((active.transferredBytes * 100) / active.totalBytes).toInt().coerceIn(0, 100) else 0
-
-                                                Text(
-                                                    text = "$pct%",
-                                                    fontSize = 22.sp,
-                                                    fontWeight = FontWeight.ExtraBold,
-                                                    color = textPrimary
+                                                val pct = if (active != null && active.totalBytes > 0) (active.transferredBytes.toFloat() / active.totalBytes.toFloat()).coerceIn(0f, 1f) else 0f
+                                                drawCircle(
+                                                    color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0),
+                                                    radius = radius,
+                                                    style = Stroke(width = strokeWidth)
                                                 )
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = active?.fileName ?: "File",
-                                                    fontSize = 11.5.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = textPrimary,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Text(
-                                                    text = "${"%.1f".format(active?.speedMbps ?: 0.0)} MB/s",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF8B5CF6)
-                                                )
-                                                Text(
-                                                    text = "${(active?.transferredBytes ?: 0) / (1024 * 1024)} MB / ${(active?.totalBytes ?: 0) / (1024 * 1024)} MB",
-                                                    fontSize = 9.5.sp,
-                                                    color = textSecondary
+                                                drawArc(
+                                                    brush = primaryGradient,
+                                                    startAngle = -90f,
+                                                    sweepAngle = 360f * pct,
+                                                    useCenter = false,
+                                                    style = Stroke(width = strokeWidth + 2.dp.toPx())
                                                 )
                                             }
                                             com.aerosync.app.viewmodel.TransferUiState.COMPLETED -> {
-                                                Icon(
-                                                    imageVector = Icons.Default.CheckCircle,
-                                                    contentDescription = "Complete",
-                                                    tint = Color(0xFF10B981),
-                                                    modifier = Modifier.size(36.dp)
-                                                )
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                                Text(
-                                                    text = "Transfer complete",
-                                                    fontSize = 13.5.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF10B981)
-                                                )
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = uiState.lastCompletedFileName.ifEmpty { "File received" },
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = textPrimary,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Text(
-                                                    text = "${uiState.lastCompletedFileSize / (1024 * 1024)} MB",
-                                                    fontSize = 10.sp,
-                                                    color = textSecondary
+                                                drawCircle(
+                                                    color = Color(0xFF10B981),
+                                                    radius = radius,
+                                                    style = Stroke(width = strokeWidth + 1.dp.toPx())
                                                 )
                                             }
                                             com.aerosync.app.viewmodel.TransferUiState.FAILED -> {
-                                                Icon(
-                                                    imageVector = Icons.Default.ErrorOutline,
-                                                    contentDescription = "Failed",
-                                                    tint = Color(0xFFEF4444),
-                                                    modifier = Modifier.size(34.dp)
-                                                )
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                                Text(
-                                                    text = "Transfer failed",
-                                                    fontSize = 13.5.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFFEF4444)
-                                                )
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = uiState.transferErrorMessage.ifBlank { "Connection lost" },
-                                                    fontSize = 10.sp,
-                                                    color = textSecondary,
-                                                    textAlign = TextAlign.Center,
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis
+                                                drawCircle(
+                                                    color = Color(0xFFEF4444),
+                                                    radius = radius,
+                                                    style = Stroke(width = strokeWidth + 1.dp.toPx())
                                                 )
                                             }
                                             com.aerosync.app.viewmodel.TransferUiState.CANCELLED -> {
-                                                Icon(
-                                                    imageVector = Icons.Default.Cancel,
-                                                    contentDescription = "Cancelled",
-                                                    tint = Color(0xFFF59E0B),
-                                                    modifier = Modifier.size(34.dp)
+                                                drawCircle(
+                                                    color = Color(0xFFF59E0B),
+                                                    radius = radius,
+                                                    style = Stroke(width = strokeWidth + 1.dp.toPx())
                                                 )
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                                Text(
-                                                    text = "Transfer cancelled",
-                                                    fontSize = 13.5.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFFF59E0B)
-                                                )
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = "Operation stopped",
-                                                    fontSize = 10.5.sp,
-                                                    color = textSecondary
-                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Surface(
+                                        modifier = Modifier
+                                            .size(innerCircleSize)
+                                            .clip(CircleShape)
+                                            .shadow(elevation = 6.dp, shape = CircleShape),
+                                        color = if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            if (isDark) Color(0xFF334155) else Color(0xFFEFF6FF)
+                                        )
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(8.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            when (currentTransferUiState) {
+                                                com.aerosync.app.viewmodel.TransferUiState.IDLE -> {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(44.dp)
+                                                            .clip(RoundedCornerShape(14.dp))
+                                                            .background(Brush.linearGradient(listOf(Color(0xFF3B82F6).copy(alpha = 0.15f), Color(0xFF8B5CF6).copy(alpha = 0.2f)))),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.CloudUpload,
+                                                            contentDescription = "Upload",
+                                                            tint = Color(0xFF3B82F6),
+                                                            modifier = Modifier.size(26.dp)
+                                                        )
+                                                    }
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Text(
+                                                        text = "Drop files here",
+                                                        fontSize = 14.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = textPrimary,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = "or tap to pick files",
+                                                        fontSize = 11.sp,
+                                                        color = textSecondary,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                }
+                                                com.aerosync.app.viewmodel.TransferUiState.FILE_SELECTED -> {
+                                                    val firstFile = uiState.selectedFiles.firstOrNull()
+                                                    val fileNameText = if (uiState.selectedFiles.size == 1) (firstFile?.fileName ?: "File") else "${uiState.selectedFiles.size} Files Selected"
+                                                    val totalBytes = uiState.selectedFiles.sumOf { it.fileSize }
+                                                    val formattedSize = if (uiState.selectedFiles.size == 1) (firstFile?.formattedSize ?: "") else "${totalBytes / (1024 * 1024)} MB"
+
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(40.dp)
+                                                            .clip(RoundedCornerShape(12.dp))
+                                                            .background(Color(0xFF3B82F6).copy(alpha = 0.15f)),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.InsertDriveFile,
+                                                            contentDescription = "File",
+                                                            tint = Color(0xFF3B82F6),
+                                                            modifier = Modifier.size(22.dp)
+                                                        )
+                                                    }
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = fileNameText,
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = textPrimary,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        textAlign = TextAlign.Center,
+                                                        modifier = Modifier.fillMaxWidth(0.9f)
+                                                    )
+                                                    Text(
+                                                        text = formattedSize,
+                                                        fontSize = 10.sp,
+                                                        color = textSecondary,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = "Ready to send",
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFF10B981),
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                }
+                                                com.aerosync.app.viewmodel.TransferUiState.PREPARING -> {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Sync,
+                                                        contentDescription = "Preparing",
+                                                        tint = Color(0xFF3B82F6),
+                                                        modifier = Modifier.size(32.dp).rotate(rotationAngle)
+                                                    )
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Text(
+                                                        text = "Preparing file...",
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = textPrimary,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = "Getting your file ready",
+                                                        fontSize = 10.5.sp,
+                                                        color = textSecondary,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                }
+                                                com.aerosync.app.viewmodel.TransferUiState.WAITING_FOR_DEVICE -> {
+                                                    val targetName = uiState.selectedPeer?.deviceName ?: uiState.waitingPeerName.ifEmpty { "Target Device" }
+                                                    Icon(
+                                                        imageVector = Icons.Default.WifiTethering,
+                                                        contentDescription = "Waiting",
+                                                        tint = Color(0xFF38BDF8),
+                                                        modifier = Modifier.size(32.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Text(
+                                                        text = "Waiting for device...",
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = textPrimary,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = targetName,
+                                                        fontSize = 11.sp,
+                                                        color = textSecondary,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        textAlign = TextAlign.Center,
+                                                        modifier = Modifier.fillMaxWidth(0.9f)
+                                                    )
+                                                }
+                                                com.aerosync.app.viewmodel.TransferUiState.WAITING_FOR_ACCEPT -> {
+                                                    val targetName = uiState.selectedPeer?.deviceName ?: uiState.waitingPeerName.ifEmpty { "Target Device" }
+                                                    Icon(
+                                                        imageVector = Icons.Default.HourglassTop,
+                                                        contentDescription = "Acceptance",
+                                                        tint = Color(0xFF8B5CF6),
+                                                        modifier = Modifier.size(30.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = "Waiting for acceptance...",
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = textPrimary,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = targetName,
+                                                        fontSize = 10.5.sp,
+                                                        color = textSecondary,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        textAlign = TextAlign.Center,
+                                                        modifier = Modifier.fillMaxWidth(0.9f)
+                                                    )
+                                                }
+                                                com.aerosync.app.viewmodel.TransferUiState.TRANSFERRING -> {
+                                                    val active = uiState.activeTransfer
+                                                    val pct = if (active != null && active.totalBytes > 0) ((active.transferredBytes * 100) / active.totalBytes).toInt().coerceIn(0, 100) else 0
+
+                                                    Text(
+                                                        text = "$pct%",
+                                                        fontSize = 22.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = textPrimary,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = active?.fileName ?: "File",
+                                                        fontSize = 11.5.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = textPrimary,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        textAlign = TextAlign.Center,
+                                                        modifier = Modifier.fillMaxWidth(0.9f)
+                                                    )
+                                                    Text(
+                                                        text = "${"%.1f".format(active?.speedMbps ?: 0.0)} MB/s",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFF8B5CF6),
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                    Text(
+                                                        text = "${(active?.transferredBytes ?: 0) / (1024 * 1024)} MB / ${(active?.totalBytes ?: 0) / (1024 * 1024)} MB",
+                                                        fontSize = 9.5.sp,
+                                                        color = textSecondary,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                }
+                                                com.aerosync.app.viewmodel.TransferUiState.COMPLETED -> {
+                                                    Icon(
+                                                        imageVector = Icons.Default.CheckCircle,
+                                                        contentDescription = "Complete",
+                                                        tint = Color(0xFF10B981),
+                                                        modifier = Modifier.size(34.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = "Transfer complete",
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFF10B981),
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = uiState.lastCompletedFileName.ifEmpty { "File received" },
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = textPrimary,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        textAlign = TextAlign.Center,
+                                                        modifier = Modifier.fillMaxWidth(0.9f)
+                                                    )
+                                                    Text(
+                                                        text = "${uiState.lastCompletedFileSize / (1024 * 1024)} MB",
+                                                        fontSize = 10.sp,
+                                                        color = textSecondary,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                }
+                                                com.aerosync.app.viewmodel.TransferUiState.FAILED -> {
+                                                    Icon(
+                                                        imageVector = Icons.Default.ErrorOutline,
+                                                        contentDescription = "Failed",
+                                                        tint = Color(0xFFEF4444),
+                                                        modifier = Modifier.size(32.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = "Transfer failed",
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFFEF4444),
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = uiState.transferErrorMessage.ifBlank { "Connection lost" },
+                                                        fontSize = 10.sp,
+                                                        color = textSecondary,
+                                                        textAlign = TextAlign.Center,
+                                                        maxLines = 2,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        modifier = Modifier.fillMaxWidth(0.9f)
+                                                    )
+                                                }
+                                                com.aerosync.app.viewmodel.TransferUiState.CANCELLED -> {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Cancel,
+                                                        contentDescription = "Cancelled",
+                                                        tint = Color(0xFFF59E0B),
+                                                        modifier = Modifier.size(32.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = "Transfer cancelled",
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFFF59E0B),
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = "Operation stopped",
+                                                        fontSize = 10.5.sp,
+                                                        color = textSecondary,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -852,14 +890,19 @@ fun HomeScreen(
                                     border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(12.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f, fill = true)
+                                        ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(34.dp)
+                                                    .size(36.dp)
                                                     .clip(CircleShape)
                                                     .background(Color(0xFF10B981).copy(alpha = 0.15f)),
                                                 contentAlignment = Alignment.Center
@@ -872,32 +915,40 @@ fun HomeScreen(
                                                 )
                                             }
                                             Spacer(modifier = Modifier.width(10.dp))
-                                            Column {
+                                            Column(modifier = Modifier.weight(1f, fill = true)) {
                                                 Text(
                                                     text = peer.deviceName,
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = textPrimary
+                                                    color = textPrimary,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
+                                                Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
                                                     text = "${peer.ipAddress} • ${peer.deviceType}",
                                                     fontSize = 10.5.sp,
-                                                    color = textSecondary
+                                                    color = textSecondary,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
                                             }
                                         }
-
+                                        Spacer(modifier = Modifier.width(8.dp))
                                         Button(
                                             onClick = {
                                                 onSelectPeer(peer)
                                                 onPickFiles()
                                             },
-                                            modifier = Modifier.height(30.dp),
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                            modifier = Modifier
+                                                .height(32.dp)
+                                                .defaultMinSize(minWidth = 60.dp)
+                                                .wrapContentWidth(),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                                             shape = RoundedCornerShape(8.dp),
                                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
                                         ) {
-                                            Text("Send", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                            Text("Send", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
                                         }
                                     }
                                 }
@@ -967,7 +1018,7 @@ fun HomeScreen(
                                                 modifier = Modifier.size(16.dp)
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Column {
+                                            Column(modifier = Modifier.weight(1f)) {
                                                 Text(
                                                     text = item.fileName,
                                                     fontSize = 12.sp,
@@ -982,6 +1033,28 @@ fun HomeScreen(
                                                     color = textSecondary
                                                 )
                                             }
+                                        }
+                                        val statusColor = when (item.status) {
+                                            "FAILED" -> Color(0xFFEF4444)
+                                            "CANCELLED" -> Color(0xFFF59E0B)
+                                            else -> Color(0xFF10B981)
+                                        }
+                                        val statusLabel = when (item.status) {
+                                            "FAILED" -> "Failed"
+                                            "CANCELLED" -> "Cancelled"
+                                            else -> "Completed"
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = statusColor.copy(alpha = 0.14f)
+                                        ) {
+                                            Text(
+                                                text = statusLabel,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = statusColor,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
                                         }
                                     }
                                 }

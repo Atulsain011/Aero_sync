@@ -216,11 +216,16 @@ fun DevicesScreen(
                                         )
                                     ) {
                                         Row(
-                                            modifier = Modifier.padding(12.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(12.dp),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.weight(1f, fill = true)
+                                            ) {
                                                 Box(
                                                     modifier = Modifier
                                                         .size(36.dp)
@@ -236,7 +241,7 @@ fun DevicesScreen(
                                                     )
                                                 }
                                                 Spacer(modifier = Modifier.width(10.dp))
-                                                Column(modifier = Modifier.weight(1f)) {
+                                                Column(modifier = Modifier.weight(1f, fill = true)) {
                                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                                         Text(peer.deviceName, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                                                         if (isSelected) {
@@ -249,21 +254,25 @@ fun DevicesScreen(
                                                             }
                                                         }
                                                     }
+                                                    Spacer(modifier = Modifier.height(2.dp))
                                                     Text("${peer.ipAddress} • ${peer.deviceType}", fontSize = 11.sp, color = textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                 }
                                             }
-
+                                            Spacer(modifier = Modifier.width(8.dp))
                                             Button(
                                                 onClick = {
                                                     onSelectPeer(peer)
                                                     onSelectTab(0)
                                                 },
-                                                modifier = Modifier.height(30.dp),
+                                                modifier = Modifier
+                                                    .height(32.dp)
+                                                    .defaultMinSize(minWidth = 84.dp)
+                                                    .wrapContentWidth(),
                                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                                                 shape = RoundedCornerShape(8.dp),
                                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
                                             ) {
-                                                Text("Send Files", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                Text("Send Files", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
                                             }
                                         }
                                     }

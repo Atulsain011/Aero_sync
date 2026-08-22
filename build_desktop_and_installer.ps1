@@ -15,10 +15,18 @@ Remove-Item -Recurse -Force "$env:TEMP\aerosync_cargo_target\release\aerosync-de
 
 Write-Host "0. Building Standalone Native Core Daemon (aerosync_daemon.exe)..." -ForegroundColor Cyan
 & "$toolBin\windres.exe" "$root\platform\windows\resources.rc" -O coff -o "$root\build_windows\resources.o"
-& "$toolBin\g++.exe" -O2 -std=c++17 -I"$root\core\include" -I"$root\platform\windows\include" "$root\platform\windows\src\daemon_main.cpp" "$root\build_windows\resources.o" "$root\core\core_build\libaerosync_core.a" -lws2_32 -lmswsock -liphlpapi -lshell32 -lole32 -luuid -o "$root\build_windows\aerosync_daemon.exe"
+& "$toolBin\g++.exe" -O2 -std=c++17 -static -static-libgcc -static-libstdc++ -I"$root\core\include" -I"$root\platform\windows\include" "$root\platform\windows\src\daemon_main.cpp" "$root\build_windows\resources.o" "$root\core\core_build\libaerosync_core.a" -lws2_32 -lmswsock -liphlpapi -lshell32 -lole32 -luuid -o "$root\build_windows\aerosync_daemon.exe"
 Copy-Item "$root\build_windows\aerosync_daemon.exe" "$root\release\aerosync_daemon.exe" -Force
 Copy-Item "$root\build_windows\aerosync_daemon.exe" "$root\platform\windows\desktop_tauri\aerosync_daemon.exe" -Force
 Copy-Item "$root\build_windows\aerosync_daemon.exe" "$root\platform\windows\desktop_tauri\src-tauri\aerosync_daemon.exe" -Force
+
+Get-ChildItem -Path "$toolBin\*.dll" | ForEach-Object {
+    Copy-Item $_.FullName "$root\build_windows\" -Force
+    Copy-Item $_.FullName "$root\release\" -Force
+    Copy-Item $_.FullName "$root\" -Force
+    Copy-Item $_.FullName "$root\platform\windows\desktop_tauri\" -Force
+    Copy-Item $_.FullName "$root\platform\windows\desktop_tauri\src-tauri\" -Force
+}
 
 Write-Host "1. Building Web Assets..." -ForegroundColor Cyan
 Push-Location "$root\platform\windows\desktop_tauri"
@@ -55,9 +63,8 @@ Write-Host "4. Building NSIS Setup Installer with Bundled WebView2Loader.dll and
 $makensisPath = "C:\Users\Atul\AppData\Local\tauri\NSIS\Bin\makensis.exe"
 if (Test-Path $makensisPath) {
     & $makensisPath "$root\platform\windows\installer\AeroSync_Installer.nsi"
-    Copy-Item "$root\release\AeroSync-Setup-v1.0.6.exe" "$root\release\AeroSync-Setup-v1.0.5.exe" -Force
-    Copy-Item "$root\release\AeroSync-Setup-v1.0.6.exe" "$root\release\AeroSync-Setup.exe" -Force
-    Write-Host "Successfully generated AeroSync-Setup-v1.0.6.exe with all runtime dependencies." -ForegroundColor Green
+    Copy-Item "$root\release\AeroSync-Setup-v1.0.7.exe" "$root\release\AeroSync-Setup.exe" -Force
+    Write-Host "Successfully generated AeroSync-Setup-v1.0.7.exe with all runtime dependencies." -ForegroundColor Green
 }
 
 Write-Host "5. Creating Windows Portable Zip..." -ForegroundColor Cyan

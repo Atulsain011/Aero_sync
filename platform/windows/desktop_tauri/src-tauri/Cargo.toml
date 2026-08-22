@@ -1,6 +1,6 @@
 [package]
 name = "aerosync-desktop"
-version = "1.0.6"
+version = "1.0.7"
 description = "AeroSync Ultra High-Speed P2P Desktop Client"
 authors = ["AeroSync Team"]
 edition = "2021"

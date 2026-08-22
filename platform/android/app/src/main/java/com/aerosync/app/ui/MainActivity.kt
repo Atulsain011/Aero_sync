@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.OpenableColumns
@@ -222,10 +223,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        acquireWifiDiscoveryLocks()
-        // Always refresh storage metrics and network info dynamically when returning to app
-        viewModel.updateStorageMetrics()
-        viewModel.updateNetworkDiagnostics()
+        lifecycleScope.launch(Dispatchers.IO) {
+            acquireWifiDiscoveryLocks()
+            viewModel.updateStorageMetrics()
+            viewModel.updateNetworkDiagnostics()
+        }
     }
 
     override fun onDestroy() {
@@ -250,6 +252,13 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         data class UriMetadata(val fileName: String, val fileSize: Long)
+
+        data class ResolvedStreamFile(
+            val fileName: String,
+            val fileSize: Long,
+            val filePath: String,
+            val pfd: ParcelFileDescriptor?
+        )
 
         fun getUriMetadata(context: Context, uri: Uri): UriMetadata {
             var fileName = "file_${System.currentTimeMillis()}"
@@ -341,6 +350,68 @@ class MainActivity : ComponentActivity() {
             } catch (_: Exception) {}
 
             return null
+        }
+
+        fun resolveFileForTransfer(context: Context, uri: Uri): ResolvedStreamFile {
+            val meta = getUriMetadata(context, uri)
+            val name = if (meta.fileName.isNotBlank()) meta.fileName else "file_${System.currentTimeMillis()}"
+            val size = meta.fileSize
+
+            // 1. Direct file:// path check
+            if (uri.scheme == "file") {
+                val path = uri.path
+                if (!path.isNullOrBlank()) {
+                    val f = File(path)
+                    if (f.exists() && f.canRead()) {
+                        return ResolvedStreamFile(name, if (size <= 0) f.length() else size, path, null)
+                    }
+                }
+            }
+
+            // 2. Direct path resolution from MediaStore / SAF
+            val directPath = resolveUriToFilePath(context, uri)
+            if (!directPath.isNullOrBlank()) {
+                val f = File(directPath)
+                if (f.exists() && f.canRead()) {
+                    return ResolvedStreamFile(name, if (size <= 0) f.length() else size, directPath, null)
+                }
+            }
+
+            // 3. Open ParcelFileDescriptor for content:// URIs (DCIM/Camera, Pictures, Movies, Documents, Downloads, SAF, etc.)
+            try {
+                val pfd = context.contentResolver.openFileDescriptor(uri, "r")
+                if (pfd != null && pfd.fileDescriptor != null && pfd.fileDescriptor.valid() && pfd.fd >= 0) {
+                    val fdPath = "/proc/self/fd/${pfd.fd}"
+                    val pfdSize = pfd.statSize
+                    val finalSize = if (pfdSize > 0) pfdSize else size
+                    return ResolvedStreamFile(name, finalSize, fdPath, pfd)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("AeroSync", "Failed to open PFD for URI $uri: ${e.message}")
+            }
+
+            // 4. Synchronous staging copy fallback if /proc/self/fd/ is restricted by custom OS
+            val stagingDir = File(context.externalCacheDir ?: context.cacheDir, "transfer_staging").apply { if (!exists()) mkdirs() }
+            val tempFile = File(stagingDir, name)
+            try {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    java.io.FileOutputStream(tempFile).use { output ->
+                        val buffer = ByteArray(4 * 1024 * 1024)
+                        var bytesRead: Int
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            output.write(buffer, 0, bytesRead)
+                        }
+                        output.flush()
+                    }
+                }
+                if (tempFile.exists() && tempFile.canRead()) {
+                    return ResolvedStreamFile(name, tempFile.length(), tempFile.absolutePath, null)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AeroSync", "Failed to stage file for URI $uri: ${e.message}")
+            }
+
+            return ResolvedStreamFile(name, size, directPath ?: uri.toString(), null)
         }
     }
 }

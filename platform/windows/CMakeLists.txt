@@ -33,6 +33,7 @@ target_link_libraries(AeroSync PRIVATE
     gdi32
     user32
 )
+target_link_options(AeroSync PRIVATE -static)
 
 add_executable(aerosync_daemon
     src/daemon_main.cpp
@@ -53,3 +54,4 @@ target_link_libraries(aerosync_daemon PRIVATE
     ole32
     uuid
 )
+target_link_options(aerosync_daemon PRIVATE -static)
