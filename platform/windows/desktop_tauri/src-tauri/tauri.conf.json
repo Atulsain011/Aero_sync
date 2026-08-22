@@ -35,8 +35,7 @@
     "shortDescription": "AeroSync Ultra High-Speed P2P Desktop Client",
     "longDescription": "AeroSync is an ultra high-speed peer-to-peer file transfer desktop application built with C++ and Tauri.",
     "resources": [
-      "aerosync_daemon*",
-      "WebView2Loader.dll"
+      "aerosync_daemon*"
     ],
     "icon": [
       "icons/icon.ico",
