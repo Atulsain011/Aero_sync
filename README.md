@@ -4,14 +4,14 @@
 
 <img src="platform/android/app/src/main/res/drawable/aerosync_logo.png" width="150" alt="AeroSync Logo" />
 
-### High-speed peer-to-peer file sharing between Windows and Android over local Wi-Fi or Hotspot.
+### High-speed peer-to-peer file sharing between Windows, Linux, and Android over local Wi-Fi or Hotspot.
 
 **Zero Cloud • Zero Compression • Direct Local Transfer**
 
 ---
 
 [![GitHub Release](https://img.shields.io/github/v/release/Atulsain011/Aero_sync?style=for-the-badge&color=00D2FF&label=Latest%20Version)](https://github.com/Atulsain011/Aero_sync/releases/latest)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Android-3A7BD5?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20Android-3A7BD5?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases)
 [![C++20 Engine](https://img.shields.io/badge/C%2B%2B-20-00599C?style=for-the-badge&logo=cplusplus&logoColor=white)](core/)
 [![Tauri v2](https://img.shields.io/badge/Tauri-v2%20Rust%20%2B%20React-FFC131?style=for-the-badge&logo=tauri&logoColor=black)](platform/windows/desktop_tauri)
 [![License](https://img.shields.io/badge/License-MIT-blueviolet?style=for-the-badge)](LICENSE)
@@ -254,13 +254,24 @@ The planned remote-transfer system will feature:
 
 ## 🚀 Quick Start Guide
 
+### Linux
+#### Recommended: AppImage (Portable Container)
+1. Download [**`AeroSync-v1.0.7-x86_64.AppImage`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-v1.0.7-x86_64.AppImage) from GitHub Releases (`v1.0.7`).
+2. Make it executable: `chmod +x AeroSync-v1.0.7-x86_64.AppImage`
+3. Launch AeroSync: `./AeroSync-v1.0.7-x86_64.AppImage` or double-click in your file manager.
+
+#### Debian / Ubuntu / Mint Package (.deb)
+1. Download [**`aerosync_1.0.7_amd64.deb`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/aerosync_1.0.7_amd64.deb) from GitHub Releases (`v1.0.7`).
+2. Install package: `sudo apt install ./aerosync_1.0.7_amd64.deb` or `sudo dpkg -i aerosync_1.0.7_amd64.deb`
+3. Launch **AeroSync** directly from your Application Launcher / Desktop Menu.
+
 ### Windows
 #### Recommended: Installer
-1. Download [**`AeroSync-Setup-v1.0.7.exe`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Setup-v1.0.7.exe) from GitHub Releases.
+1. Download [**`AeroSync-Setup-v1.0.7.exe`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Setup-v1.0.7.exe) from GitHub Releases (`v1.0.7`).
 2. Run the installer and complete setup.
 3. Launch AeroSync from the Desktop shortcut or Start Menu.
 4. Allow network access through Windows Firewall if prompted.
-5. Connect your Windows PC and Android device to the same Wi-Fi or hotspot.
+5. Connect your Windows PC, Linux machine, and Android device to the same Wi-Fi or hotspot.
 
 #### Portable Version
 1. Download [**`AeroSync-Windows-Portable.zip`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Windows-Portable.zip).
@@ -406,6 +417,7 @@ AeroSync v1.0.7 uses standardized branding across all platforms:
 
 ### Current (v1.0.7)
 - [x] Windows application (Tauri v2 + React)
+- [x] Linux application (AppImage container & DEB package with system launcher)
 - [x] Android application (Jetpack Compose + Material 3)
 - [x] Local Wi-Fi & Mobile Hotspot transfer
 - [x] UDP automatic device discovery
@@ -414,6 +426,7 @@ AeroSync v1.0.7 uses standardized branding across all platforms:
 - [x] Real-time transfer queue & live ETA/progress
 - [x] Instant bi-directional transfer cancellation
 - [x] Windows NSIS setup installer & Portable ZIP
+- [x] Linux system application launcher integration & native desktop actions
 - [x] Android APK release automation
 - [x] Standardized application branding & multi-res icons
 

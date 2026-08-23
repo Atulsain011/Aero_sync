@@ -167,6 +167,7 @@ jobs:
         run: |
           mkdir -p linux-artifacts
           targetDir="platform/windows/desktop_tauri/src-tauri/target/release"
+          daemonBin="build_linux/aerosync_daemon"
           
           if [ -f "$targetDir/aerosync-desktop" ]; then
             cp "$targetDir/aerosync-desktop" linux-artifacts/AeroSync-Linux
@@ -182,7 +183,42 @@ jobs:
             cp "$debFile" linux-artifacts/aerosync_1.0.7_amd64.deb
           fi
 
-          tar -czf linux-artifacts/AeroSync-Linux-Portable.tar.gz -C linux-artifacts AeroSync-Linux 2>/dev/null || true
+          # Build complete Linux Portable Bundle containing GUI binary + native core daemon + launcher
+          portableDir="linux-portable-tmp/AeroSync-Linux-Portable"
+          mkdir -p "$portableDir"
+          if [ -f "$targetDir/aerosync-desktop" ]; then
+            cp "$targetDir/aerosync-desktop" "$portableDir/AeroSync"
+            chmod +x "$portableDir/AeroSync"
+          fi
+          if [ -f "$daemonBin" ]; then
+            cp "$daemonBin" "$portableDir/aerosync_daemon"
+            chmod +x "$portableDir/aerosync_daemon"
+          elif [ -f "platform/windows/desktop_tauri/src-tauri/aerosync_daemon" ]; then
+            cp "platform/windows/desktop_tauri/src-tauri/aerosync_daemon" "$portableDir/aerosync_daemon"
+            chmod +x "$portableDir/aerosync_daemon"
+          fi
+          if [ -f "platform/windows/desktop_tauri/src-tauri/icons/256x256.png" ]; then
+            cp "platform/windows/desktop_tauri/src-tauri/icons/256x256.png" "$portableDir/aerosync.png"
+          fi
+          
+          cat <<'EOF' > "$portableDir/launch_aerosync.sh"
+          #!/usr/bin/env bash
+          SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+          export PATH="$SCRIPT_DIR:$PATH"
+          export LD_LIBRARY_PATH="$SCRIPT_DIR:$LD_LIBRARY_PATH"
+
+          if [ -f "$SCRIPT_DIR/aerosync_daemon" ]; then
+              chmod +x "$SCRIPT_DIR/aerosync_daemon"
+              "$SCRIPT_DIR/aerosync_daemon" >/dev/null 2>&1 &
+          fi
+
+          chmod +x "$SCRIPT_DIR/AeroSync"
+          exec "$SCRIPT_DIR/AeroSync" "$@"
+          EOF
+          chmod +x "$portableDir/launch_aerosync.sh"
+
+          tar -czf linux-artifacts/AeroSync-Linux-Portable.tar.gz -C linux-portable-tmp AeroSync-Linux-Portable
+          rm -rf linux-portable-tmp
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4

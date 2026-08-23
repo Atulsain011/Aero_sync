@@ -23,7 +23,7 @@ fn find_daemon_executable() -> Option<PathBuf> {
         "aerosync_daemon"
     };
 
-    // 1. Check in same directory as current executable (Standalone / Portable location)
+    // 1. Check in same directory as current executable (Standalone / Portable / AppImage location)
     if let Ok(current_exe) = std::env::current_exe() {
         if let Some(current_dir) = current_exe.parent() {
             let candidate1 = current_dir.join(exe_name);
@@ -33,6 +33,14 @@ fn find_daemon_executable() -> Option<PathBuf> {
             let candidate_res = current_dir.join("resources").join(exe_name);
             if candidate_res.exists() {
                 return Some(candidate_res);
+            }
+            let candidate_res_up = current_dir.join("..").join("resources").join(exe_name);
+            if candidate_res_up.exists() {
+                return Some(candidate_res_up);
+            }
+            let candidate_lib_res = current_dir.join("..").join("lib").join("aerosync").join("resources").join(exe_name);
+            if candidate_lib_res.exists() {
+                return Some(candidate_lib_res);
             }
         }
     }
@@ -53,13 +61,38 @@ fn find_daemon_executable() -> Option<PathBuf> {
 
     #[cfg(not(windows))]
     {
+        // 2a. AppImage Container ($APPDIR) Resolution
+        if let Some(appdir) = std::env::var_os("APPDIR") {
+            let appdir_path = PathBuf::from(appdir);
+            let appdir_candidates = [
+                appdir_path.join("usr").join("bin").join("aerosync_daemon"),
+                appdir_path.join("usr").join("lib").join("aerosync").join("resources").join("aerosync_daemon"),
+                appdir_path.join("usr").join("lib").join("aerosync").join("aerosync_daemon"),
+                appdir_path.join("resources").join("aerosync_daemon"),
+            ];
+            for path in appdir_candidates.iter() {
+                if path.exists() {
+                    return Some(path.clone());
+                }
+            }
+        }
+
         if let Some(home) = std::env::var_os("HOME") {
-            let user_bin = PathBuf::from(home)
+            let user_bin = PathBuf::from(&home)
                 .join(".local")
                 .join("bin")
                 .join("aerosync_daemon");
             if user_bin.exists() {
                 return Some(user_bin);
+            }
+            let user_share_bin = PathBuf::from(&home)
+                .join(".local")
+                .join("share")
+                .join("AeroSync")
+                .join("bin")
+                .join("aerosync_daemon");
+            if user_share_bin.exists() {
+                return Some(user_share_bin);
             }
         }
         let system_paths = [
@@ -67,6 +100,8 @@ fn find_daemon_executable() -> Option<PathBuf> {
             PathBuf::from("/usr/local/bin/aerosync_daemon"),
             PathBuf::from("/opt/aerosync/aerosync_daemon"),
             PathBuf::from("/usr/lib/aerosync/aerosync_daemon"),
+            PathBuf::from("/usr/lib/aerosync/resources/aerosync_daemon"),
+            PathBuf::from("/usr/share/aerosync/resources/aerosync_daemon"),
         ];
         for sys_path in system_paths.iter() {
             if sys_path.exists() {
@@ -102,6 +137,18 @@ fn start_daemon_process(state: &DaemonState) {
     let child_arc = state.child.clone();
     std::thread::spawn(move || {
         if let Some(daemon_path) = find_daemon_executable() {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Ok(meta) = std::fs::metadata(&daemon_path) {
+                    let mut perms = meta.permissions();
+                    if perms.mode() & 0o111 == 0 {
+                        perms.set_mode(perms.mode() | 0o755);
+                        let _ = std::fs::set_permissions(&daemon_path, perms);
+                    }
+                }
+            }
+
             let mut cmd = Command::new(&daemon_path);
 
             #[cfg(windows)]
@@ -168,7 +215,20 @@ fn show_in_folder(path: String) -> Result<(), String> {
     }
     #[cfg(not(windows))]
     {
-        Err("Unsupported platform".into())
+        let p = Path::new(&path);
+        if !p.exists() {
+            return Err("File path does not exist".into());
+        }
+        let target = if p.is_file() {
+            p.parent().unwrap_or(p)
+        } else {
+            p
+        };
+        Command::new("xdg-open")
+            .arg(target)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
     }
 }
 
@@ -185,7 +245,15 @@ fn open_folder(path: String) -> Result<(), String> {
     }
     #[cfg(not(windows))]
     {
-        Err("Unsupported platform".into())
+        let p = Path::new(&path);
+        if !p.exists() {
+            return Err("Folder path does not exist".into());
+        }
+        Command::new("xdg-open")
+            .arg(p)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
     }
 }
 
@@ -245,6 +313,21 @@ fn get_disk_space(path: Option<String>) -> Result<DiskSpaceInfo, String> {
     }
     #[cfg(not(windows))]
     {
+        use std::ffi::CString;
+        let target_path = path.unwrap_or_else(|| "/".to_string());
+        if let Ok(c_path) = CString::new(target_path) {
+            unsafe {
+                let mut stat: libc::statvfs = std::mem::zeroed();
+                if libc::statvfs(c_path.as_ptr(), &mut stat) == 0 {
+                    let free_bytes = (stat.f_bavail as u64) * (stat.f_frsize as u64);
+                    let total_bytes = (stat.f_blocks as u64) * (stat.f_frsize as u64);
+                    return Ok(DiskSpaceInfo {
+                        free_bytes,
+                        total_bytes,
+                    });
+                }
+            }
+        }
         Ok(DiskSpaceInfo {
             free_bytes: 100 * 1024 * 1024 * 1024,
             total_bytes: 512 * 1024 * 1024 * 1024,

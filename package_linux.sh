@@ -65,13 +65,39 @@ EOF
 [Desktop Entry]
 Name=AeroSync
 Comment=Ultra High-Speed P2P File Transfer
-Exec=/usr/bin/aerosync
+Exec=/usr/bin/aerosync %U
 Icon=aerosync
 Terminal=false
 Type=Application
 Categories=Network;FileTransfer;Utility;
-Keywords=P2P;File;Share;Transfer;Speed;
+Keywords=P2P;File;Share;Transfer;Speed;AeroSync;
+StartupWMClass=aerosync
 EOF
+
+    # Post-installation script for desktop and icon database refresh
+    cat <<EOF > "$DEB_DIR/DEBIAN/postinst"
+#!/bin/sh
+set -e
+if [ -x "\$(command -v update-desktop-database)" ]; then
+    update-desktop-database -q || true
+fi
+if [ -x "\$(command -v gtk-update-icon-cache)" ]; then
+    gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor || true
+fi
+EOF
+    chmod 755 "$DEB_DIR/DEBIAN/postinst"
+
+    cat <<EOF > "$DEB_DIR/DEBIAN/postrm"
+#!/bin/sh
+set -e
+if [ -x "\$(command -v update-desktop-database)" ]; then
+    update-desktop-database -q || true
+fi
+if [ -x "\$(command -v gtk-update-icon-cache)" ]; then
+    gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor || true
+fi
+EOF
+    chmod 755 "$DEB_DIR/DEBIAN/postrm"
 
     # Install binaries
     cp "$MAIN_BIN" "$DEB_DIR/usr/bin/aerosync"
@@ -96,7 +122,7 @@ fi
 # 2. Build AppImage (.AppImage) Container
 # ------------------------------------------------------------------------------
 if [ -n "$MAIN_BIN" ]; then
-    echo -e "\n[2/2] Preparing AppImage Structure (AppDir)..."
+    echo -e "\n[2/3] Preparing AppImage Structure (AppDir)..."
     APPDIR="$ROOT_DIR/build_linux_pkg/appimage/AeroSync.AppDir"
     rm -rf "$APPDIR"
     mkdir -p "$APPDIR/usr/bin"
@@ -110,6 +136,7 @@ export LD_LIBRARY_PATH="$HERE/usr/lib:$LD_LIBRARY_PATH"
 
 # Launch background C++ daemon if present
 if [ -f "$HERE/usr/bin/aerosync_daemon" ]; then
+    chmod +x "$HERE/usr/bin/aerosync_daemon"
     "$HERE/usr/bin/aerosync_daemon" >/dev/null 2>&1 &
 fi
 
@@ -122,11 +149,13 @@ EOF
 [Desktop Entry]
 Name=AeroSync
 Comment=Ultra High-Speed P2P File Transfer
-Exec=aerosync
+Exec=aerosync %U
 Icon=aerosync
 Terminal=false
 Type=Application
-Categories=Utility;
+Categories=Network;FileTransfer;Utility;
+Keywords=P2P;File;Share;Transfer;Speed;AeroSync;
+StartupWMClass=aerosync
 EOF
     cp "$APPDIR/aerosync.desktop" "$APPDIR/AppRun.desktop" 2>/dev/null || true
 
@@ -148,8 +177,69 @@ EOF
         echo "Generated AppImage: $RELEASE_DIR/AeroSync-v${VERSION}-x86_64.AppImage"
     else
         echo "AppDir structure prepared at: $APPDIR"
-        echo "Install 'appimagetool' or use Tauri bundler to produce final single-file .AppImage binary."
+        echo "Install 'appimagetool' or use Tauri CLI to build final single-file .AppImage binary."
     fi
 fi
 
-echo -e "\nPackaging complete."
+# ------------------------------------------------------------------------------
+# 3. Build Linux Portable Archive (.tar.gz)
+# ------------------------------------------------------------------------------
+if [ -n "$MAIN_BIN" ]; then
+    echo -e "\n[3/3] Building Linux Portable Archive (.tar.gz)..."
+    PORTABLE_BUILD_DIR="$ROOT_DIR/build_linux_pkg/portable"
+    PORTABLE_DIR="$PORTABLE_BUILD_DIR/AeroSync-Linux-Portable"
+    rm -rf "$PORTABLE_BUILD_DIR"
+    mkdir -p "$PORTABLE_DIR"
+
+    cp "$MAIN_BIN" "$PORTABLE_DIR/AeroSync"
+    chmod +x "$PORTABLE_DIR/AeroSync"
+
+    if [ -n "$DAEMON_BIN" ]; then
+        cp "$DAEMON_BIN" "$PORTABLE_DIR/aerosync_daemon"
+        chmod +x "$PORTABLE_DIR/aerosync_daemon"
+    fi
+
+    if [ -f "$ICON_SRC" ]; then
+        cp "$ICON_SRC" "$PORTABLE_DIR/aerosync.png"
+    fi
+
+    # Create portable launcher script
+    cat <<'EOF' > "$PORTABLE_DIR/launch_aerosync.sh"
+#!/usr/bin/env bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PATH="$SCRIPT_DIR:$PATH"
+export LD_LIBRARY_PATH="$SCRIPT_DIR:$LD_LIBRARY_PATH"
+
+if [ -f "$SCRIPT_DIR/aerosync_daemon" ]; then
+    chmod +x "$SCRIPT_DIR/aerosync_daemon"
+    "$SCRIPT_DIR/aerosync_daemon" >/dev/null 2>&1 &
+fi
+
+chmod +x "$SCRIPT_DIR/AeroSync"
+exec "$SCRIPT_DIR/AeroSync" "$@"
+EOF
+    chmod +x "$PORTABLE_DIR/launch_aerosync.sh"
+
+    cat <<EOF > "$PORTABLE_DIR/aerosync.desktop"
+[Desktop Entry]
+Name=AeroSync
+Comment=Ultra High-Speed P2P File Transfer
+Exec=/bin/bash -c "cd '%k' && ./launch_aerosync.sh %U"
+Icon=aerosync
+Terminal=false
+Type=Application
+Categories=Network;FileTransfer;Utility;
+Keywords=P2P;File;Share;Transfer;Speed;AeroSync;
+StartupWMClass=aerosync
+EOF
+
+    cd "$PORTABLE_BUILD_DIR"
+    tar -czf "$RELEASE_DIR/AeroSync-Linux-Portable.tar.gz" AeroSync-Linux-Portable
+    echo "Generated Linux Portable Archive: $RELEASE_DIR/AeroSync-Linux-Portable.tar.gz"
+fi
+
+echo -e "\n=========================================================="
+echo " LINUX PACKAGING COMPLETE!"
+echo " Output artifacts in: $RELEASE_DIR"
+echo "=========================================================="
+

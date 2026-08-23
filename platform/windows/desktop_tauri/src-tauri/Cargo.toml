@@ -16,6 +16,9 @@ serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
 rfd = { version = "0.16", default-features = false, features = ["gtk3", "tokio"] }
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [profile.release]
 panic = "abort"
 codegen-units = 1

@@ -32,6 +32,7 @@ cmake "$ROOT_DIR/platform/windows" \
 
 cmake --build . --config Release -j$(nproc)
 
+chmod +x "$ROOT_DIR/build_linux/aerosync_daemon" 2>/dev/null || true
 cp "$ROOT_DIR/build_linux/aerosync_daemon" "$ROOT_DIR/release/aerosync_daemon" 2>/dev/null || true
 cp "$ROOT_DIR/build_linux/aerosync_daemon" "$ROOT_DIR/platform/windows/desktop_tauri/aerosync_daemon" 2>/dev/null || true
 cp "$ROOT_DIR/build_linux/aerosync_daemon" "$ROOT_DIR/platform/windows/desktop_tauri/src-tauri/aerosync_daemon" 2>/dev/null || true
@@ -74,13 +75,20 @@ if [ -f "$ROOT_DIR/package_linux.sh" ]; then
     bash "$ROOT_DIR/package_linux.sh" || true
 fi
 
+chmod +x "$ROOT_DIR/release/aerosync_daemon" 2>/dev/null || true
+chmod +x "$ROOT_DIR/release/AeroSync" 2>/dev/null || true
+if [ -f "$ROOT_DIR/release/AeroSync-v1.0.7-x86_64.AppImage" ]; then
+    chmod +x "$ROOT_DIR/release/AeroSync-v1.0.7-x86_64.AppImage" 2>/dev/null || true
+fi
+
 echo "=========================================================="
 echo " LINUX BUILD SUCCESSFUL! RELEASE ARTIFACTS READY:"
 echo "=========================================================="
-echo " 1. Linux Core Daemon:  $ROOT_DIR/release/aerosync_daemon"
-echo " 2. Linux Executable:   $ROOT_DIR/release/AeroSync"
-echo " 3. AppImage Container: $ROOT_DIR/release/AeroSync-v1.0.7-x86_64.AppImage"
-echo " 4. Debian DEB Package: $ROOT_DIR/release/aerosync_1.0.7_amd64.deb"
-echo " 5. Linux Test Runner:  $ROOT_DIR/build_tests_linux/test_core_engine"
-echo " 6. Linux Benchmark:    $ROOT_DIR/build_tests_linux/aerosync_benchmark"
+echo " 1. Linux Core Daemon:    $ROOT_DIR/release/aerosync_daemon"
+echo " 2. Linux Executable:     $ROOT_DIR/release/AeroSync"
+echo " 3. AppImage Container:   $ROOT_DIR/release/AeroSync-v1.0.7-x86_64.AppImage"
+echo " 4. Debian DEB Package:   $ROOT_DIR/release/aerosync_1.0.7_amd64.deb"
+echo " 5. Linux Portable Tar:   $ROOT_DIR/release/AeroSync-Linux-Portable.tar.gz"
+echo " 6. Linux Test Runner:    $ROOT_DIR/build_tests_linux/test_core_engine"
+echo " 7. Linux Benchmark:      $ROOT_DIR/build_tests_linux/aerosync_benchmark"
 echo "=========================================================="
