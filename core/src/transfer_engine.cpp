@@ -138,7 +138,8 @@ public:
 // Journal Helper: reads/writes completed chunk indices for crash recovery
 static std::set<uint32_t> loadResumeJournal(const std::filesystem::path& journalPath) {
     std::set<uint32_t> completedChunks;
-    if (std::filesystem::exists(journalPath)) {
+    std::error_code ec;
+    if (std::filesystem::exists(journalPath, ec)) {
         std::ifstream jFile(journalPath, std::ios::binary);
         uint32_t idx;
         while (jFile.read(reinterpret_cast<char*>(&idx), sizeof(idx))) {
@@ -471,8 +472,9 @@ bool TransferEngine::sendFileBatch(int sockFd,
             return false;
         }
 
-        if (std::filesystem::exists(journalPath)) {
-            std::filesystem::remove(journalPath);
+        std::error_code ecJ;
+        if (std::filesystem::exists(journalPath, ecJ)) {
+            std::filesystem::remove(journalPath, ecJ);
         }
     }
 
@@ -515,7 +517,8 @@ bool TransferEngine::receiveFileBatch(int sockFd,
     auto startTime = std::chrono::steady_clock::now();
     auto lastReportTime = startTime;
 
-    std::filesystem::create_directories(downloadDirectory);
+    std::error_code ecDl;
+    std::filesystem::create_directories(downloadDirectory, ecDl);
 
     size_t chunkSize = manifest.chunkSize > 0 ? manifest.chunkSize : LARGE_CHUNK_SIZE;
     

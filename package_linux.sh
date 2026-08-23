@@ -132,11 +132,11 @@ if [ -n "$MAIN_BIN" ]; then
 #!/bin/bash
 HERE="$(dirname "$(readlink -f "${0}")")"
 export PATH="$HERE/usr/bin:$PATH"
-export LD_LIBRARY_PATH="$HERE/usr/lib:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="$HERE/usr/lib:$HERE/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
 
-# Launch background C++ daemon if present
+# Launch background C++ daemon if present and executable
 if [ -f "$HERE/usr/bin/aerosync_daemon" ]; then
-    chmod +x "$HERE/usr/bin/aerosync_daemon"
+    chmod +x "$HERE/usr/bin/aerosync_daemon" 2>/dev/null || true
     "$HERE/usr/bin/aerosync_daemon" >/dev/null 2>&1 &
 fi
 

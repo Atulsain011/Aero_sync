@@ -133,9 +133,25 @@ fn find_daemon_executable() -> Option<PathBuf> {
     None
 }
 
+fn is_daemon_running() -> bool {
+    use std::net::{SocketAddr, TcpStream};
+    use std::time::Duration;
+    if let Ok(addr) = "127.0.0.1:48126".parse::<SocketAddr>() {
+        if TcpStream::connect_timeout(&addr, Duration::from_millis(150)).is_ok() {
+            return true;
+        }
+    }
+    false
+}
+
 fn start_daemon_process(state: &DaemonState) {
     let child_arc = state.child.clone();
     std::thread::spawn(move || {
+        if is_daemon_running() {
+            println!("[AeroSync] AeroSync Core Daemon is already active on 127.0.0.1:48126.");
+            return;
+        }
+
         if let Some(daemon_path) = find_daemon_executable() {
             #[cfg(unix)]
             {

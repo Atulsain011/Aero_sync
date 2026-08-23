@@ -15,8 +15,18 @@ echo " AEROSYNC LINUX PRODUCTION BUILD PIPELINE (v1.0.7)"
 echo "=========================================================="
 
 # Check for required build tools
+CXX_COMPILER="g++"
+C_COMPILER="gcc"
+if ! command -v g++ >/dev/null 2>&1; then
+    if command -v clang++ >/dev/null 2>&1; then
+        CXX_COMPILER="clang++"
+        C_COMPILER="clang"
+    else
+        echo >&2 "Error: g++ or clang++ is required but not installed."
+        exit 1
+    fi
+fi
 command -v cmake >/dev/null 2>&1 || { echo >&2 "Error: cmake is required but not installed."; exit 1; }
-command -v g++ >/dev/null 2>&1 || { echo >&2 "Error: g++ is required but not installed."; exit 1; }
 command -v npm >/dev/null 2>&1 || { echo >&2 "Error: npm is required but not installed."; exit 1; }
 
 mkdir -p "$ROOT_DIR/build_linux"
@@ -27,8 +37,8 @@ echo -e "\n[1/4] Building Linux Native Core Daemon (aerosync_daemon)..."
 cd "$ROOT_DIR/build_linux"
 cmake "$ROOT_DIR/platform/windows" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_CXX_COMPILER=g++ \
-    -DCMAKE_C_COMPILER=gcc
+    -DCMAKE_CXX_COMPILER="$CXX_COMPILER" \
+    -DCMAKE_C_COMPILER="$C_COMPILER"
 
 cmake --build . --config Release -j$(nproc)
 

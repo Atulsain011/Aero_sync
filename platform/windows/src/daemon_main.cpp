@@ -26,6 +26,10 @@
     #include <arpa/inet.h>
     #include <unistd.h>
     #include <sys/statvfs.h>
+    #include <sys/file.h>
+    #include <fcntl.h>
+    #include <signal.h>
+    #include <errno.h>
     #include <ifaddrs.h>
     #include <net/if.h>
     using socket_t = int;
@@ -293,7 +297,11 @@ static void sendHttpResponse(socket_t clientSock, int statusCode, const std::str
     ss << body;
 
     std::string response = ss.str();
+#ifdef _WIN32
     send(clientSock, response.c_str(), static_cast<int>(response.length()), 0);
+#else
+    send(clientSock, response.c_str(), static_cast<int>(response.length()), MSG_NOSIGNAL);
+#endif
 }
 
 static std::string extractJsonString(const std::string& src, const std::string& key) {
@@ -359,129 +367,136 @@ static std::vector<std::string> extractJsonStringArray(const std::string& src, c
 }
 
 static void handleHttpClient(socket_t clientSock) {
-    std::vector<char> reqBuf(65536);
-    int bytesRecv = recv(clientSock, reqBuf.data(), static_cast<int>(reqBuf.size() - 1), 0);
-    if (bytesRecv <= 0) {
-        CLOSE_SOCKET(clientSock);
-        return;
-    }
-    reqBuf[bytesRecv] = '\0';
-    std::string req(reqBuf.data(), bytesRecv);
-
-    std::istringstream reqStream(req);
-    std::string method, path, httpVersion;
-    reqStream >> method >> path >> httpVersion;
-
-    if (method == "OPTIONS") {
-        sendHttpResponse(clientSock, 200, "text/plain", "OK");
-        CLOSE_SOCKET(clientSock);
-        return;
-    }
-
-    if (method == "GET" && (path == "/api/status" || path == "/status" || path == "/")) {
-        std::string json = buildStatusJsonResponse();
-        sendHttpResponse(clientSock, 200, "application/json", json);
-    } else if (method == "POST" && path == "/api/transfer/send") {
-        size_t bodyPos = req.find("\r\n\r\n");
-        std::string body = (bodyPos != std::string::npos) ? req.substr(bodyPos + 4) : "";
-
-        std::string targetIp = extractJsonString(body, "targetIp");
-        if (targetIp.empty()) targetIp = "127.0.0.1";
-
-        int targetPort = 48124;
-        size_t portPos = body.find("\"targetPort\":");
-        if (portPos != std::string::npos) {
-            size_t pStart = portPos + 13;
-            while (pStart < body.size() && (body[pStart] == ' ' || body[pStart] == ':')) pStart++;
-            targetPort = std::atoi(body.c_str() + pStart);
-            if (targetPort <= 0) targetPort = 48124;
-        }
-
-        std::vector<std::string> filePaths = extractJsonStringArray(body, "filePaths");
-
-        if (filePaths.empty()) {
-            sendHttpResponse(clientSock, 400, "application/json", "{\"success\":false,\"error\":\"No files specified\"}");
-        } else {
-            aerosync::PeerInfo target;
-            target.deviceId = "direct-" + targetIp;
-            target.deviceName = "Remote Device (" + targetIp + ")";
-            target.ipAddress = targetIp;
-            target.port = static_cast<uint16_t>(targetPort);
-
-            std::thread([target, filePaths]() {
-                {
-                    std::lock_guard<std::mutex> lock(g_state.mtx);
-                    g_state.isTransferring = true;
-                    g_state.isPaused = false;
-                    g_state.statusMessage = "Sending " + std::to_string(filePaths.size()) + " file(s) to " + target.ipAddress;
-                }
-
-                bool ok = g_app->sendFiles(target, filePaths, [](const aerosync::TransferProgress& prog) {
-                    std::lock_guard<std::mutex> lock(g_state.mtx);
-                    g_state.currentProgress = prog;
-                    g_state.isTransferring = (prog.state == aerosync::TransferState::TRANSFERRING);
-                    double mbSec = prog.speedBytesPerSec / (1024.0 * 1024.0);
-                    char buf[64];
-                    snprintf(buf, sizeof(buf), "%.1f MB/s", mbSec);
-                    g_state.statusMessage = "Streaming " + prog.currentFileName + " (" + buf + ")";
-                });
-
-                {
-                    std::lock_guard<std::mutex> lock(g_state.mtx);
-                    g_state.isTransferring = false;
-                    if (ok) {
-                        for (const auto& fp : filePaths) {
-                            std::string fn = std::filesystem::path(fp).filename().string();
-                            g_state.completedHistory.push_back(fn);
-                        }
-                        g_state.statusMessage = "Transfer completed successfully!";
-                    } else {
-                        g_state.currentProgress.state = aerosync::TransferState::CANCELLED;
-                        g_state.currentProgress.speedBytesPerSec = 0;
-                        g_state.statusMessage = "Transfer cancelled or interrupted";
-                    }
-                }
-            }).detach();
-
-            sendHttpResponse(clientSock, 200, "application/json", "{\"success\":true,\"message\":\"Transfer started\"}");
-        }
-    } else if (method == "POST" && path == "/api/transfer/cancel") {
-        g_app->cancelTransfer();
-        {
-            std::lock_guard<std::mutex> lock(g_state.mtx);
-            g_state.isTransferring = false;
-            g_state.currentProgress.state = aerosync::TransferState::CANCELLED;
-            g_state.currentProgress.speedBytesPerSec = 0;
-            g_state.statusMessage = "Transfer cancelled";
-        }
-        sendHttpResponse(clientSock, 200, "application/json", "{\"success\":true,\"message\":\"Cancelled\"}");
-    } else if (method == "POST" && path == "/api/settings/download_dir") {
-        size_t bodyPos = req.find("\r\n\r\n");
-        std::string body = (bodyPos != std::string::npos) ? req.substr(bodyPos + 4) : "";
-        std::string newDir = extractJsonString(body, "downloadDir");
-        if (newDir.empty()) newDir = extractJsonString(body, "dir");
-
-        if (!newDir.empty()) {
-            {
-                std::lock_guard<std::mutex> lock(g_state.mtx);
-                g_state.downloadDir = newDir;
-            }
-            g_app->setDownloadDirectory(newDir);
-            sendHttpResponse(clientSock, 200, "application/json", "{\"success\":true,\"downloadDir\":\"" + escapeJson(newDir) + "\"}");
+    try {
+        std::vector<char> reqBuf(65536);
+        int bytesRecv = recv(clientSock, reqBuf.data(), static_cast<int>(reqBuf.size() - 1), 0);
+        if (bytesRecv <= 0) {
             CLOSE_SOCKET(clientSock);
             return;
         }
-        sendHttpResponse(clientSock, 400, "application/json", "{\"success\":false,\"error\":\"Invalid directory\"}");
-    } else if (method == "GET" && path == "/api/shutdown") {
-        sendHttpResponse(clientSock, 200, "application/json", "{\"success\":true,\"message\":\"Shutting down\"}");
-        CLOSE_SOCKET(clientSock);
-        g_running = false;
-        return;
-    } else {
-        sendHttpResponse(clientSock, 404, "application/json", "{\"error\":\"Not Found\"}");
-    }
+        reqBuf[bytesRecv] = '\0';
+        std::string req(reqBuf.data(), bytesRecv);
 
-    CLOSE_SOCKET(clientSock);
+        std::istringstream reqStream(req);
+        std::string method, path, httpVersion;
+        reqStream >> method >> path >> httpVersion;
+
+        if (method == "OPTIONS") {
+            sendHttpResponse(clientSock, 200, "text/plain", "OK");
+            CLOSE_SOCKET(clientSock);
+            return;
+        }
+
+        if (method == "GET" && (path == "/api/status" || path == "/status" || path == "/")) {
+            std::string json = buildStatusJsonResponse();
+            sendHttpResponse(clientSock, 200, "application/json", json);
+        } else if (method == "POST" && path == "/api/transfer/send") {
+            size_t bodyPos = req.find("\r\n\r\n");
+            std::string body = (bodyPos != std::string::npos) ? req.substr(bodyPos + 4) : "";
+
+            std::string targetIp = extractJsonString(body, "targetIp");
+            if (targetIp.empty()) targetIp = "127.0.0.1";
+
+            int targetPort = 48124;
+            size_t portPos = body.find("\"targetPort\":");
+            if (portPos != std::string::npos) {
+                size_t pStart = portPos + 13;
+                while (pStart < body.size() && (body[pStart] == ' ' || body[pStart] == ':')) pStart++;
+                targetPort = std::atoi(body.c_str() + pStart);
+                if (targetPort <= 0) targetPort = 48124;
+            }
+
+            std::vector<std::string> filePaths = extractJsonStringArray(body, "filePaths");
+
+            if (filePaths.empty()) {
+                sendHttpResponse(clientSock, 400, "application/json", "{\"success\":false,\"error\":\"No files specified\"}");
+            } else {
+                aerosync::PeerInfo target;
+                target.deviceId = "direct-" + targetIp;
+                target.deviceName = "Remote Device (" + targetIp + ")";
+                target.ipAddress = targetIp;
+                target.port = static_cast<uint16_t>(targetPort);
+
+                std::thread([target, filePaths]() {
+                    try {
+                        {
+                            std::lock_guard<std::mutex> lock(g_state.mtx);
+                            g_state.isTransferring = true;
+                            g_state.isPaused = false;
+                            g_state.statusMessage = "Sending " + std::to_string(filePaths.size()) + " file(s) to " + target.ipAddress;
+                        }
+
+                        bool ok = g_app->sendFiles(target, filePaths, [](const aerosync::TransferProgress& prog) {
+                            std::lock_guard<std::mutex> lock(g_state.mtx);
+                            g_state.currentProgress = prog;
+                            g_state.isTransferring = (prog.state == aerosync::TransferState::TRANSFERRING);
+                            double mbSec = prog.speedBytesPerSec / (1024.0 * 1024.0);
+                            char buf[64];
+                            snprintf(buf, sizeof(buf), "%.1f MB/s", mbSec);
+                            g_state.statusMessage = "Streaming " + prog.currentFileName + " (" + buf + ")";
+                        });
+
+                        {
+                            std::lock_guard<std::mutex> lock(g_state.mtx);
+                            g_state.isTransferring = false;
+                            if (ok) {
+                                for (const auto& fp : filePaths) {
+                                    std::error_code ecP;
+                                    std::string fn = std::filesystem::path(fp).filename().string();
+                                    g_state.completedHistory.push_back(fn);
+                                }
+                                g_state.statusMessage = "Transfer completed successfully!";
+                            } else {
+                                g_state.currentProgress.state = aerosync::TransferState::CANCELLED;
+                                g_state.currentProgress.speedBytesPerSec = 0;
+                                g_state.statusMessage = "Transfer cancelled or interrupted";
+                            }
+                        }
+                    } catch (...) {}
+                }).detach();
+
+                sendHttpResponse(clientSock, 200, "application/json", "{\"success\":true,\"message\":\"Transfer started\"}");
+            }
+        } else if (method == "POST" && path == "/api/transfer/cancel") {
+            g_app->cancelTransfer();
+            {
+                std::lock_guard<std::mutex> lock(g_state.mtx);
+                g_state.isTransferring = false;
+                g_state.currentProgress.state = aerosync::TransferState::CANCELLED;
+                g_state.currentProgress.speedBytesPerSec = 0;
+                g_state.statusMessage = "Transfer cancelled";
+            }
+            sendHttpResponse(clientSock, 200, "application/json", "{\"success\":true,\"message\":\"Cancelled\"}");
+        } else if (method == "POST" && path == "/api/settings/download_dir") {
+            size_t bodyPos = req.find("\r\n\r\n");
+            std::string body = (bodyPos != std::string::npos) ? req.substr(bodyPos + 4) : "";
+            std::string newDir = extractJsonString(body, "downloadDir");
+            if (newDir.empty()) newDir = extractJsonString(body, "dir");
+
+            if (!newDir.empty()) {
+                {
+                    std::lock_guard<std::mutex> lock(g_state.mtx);
+                    g_state.downloadDir = newDir;
+                }
+                g_app->setDownloadDirectory(newDir);
+                sendHttpResponse(clientSock, 200, "application/json", "{\"success\":true,\"downloadDir\":\"" + escapeJson(newDir) + "\"}");
+                CLOSE_SOCKET(clientSock);
+                return;
+            }
+            sendHttpResponse(clientSock, 400, "application/json", "{\"success\":false,\"error\":\"Invalid directory\"}");
+        } else if (method == "GET" && path == "/api/shutdown") {
+            sendHttpResponse(clientSock, 200, "application/json", "{\"success\":true,\"message\":\"Shutting down\"}");
+            CLOSE_SOCKET(clientSock);
+            g_running = false;
+            return;
+        } else {
+            sendHttpResponse(clientSock, 404, "application/json", "{\"error\":\"Not Found\"}");
+        }
+
+        CLOSE_SOCKET(clientSock);
+    } catch (...) {
+        CLOSE_SOCKET(clientSock);
+    }
 }
 
 } // namespace
@@ -497,6 +512,23 @@ int main(int argc, char** argv) {
 
     WSADATA wsa;
     WSAStartup(MAKEWORD(2, 2), &wsa);
+#else
+    // Enforce Single-Instance Core Daemon on Linux via file lock
+    const char* homeDirLock = getenv("HOME");
+    std::string lockDirPath = homeDirLock ? std::string(homeDirLock) + "/.config/AeroSync" : "/tmp/AeroSync";
+    std::error_code ecLockDir;
+    std::filesystem::create_directories(lockDirPath, ecLockDir);
+    std::string lockFilePath = lockDirPath + "/aerosync_daemon.lock";
+    int lockFd = open(lockFilePath.c_str(), O_RDWR | O_CREAT, 0666);
+    if (lockFd != -1) {
+        if (flock(lockFd, LOCK_EX | LOCK_NB) != 0) {
+            std::cout << "[Daemon] Another AeroSync Core Daemon is already running. Exiting cleanly." << std::endl;
+            close(lockFd);
+            return 0;
+        }
+    }
+    // Ignore SIGPIPE on Linux to prevent sudden termination on client disconnection
+    signal(SIGPIPE, SIG_IGN);
 #endif
 
     char compName[256] = "AeroSync-Device";
@@ -509,23 +541,25 @@ int main(int argc, char** argv) {
 
     // Retrieve or persist permanent device ID for this machine
     std::string idFilePath;
+    std::error_code ecDir;
 #ifdef _WIN32
     char localAppData[MAX_PATH] = {0};
     if (GetEnvironmentVariableA("LOCALAPPDATA", localAppData, MAX_PATH) > 0) {
         std::string appDir = std::string(localAppData) + "\\AeroSync";
-        std::filesystem::create_directories(appDir);
+        std::filesystem::create_directories(appDir, ecDir);
         idFilePath = appDir + "\\device_id.txt";
     }
 #else
     const char* home = getenv("HOME");
     std::string homeDir = home ? home : "/tmp";
     std::string appDir = homeDir + "/.config/AeroSync";
-    std::filesystem::create_directories(appDir);
+    std::filesystem::create_directories(appDir, ecDir);
     idFilePath = appDir + "/device_id.txt";
 #endif
 
     std::string persistentId;
-    if (!idFilePath.empty() && std::filesystem::exists(idFilePath)) {
+    std::error_code ecFile;
+    if (!idFilePath.empty() && std::filesystem::exists(idFilePath, ecFile)) {
         std::ifstream f(idFilePath);
         std::getline(f, persistentId);
     }
@@ -566,7 +600,8 @@ int main(int argc, char** argv) {
         g_state.downloadDir = "/tmp/AeroSync_Downloads";
     }
 #endif
-    std::filesystem::create_directories(g_state.downloadDir);
+    std::error_code ecDl;
+    std::filesystem::create_directories(g_state.downloadDir, ecDl);
 
     g_app = std::make_unique<aerosync::AeroSyncApp>(
         g_state.deviceId,

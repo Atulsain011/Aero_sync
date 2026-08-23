@@ -205,14 +205,14 @@ jobs:
           #!/usr/bin/env bash
           SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
           export PATH="$SCRIPT_DIR:$PATH"
-          export LD_LIBRARY_PATH="$SCRIPT_DIR:$LD_LIBRARY_PATH"
+          export LD_LIBRARY_PATH="$SCRIPT_DIR:$SCRIPT_DIR/lib:$LD_LIBRARY_PATH"
 
           if [ -f "$SCRIPT_DIR/aerosync_daemon" ]; then
-              chmod +x "$SCRIPT_DIR/aerosync_daemon"
+              chmod +x "$SCRIPT_DIR/aerosync_daemon" 2>/dev/null || true
               "$SCRIPT_DIR/aerosync_daemon" >/dev/null 2>&1 &
           fi
 
-          chmod +x "$SCRIPT_DIR/AeroSync"
+          chmod +x "$SCRIPT_DIR/AeroSync" 2>/dev/null || true
           exec "$SCRIPT_DIR/AeroSync" "$@"
           EOF
           chmod +x "$portableDir/launch_aerosync.sh"
