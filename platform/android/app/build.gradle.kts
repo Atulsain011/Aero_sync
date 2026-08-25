@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "com.aerosync.app"
     compileSdk = 34
+    ndkVersion = "25.1.8937393"
 
     defaultConfig {
         applicationId = "com.aerosync.app"
@@ -26,18 +27,6 @@ android {
         }
     }
 
-    signingConfigs {
-        create("release") {
-            storeFile = rootProject.file("release.keystore")
-            storePassword = "aerosync123"
-            keyAlias = "aerosync"
-            keyPassword = "aerosync123"
-            enableV1Signing = true
-            enableV2Signing = true
-            enableV3Signing = true
-        }
-    }
-
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -45,7 +34,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {

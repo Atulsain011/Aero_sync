@@ -80,45 +80,90 @@ static std::string unescapeJson(const std::string& str) {
 }
 
 static std::string extractJsonString(const std::string& json, const std::string& key) {
-    std::string pattern = "\"" + key + "\":\"";
-    size_t start = json.find(pattern);
-    if (start == std::string::npos) return "";
-    start += pattern.length();
-    size_t end = json.find("\"", start);
-    if (end == std::string::npos) return "";
-    return unescapeJson(json.substr(start, end - start));
+    std::vector<std::string> keysToTry;
+    keysToTry.push_back(key);
+    if (key == "device_name") {
+        keysToTry.push_back("deviceName");
+        keysToTry.push_back("name");
+    } else if (key == "device_id") {
+        keysToTry.push_back("deviceId");
+        keysToTry.push_back("id");
+    } else if (key == "app_version") {
+        keysToTry.push_back("appVersion");
+    } else if (key == "listening_port") {
+        keysToTry.push_back("listeningPort");
+        keysToTry.push_back("port");
+    }
+
+    for (const auto& k : keysToTry) {
+        std::string searchKey = "\"" + k + "\"";
+        size_t keyPos = json.find(searchKey);
+        if (keyPos == std::string::npos) continue;
+
+        size_t colonPos = json.find(':', keyPos + searchKey.length());
+        if (colonPos == std::string::npos) continue;
+
+        size_t quoteStart = json.find('"', colonPos + 1);
+        if (quoteStart == std::string::npos) continue;
+
+        size_t valStart = quoteStart + 1;
+        size_t valEnd = valStart;
+        while (valEnd < json.length()) {
+            if (json[valEnd] == '"' && json[valEnd - 1] != '\\') {
+                break;
+            }
+            valEnd++;
+        }
+        if (valEnd >= json.length()) continue;
+
+        std::string rawVal = json.substr(valStart, valEnd - valStart);
+        std::string unescaped = unescapeJson(rawVal);
+        if (!unescaped.empty()) return unescaped;
+    }
+    return "";
 }
 
 static int extractJsonInt(const std::string& json, const std::string& key, int defaultVal = 0) {
-    std::string pattern = "\"" + key + "\":";
-    size_t start = json.find(pattern);
-    if (start == std::string::npos) return defaultVal;
-    start += pattern.length();
-    while (start < json.length() && (json[start] == ' ' || json[start] == '\t')) start++;
-    size_t end = start;
-    while (end < json.length() && (isdigit(json[end]) || json[end] == '-')) end++;
-    if (end == start) return defaultVal;
-    try {
-        return std::stoi(json.substr(start, end - start));
-    } catch (...) {
-        return defaultVal;
+    std::vector<std::string> keysToTry = { key };
+    if (key == "listening_port") {
+        keysToTry.push_back("listeningPort");
+        keysToTry.push_back("port");
     }
+    for (const auto& k : keysToTry) {
+        std::string pattern = "\"" + k + "\":";
+        size_t start = json.find(pattern);
+        if (start == std::string::npos) continue;
+        start += pattern.length();
+        while (start < json.length() && (json[start] == ' ' || json[start] == '\t')) start++;
+        size_t end = start;
+        while (end < json.length() && (isdigit(json[end]) || json[end] == '-')) end++;
+        if (end == start) continue;
+        try {
+            return std::stoi(json.substr(start, end - start));
+        } catch (...) {}
+    }
+    return defaultVal;
 }
 
 static uint64_t extractJsonUint64(const std::string& json, const std::string& key, uint64_t defaultVal = 0) {
-    std::string pattern = "\"" + key + "\":";
-    size_t start = json.find(pattern);
-    if (start == std::string::npos) return defaultVal;
-    start += pattern.length();
-    while (start < json.length() && (json[start] == ' ' || json[start] == '\t')) start++;
-    size_t end = start;
-    while (end < json.length() && isdigit(json[end])) end++;
-    if (end == start) return defaultVal;
-    try {
-        return std::stoull(json.substr(start, end - start));
-    } catch (...) {
-        return defaultVal;
+    std::vector<std::string> keysToTry = { key };
+    if (key == "timestamp_ms") {
+        keysToTry.push_back("timestampMs");
     }
+    for (const auto& k : keysToTry) {
+        std::string pattern = "\"" + k + "\":";
+        size_t start = json.find(pattern);
+        if (start == std::string::npos) continue;
+        start += pattern.length();
+        while (start < json.length() && (json[start] == ' ' || json[start] == '\t')) start++;
+        size_t end = start;
+        while (end < json.length() && isdigit(json[end])) end++;
+        if (end == start) continue;
+        try {
+            return std::stoull(json.substr(start, end - start));
+        } catch (...) {}
+    }
+    return defaultVal;
 }
 
 // 1. Wire Control Frame Encoding / Decoding
@@ -165,9 +210,15 @@ bool ProtocolSerializer::decodeControlFrame(const std::string& rawFrame, Control
 // 2. Discovery Beacon Serialization
 std::string ProtocolSerializer::serializeDiscoveryBeacon(const PeerInfo& peer) {
     std::ostringstream ss;
+    std::string safeName = peer.deviceName;
+    if (safeName.empty()) {
+        safeName = deviceTypeToString(peer.deviceType) + " Device";
+    }
     ss << "{"
-       << "\"device_name\":\"" << escapeJson(peer.deviceName) << "\","
+       << "\"device_name\":\"" << escapeJson(safeName) << "\","
+       << "\"deviceName\":\"" << escapeJson(safeName) << "\","
        << "\"device_id\":\"" << escapeJson(peer.deviceId) << "\","
+       << "\"deviceId\":\"" << escapeJson(peer.deviceId) << "\","
        << "\"platform\":\"" << deviceTypeToString(peer.deviceType) << "\","
        << "\"app_version\":\"" << escapeJson(peer.appVersion) << "\","
        << "\"listening_port\":" << peer.port << ","
@@ -187,9 +238,17 @@ bool ProtocolSerializer::deserializeDiscoveryBeacon(const std::string& data, con
     if (deviceId.empty()) return false;
 
     outPeer.deviceId = deviceId;
-    outPeer.deviceName = deviceName.empty() ? "Unknown Device" : deviceName;
     outPeer.platform = platformStr;
     outPeer.deviceType = stringToDeviceType(platformStr);
+    
+    if (deviceName.empty() || deviceName == "Unknown Device") {
+        std::string pName = platformStr.empty() ? "Remote Device" : platformStr;
+        if (!pName.empty()) pName[0] = static_cast<char>(std::toupper(pName[0]));
+        outPeer.deviceName = pName + " (" + senderIp + ")";
+    } else {
+        outPeer.deviceName = deviceName;
+    }
+
     outPeer.appVersion = appVerStr.empty() ? "1.0.0" : appVerStr;
     outPeer.ipAddress = senderIp;
     outPeer.port = static_cast<uint16_t>(port);

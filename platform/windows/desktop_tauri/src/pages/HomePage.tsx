@@ -175,7 +175,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   <MonitorSmartphone size={16} />
                 </div>
                 <div className="quick-peer-meta">
-                  <span className="quick-peer-name">{peer.deviceName}</span>
+                  <span className="quick-peer-name">{peer.deviceName || `${peer.platform || 'Device'} (${peer.ipAddress})`}</span>
                   <span className="quick-peer-ip">{peer.ipAddress}</span>
                 </div>
               </div>

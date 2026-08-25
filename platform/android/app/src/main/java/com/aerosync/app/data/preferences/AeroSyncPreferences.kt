@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.Environment
+import android.provider.Settings
 import java.io.File
 import java.util.UUID
 
@@ -105,12 +106,36 @@ class AeroSyncPreferences(private val context: Context) {
 
     var deviceName: String
         get() {
-            val defaultName = Build.MODEL ?: "AeroSync Device"
-            return prefs.getString(KEY_DEVICE_NAME, defaultName) ?: defaultName
+            val savedName = prefs.getString(KEY_DEVICE_NAME, null)?.trim()
+            if (!savedName.isNullOrBlank()) return savedName
+
+            // 1. Bluetooth / System Device Name
+            try {
+                val btName = Settings.Secure.getString(context.contentResolver, "bluetooth_name")
+                    ?: Settings.Global.getString(context.contentResolver, "device_name")
+                if (!btName.isNullOrBlank()) return btName.trim()
+            } catch (_: Exception) {}
+
+            // 2. Android Device Model (Manufacturer + Model)
+            try {
+                val manufacturer = Build.MANUFACTURER?.takeIf { it.isNotBlank() } ?: ""
+                val model = Build.MODEL?.takeIf { it.isNotBlank() } ?: ""
+                val fullModel = if (model.startsWith(manufacturer, ignoreCase = true)) {
+                    model
+                } else if (manufacturer.isNotBlank() && model.isNotBlank()) {
+                    "$manufacturer $model"
+                } else {
+                    model.ifBlank { manufacturer }
+                }
+                if (fullModel.isNotBlank()) return fullModel.trim()
+            } catch (_: Exception) {}
+
+            // 3. Guaranteed Fallback
+            return "Android Device"
         }
         set(value) {
             if (value.isNotBlank()) {
-                prefs.edit().putString(KEY_DEVICE_NAME, value).apply()
+                prefs.edit().putString(KEY_DEVICE_NAME, value.trim()).apply()
             }
         }
 

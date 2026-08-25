@@ -243,7 +243,7 @@ fun DevicesScreen(
                                                 Spacer(modifier = Modifier.width(10.dp))
                                                 Column(modifier = Modifier.weight(1f, fill = true)) {
                                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Text(peer.deviceName, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                                                        Text(peer.deviceName.ifBlank { "${peer.deviceType} (${peer.ipAddress})" }, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                                                         if (isSelected) {
                                                             Spacer(modifier = Modifier.width(6.dp))
                                                             Surface(

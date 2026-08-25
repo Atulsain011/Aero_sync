@@ -917,7 +917,7 @@ fun HomeScreen(
                                             Spacer(modifier = Modifier.width(10.dp))
                                             Column(modifier = Modifier.weight(1f, fill = true)) {
                                                 Text(
-                                                    text = peer.deviceName,
+                                                    text = peer.deviceName.ifBlank { "${peer.deviceType} (${peer.ipAddress})" },
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = textPrimary,

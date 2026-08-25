@@ -932,7 +932,8 @@ void AppWindow::renderFilesTab(HDC hdc, const RECT& rect, bool isDark) {
 
             SelectObject(hdc, fontBodyBold);
             SetTextColor(hdc, textPrimary);
-            TextOut(hdc, 648, dy + 6, peer.deviceName.c_str(), static_cast<int>(peer.deviceName.length()));
+            std::string dName = peer.deviceName.empty() ? ("Device (" + peer.ipAddress + ")") : peer.deviceName;
+            TextOut(hdc, 648, dy + 6, dName.c_str(), static_cast<int>(dName.length()));
 
             SelectObject(hdc, fontSmall);
             SetTextColor(hdc, textSecondary);
@@ -1203,7 +1204,8 @@ void AppWindow::renderDevicesTab(HDC hdc, const RECT& rect, bool isDark) {
 
             SelectObject(hdc, fontBodyBold);
             SetTextColor(hdc, textPrimary);
-            TextOut(hdc, 80, dy + 10, peer.deviceName.c_str(), static_cast<int>(peer.deviceName.length()));
+            std::string pName = peer.deviceName.empty() ? ("Device (" + peer.ipAddress + ")") : peer.deviceName;
+            TextOut(hdc, 80, dy + 10, pName.c_str(), static_cast<int>(pName.length()));
 
             SelectObject(hdc, fontSmall);
             SetTextColor(hdc, textSecondary);

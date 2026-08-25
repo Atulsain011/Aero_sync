@@ -146,16 +146,20 @@ fun TransfersScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // 3. Active Transfer Telemetry Card (if transferring or paused)
-            val active = uiState.activeTransfer
-            if (active != null) {
+            // 3. Active Transfer Telemetry Cards (Separate per direction: Phone → PC and PC → Phone)
+            val activeList = listOfNotNull(uiState.activeSendTransfer, uiState.activeReceiveTransfer).ifEmpty { listOfNotNull(uiState.activeTransfer) }
+            for (active in activeList) {
+                val isSend = !active.isReceived
+                val accentColor = if (isSend) Color(0xFF3B82F6) else Color(0xFF10B981)
+                val dirLabel = if (isSend) "Phone → PC" else "PC → Phone"
+
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 12.dp)
+                        .padding(bottom = 10.dp)
                         .clip(RoundedCornerShape(16.dp)),
                     color = cardBg,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF8B5CF6)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, accentColor),
                     shadowElevation = if (isDark) 0.dp else 2.dp
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
@@ -165,6 +169,32 @@ fun TransfersScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = accentColor.copy(alpha = 0.15f)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isSend) Icons.Default.ArrowOutward else Icons.Default.SouthWest,
+                                                contentDescription = null,
+                                                tint = accentColor,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(3.dp))
+                                            Text(
+                                                text = dirLabel,
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = accentColor
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = active.fileName,
                                     fontSize = 14.sp,
@@ -183,14 +213,14 @@ fun TransfersScreen(
                             val percent = if (active.totalBytes > 0) ((active.transferredBytes * 100) / active.totalBytes).toInt() else 0
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = Color(0xFF8B5CF6).copy(alpha = 0.15f),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF8B5CF6))
+                                color = accentColor.copy(alpha = 0.15f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, accentColor)
                             ) {
                                 Text(
                                     text = "$percent%",
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = Color(0xFF8B5CF6),
+                                    color = accentColor,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 )
                             }
@@ -205,7 +235,7 @@ fun TransfersScreen(
                                 .fillMaxWidth()
                                 .height(6.dp)
                                 .clip(RoundedCornerShape(3.dp)),
-                            color = Color(0xFF8B5CF6),
+                            color = accentColor,
                             trackColor = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)
                         )
 

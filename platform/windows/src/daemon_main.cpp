@@ -216,9 +216,14 @@ static std::string buildStatusJsonResponse() {
     for (size_t i = 0; i < g_state.peers.size(); ++i) {
         const auto& p = g_state.peers[i];
         std::string platformStr = (p.deviceType == aerosync::DeviceType::DEVICE_ANDROID) ? "android" : "windows";
+        std::string dName = p.deviceName;
+        if (dName.empty() || dName == "Unknown Device") {
+            dName = (platformStr == "android" ? "Android Device" : "Windows PC") + (" (" + p.ipAddress + ")");
+        }
         ss << "    {\n";
         ss << "      \"deviceId\": \"" << escapeJson(p.deviceId) << "\",\n";
-        ss << "      \"deviceName\": \"" << escapeJson(p.deviceName) << "\",\n";
+        ss << "      \"deviceName\": \"" << escapeJson(dName) << "\",\n";
+        ss << "      \"device_name\": \"" << escapeJson(dName) << "\",\n";
         ss << "      \"deviceType\": " << static_cast<int>(p.deviceType) << ",\n";
         ss << "      \"platform\": \"" << platformStr << "\",\n";
         ss << "      \"ipAddress\": \"" << escapeJson(p.ipAddress) << "\",\n";
@@ -626,7 +631,13 @@ int main(int argc, char** argv) {
 
     g_app->setPairingStateChangedCallback([](aerosync::PairingState state, const std::string& reason) {
         std::lock_guard<std::mutex> lock(g_state.mtx);
-        g_state.statusMessage = "Pairing: " + aerosync::pairingStateToString(state) + (reason.empty() ? "" : (" (" + reason + ")"));
+        if (state == aerosync::PairingState::UNPAIRED || state == aerosync::PairingState::DISCONNECTED) {
+            g_state.isTransferring = false;
+            g_state.currentProgress.state = aerosync::TransferState::CANCELLED;
+            g_state.statusMessage = "Transfer cancelled by peer. Device disconnected.";
+        } else {
+            g_state.statusMessage = "Pairing: " + aerosync::pairingStateToString(state) + (reason.empty() ? "" : (" (" + reason + ")"));
+        }
     });
 
     g_app->setIncomingTransferCallback([](const aerosync::TransferManifest& manifest, std::function<void(bool)> respondCb) {
@@ -641,16 +652,21 @@ int main(int argc, char** argv) {
     g_app->setIncomingTransferProgressCallback([](const aerosync::TransferProgress& prog) {
         std::lock_guard<std::mutex> lock(g_state.mtx);
         g_state.currentProgress = prog;
-        g_state.isTransferring = (prog.state == aerosync::TransferState::TRANSFERRING);
-        if (prog.state == aerosync::TransferState::COMPLETED ||
-            (prog.fileBytesTransferred >= prog.fileSize && prog.fileSize > 0)) {
-            g_state.completedHistory.push_back(prog.currentFileName);
-            g_state.statusMessage = "Received: " + prog.currentFileName;
+        if (prog.state == aerosync::TransferState::CANCELLED || prog.state == aerosync::TransferState::FAILED) {
+            g_state.isTransferring = false;
+            g_state.statusMessage = "Transfer cancelled by peer.";
         } else {
-            double mbSec = prog.speedBytesPerSec / (1024.0 * 1024.0);
-            char buf[64];
-            snprintf(buf, sizeof(buf), "%.1f MB/s", mbSec);
-            g_state.statusMessage = "Receiving: " + prog.currentFileName + " (" + buf + ")";
+            g_state.isTransferring = (prog.state == aerosync::TransferState::TRANSFERRING);
+            if (prog.state == aerosync::TransferState::COMPLETED ||
+                (prog.fileBytesTransferred >= prog.fileSize && prog.fileSize > 0)) {
+                g_state.completedHistory.push_back(prog.currentFileName);
+                g_state.statusMessage = "Received: " + prog.currentFileName;
+            } else {
+                double mbSec = prog.speedBytesPerSec / (1024.0 * 1024.0);
+                char buf[64];
+                snprintf(buf, sizeof(buf), "%.1f MB/s", mbSec);
+                g_state.statusMessage = "Receiving: " + prog.currentFileName + " (" + buf + ")";
+            }
         }
     });
 
@@ -677,9 +693,9 @@ int main(int argc, char** argv) {
     inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
 
     if (bind(serverSock, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        std::cerr << "Failed to bind IPC server socket to port 48126" << std::endl;
+        std::cout << "[Daemon] Another AeroSync Core Daemon is already bound to port 48126. Exiting cleanly." << std::endl;
         CLOSE_SOCKET(serverSock);
-        return 1;
+        return 0;
     }
 
     if (listen(serverSock, 32) == SOCKET_ERROR) {

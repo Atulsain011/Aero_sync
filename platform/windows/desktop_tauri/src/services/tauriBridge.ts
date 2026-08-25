@@ -136,5 +136,44 @@ export const tauriBridge = {
       }
     }
     return { freeBytes: 120 * 1024 * 1024 * 1024, totalBytes: 512 * 1024 * 1024 * 1024 };
+  },
+
+  setAutostart: async (enable: boolean): Promise<boolean> => {
+    if (isTauriAvailable()) {
+      try {
+        await invoke('set_autostart', { enable });
+        return true;
+      } catch (err) {
+        console.warn('Failed to toggle autostart:', err);
+      }
+    }
+    return false;
+  },
+
+  getAutostart: async (): Promise<boolean> => {
+    if (isTauriAvailable()) {
+      try {
+        return await invoke<boolean>('get_autostart');
+      } catch (err) {
+        console.warn('Failed to query autostart status:', err);
+      }
+    }
+    return false;
+  },
+
+  sendNotification: async (title: string, body: string): Promise<void> => {
+    if (isTauriAvailable()) {
+      try {
+        await invoke('send_notification', { title, body });
+        return;
+      } catch (err) {
+        console.warn('Failed to send native notification:', err);
+      }
+    }
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(title, { body });
+      } catch {}
+    }
   }
 };

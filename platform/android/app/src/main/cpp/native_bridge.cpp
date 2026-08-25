@@ -279,7 +279,14 @@ Java_com_aerosync_app_nativebridge_AeroSyncNativeBridge_nativeGetPeers(JNIEnv* e
     jobjectArray result = env->NewObjectArray(static_cast<jsize>(peers.size()), stringClazz, nullptr);
 
     for (size_t i = 0; i < peers.size(); ++i) {
-        std::string info = peers[i].deviceId + "|" + peers[i].deviceName + "|" +
+        std::string dName = peers[i].deviceName;
+        std::replace(dName.begin(), dName.end(), '|', ' ');
+        std::string dId = peers[i].deviceId;
+        std::replace(dId.begin(), dId.end(), '|', ' ');
+        if (dName.empty() || dName == "Unknown Device") {
+            dName = aerosync::deviceTypeToString(peers[i].deviceType) + " (" + peers[i].ipAddress + ")";
+        }
+        std::string info = dId + "|" + dName + "|" +
                            aerosync::deviceTypeToString(peers[i].deviceType) + "|" +
                            peers[i].ipAddress + "|" + std::to_string(peers[i].port);
         jstring jStr = env->NewStringUTF(info.c_str());
@@ -351,22 +358,19 @@ Java_com_aerosync_app_nativebridge_AeroSyncNativeBridge_nativeConnectToPeer(
     if (!targetIp) return JNI_FALSE;
 
     const char* ipStr = env->GetStringUTFChars(targetIp, nullptr);
-    const char* pinStr = pin ? env->GetStringUTFChars(pin, nullptr) : "";
+    const char* pinStr = pin ? env->GetStringUTFChars(pin, nullptr) : nullptr;
 
     aerosync::PeerInfo target;
     target.ipAddress = ipStr ? ipStr : "";
     target.port = static_cast<uint16_t>(targetPort);
 
     auto app = getAppInstance();
-    if (!app) {
-        if (ipStr) env->ReleaseStringUTFChars(targetIp, ipStr);
-        if (pin && pinStr) env->ReleaseStringUTFChars(pin, pinStr);
-        return JNI_FALSE;
+    bool res = false;
+    if (app) {
+        res = app->connectToPeer(target, pinStr ? pinStr : "");
     }
 
-    bool res = app->connectToPeer(target, pinStr ? pinStr : "");
-
-    if (ipStr) env->ReleaseStringUTFChars(targetIp, ipStr);
+    if (targetIp && ipStr) env->ReleaseStringUTFChars(targetIp, ipStr);
     if (pin && pinStr) env->ReleaseStringUTFChars(pin, pinStr);
 
     return res ? JNI_TRUE : JNI_FALSE;

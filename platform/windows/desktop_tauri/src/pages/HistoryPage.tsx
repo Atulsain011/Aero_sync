@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Clock,
+  Trash2,
   FolderOpen,
   ArrowUpRight,
   ArrowDownLeft,
@@ -19,7 +20,8 @@ interface HistoryPageProps {
 
 export const HistoryPage: React.FC<HistoryPageProps> = ({
   history,
-  downloadDirectory
+  downloadDirectory,
+  onClearHistory
 }) => {
   return (
     <div className="page-container">
@@ -28,7 +30,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
           <h2 className="page-title">Transfer History</h2>
           <p className="page-subtitle">Log of completed and verified P2P file transmissions.</p>
         </div>
-        <div className="page-header-actions">
+        <div className="page-header-actions" style={{ display: 'flex', gap: '8px' }}>
           <button
             className="btn btn-secondary"
             onClick={() => tauriBridge.openFolder(downloadDirectory)}
@@ -36,6 +38,12 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
             <FolderOpen size={15} />
             <span>Open Downloads</span>
           </button>
+          {history.length > 0 && onClearHistory && (
+            <button className="btn btn-secondary" onClick={onClearHistory} title="Clear all transfer history">
+              <Trash2 size={15} />
+              <span>Clear History</span>
+            </button>
+          )}
         </div>
       </div>
 

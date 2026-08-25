@@ -199,7 +199,142 @@ fn get_disk_space(path: Option<String>) -> Result<DiskSpaceInfo, String> {
     }
 }
 
+#[tauri::command]
+fn set_autostart(enable: bool) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        if let Ok(current_exe) = std::env::current_exe() {
+            let exe_path = current_exe.to_string_lossy().to_string();
+            let clean_exe = exe_path.replace('/', "\\");
+            if enable {
+                let status = Command::new("reg")
+                    .args([
+                        "add",
+                        "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                        "/v",
+                        "AeroSync",
+                        "/t",
+                        "REG_SZ",
+                        "/d",
+                        &format!("\"{}\"", clean_exe),
+                        "/f",
+                    ])
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .status();
+                match status {
+                    Ok(s) if s.success() => Ok(()),
+                    Ok(s) => Err(format!("reg add exited with status {}", s)),
+                    Err(e) => Err(e.to_string()),
+                }
+            } else {
+                let _ = Command::new("reg")
+                    .args([
+                        "delete",
+                        "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                        "/v",
+                        "AeroSync",
+                        "/f",
+                    ])
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .status();
+                Ok(())
+            }
+        } else {
+            Err("Could not determine current executable path".into())
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        if let Ok(home) = std::env::var("HOME") {
+            let autostart_dir = PathBuf::from(home).join(".config").join("autostart");
+            let desktop_file = autostart_dir.join("aerosync.desktop");
+            if enable {
+                let _ = std::fs::create_dir_all(&autostart_dir);
+                if let Ok(current_exe) = std::env::current_exe() {
+                    let content = format!(
+                        "[Desktop Entry]\nType=Application\nName=AeroSync\nExec=\"{}\"\nTerminal=false\nX-GNOME-Autostart-enabled=true\n",
+                        current_exe.to_string_lossy()
+                    );
+                    let _ = std::fs::write(&desktop_file, content);
+                }
+            } else {
+                if desktop_file.exists() {
+                    let _ = std::fs::remove_file(desktop_file);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[tauri::command]
+fn get_autostart() -> Result<bool, String> {
+    #[cfg(windows)]
+    {
+        let output = Command::new("reg")
+            .args([
+                "query",
+                "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                "/v",
+                "AeroSync",
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+        match output {
+            Ok(out) => Ok(out.status.success()),
+            Err(_) => Ok(false),
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        if let Ok(home) = std::env::var("HOME") {
+            let desktop_file = PathBuf::from(home).join(".config").join("autostart").join("aerosync.desktop");
+            Ok(desktop_file.exists())
+        } else {
+            Ok(false)
+        }
+    }
+}
+
+#[tauri::command]
+fn send_notification(title: String, body: String) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let clean_title = title.replace('\'', "''").replace('"', "`\"");
+        let clean_body = body.replace('\'', "''").replace('"', "`\"");
+        let script = format!(
+            "[reflection.assembly]::loadwithpartialname('System.Windows.Forms') | Out-Null; $n = New-Object System.Windows.Forms.NotifyIcon; $n.Icon = [System.Drawing.SystemIcons]::Information; $n.Visible = `$true; $n.ShowBalloonTip(5000, '{}', '{}', [System.Windows.Forms.ToolTipIcon]::Info); Start-Sleep -m 500; $n.Dispose()",
+            clean_title, clean_body
+        );
+        let status = Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .creation_flags(CREATE_NO_WINDOW)
+            .status();
+        match status {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = Command::new("notify-send")
+            .args([&title, &body])
+            .status();
+        Ok(())
+    }
+}
+
 fn main() {
+    #[cfg(not(windows))]
+    {
+        if std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+        }
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+    }
+
     let daemon_state = DaemonState {
         child: Mutex::new(None),
     };
@@ -216,7 +351,10 @@ fn main() {
             close_window,
             show_in_folder,
             open_folder,
-            get_disk_space
+            get_disk_space,
+            set_autostart,
+            get_autostart,
+            send_notification
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

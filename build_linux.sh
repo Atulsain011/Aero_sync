@@ -34,13 +34,23 @@ mkdir -p "$ROOT_DIR/release"
 
 # 1. Build C++ Core Static Library & Native Linux Daemon
 echo -e "\n[1/4] Building Linux Native Core Daemon (aerosync_daemon)..."
+mkdir -p "$ROOT_DIR/build_linux"
 cd "$ROOT_DIR/build_linux"
+
+# Remove non-Linux stale binaries if present
+if [ -f "$ROOT_DIR/build_linux/aerosync_daemon" ] && ! file "$ROOT_DIR/build_linux/aerosync_daemon" 2>/dev/null | grep -q "ld-linux"; then
+    rm -f "$ROOT_DIR/build_linux/aerosync_daemon"
+fi
+if [ -f "$ROOT_DIR/release/aerosync_daemon" ] && ! file "$ROOT_DIR/release/aerosync_daemon" 2>/dev/null | grep -q "ld-linux"; then
+    rm -f "$ROOT_DIR/release/aerosync_daemon"
+fi
+
 cmake "$ROOT_DIR/platform/windows" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_CXX_COMPILER="$CXX_COMPILER" \
     -DCMAKE_C_COMPILER="$C_COMPILER"
 
-cmake --build . --config Release -j$(nproc)
+cmake --build . --config Release -j$(nproc 2>/dev/null || echo 2)
 
 chmod +x "$ROOT_DIR/build_linux/aerosync_daemon" 2>/dev/null || true
 cp "$ROOT_DIR/build_linux/aerosync_daemon" "$ROOT_DIR/release/aerosync_daemon" 2>/dev/null || true
@@ -53,10 +63,10 @@ mkdir -p "$ROOT_DIR/build_tests_linux"
 cd "$ROOT_DIR/build_tests_linux"
 cmake "$ROOT_DIR/tests" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_CXX_COMPILER=g++ \
-    -DCMAKE_C_COMPILER=gcc
+    -DCMAKE_CXX_COMPILER="$CXX_COMPILER" \
+    -DCMAKE_C_COMPILER="$C_COMPILER"
 
-cmake --build . --config Release -j$(nproc)
+cmake --build . --config Release -j$(nproc 2>/dev/null || echo 2)
 
 # 3. Build Web Assets (Vite + React + TypeScript)
 echo -e "\n[3/4] Building Web Assets..."
@@ -80,7 +90,7 @@ else
     echo "Note: Install Rust/Cargo and Tauri CLI to generate native Linux AppImage and DEB packages."
 fi
 
-# Fallback: Run standalone Linux packager if available
+# Run Linux packaging pipeline
 if [ -f "$ROOT_DIR/package_linux.sh" ]; then
     bash "$ROOT_DIR/package_linux.sh" || true
 fi

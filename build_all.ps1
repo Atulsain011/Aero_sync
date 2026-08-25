@@ -76,12 +76,26 @@ try {
 }
 
 # 5. Build Android Mobile App APK (with JNI C++ Core for 4 ABIs)
-Write-Host "`n[5/5] Building Android APK (app-debug.apk)..." -ForegroundColor Yellow
+Write-Host "`n[5/5] Building Android APK (AeroSync.apk & app-debug.apk)..." -ForegroundColor Yellow
 Push-Location "$root\platform\android"
 try {
-    & $gradle assembleDebug --quiet
+    & $gradle assembleRelease assembleDebug --quiet
 } finally {
     Pop-Location
+}
+
+$releaseApkSrc = "$root\platform\android\app\build\outputs\apk\release\app-release.apk"
+$debugApkSrc   = "$root\platform\android\app\build\outputs\apk\debug\app-debug.apk"
+$targetApkSrc  = if (Test-Path $debugApkSrc) { $debugApkSrc } else { $releaseApkSrc }
+
+if (Test-Path $targetApkSrc) {
+    if (-not (Test-Path "$root\release")) { New-Item -ItemType Directory -Path "$root\release" -Force }
+    Copy-Item $targetApkSrc "$root\AeroSync.apk" -Force
+    Copy-Item $targetApkSrc "$root\release\AeroSync.apk" -Force
+    Copy-Item $targetApkSrc "$root\release\AeroSync-v1.0.7.apk" -Force
+    if (Test-Path $debugApkSrc) {
+        Copy-Item $debugApkSrc "$root\release\app-debug.apk" -Force
+    }
 }
 
 # Create 1-click launcher batch script in root directory
@@ -94,7 +108,8 @@ Write-Host "==========================================================" -Foregro
 Write-Host " 1. Production Native Desktop App: $root\build_windows\AeroSync.exe" -ForegroundColor White
 Write-Host " 2. One-Click Launcher:            $root\Start_AeroSync_Desktop.bat" -ForegroundColor White
 Write-Host " 3. Native C++ Daemon:             $root\build_windows\aerosync_daemon.exe" -ForegroundColor White
-Write-Host " 4. Android Mobile APK:            $root\platform\android\app\build\outputs\apk\debug\app-debug.apk" -ForegroundColor White
-Write-Host " 5. Test Runner:                   $root\build_tests\test_core_engine.exe" -ForegroundColor White
-Write-Host " 6. Benchmark:                     $root\build_tests\aerosync_benchmark.exe" -ForegroundColor White
+Write-Host " 4. Android Mobile APK (Root):     $root\AeroSync.apk" -ForegroundColor White
+Write-Host " 5. Android Mobile APK (Release):  $root\release\AeroSync.apk" -ForegroundColor White
+Write-Host " 6. Test Runner:                   $root\build_tests\test_core_engine.exe" -ForegroundColor White
+Write-Host " 7. Benchmark:                     $root\build_tests\aerosync_benchmark.exe" -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor Green

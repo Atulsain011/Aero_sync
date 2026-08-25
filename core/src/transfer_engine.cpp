@@ -463,10 +463,11 @@ bool TransferEngine::sendFileBatch(int sockFd,
         }
 
         if (!networkSuccess || !readerSuccess || cancelSignal.load()) {
-            if (cancelSignal.load() && progressCb) {
+            if (progressCb) {
                 TransferProgress prog;
                 prog.batchId = manifest.batchId;
                 prog.state = TransferState::CANCELLED;
+                prog.currentFileName = fileMeta.relativePath;
                 progressCb(prog);
             }
             return false;
@@ -765,10 +766,11 @@ bool TransferEngine::receiveFileBatch(int sockFd,
 #endif
 
         if (!networkSuccess || !writerSuccess || cancelSignal) {
-            if (cancelSignal && progressCb) {
+            if (progressCb) {
                 TransferProgress prog;
                 prog.batchId = manifest.batchId;
                 prog.state = TransferState::CANCELLED;
+                prog.currentFileName = fileMeta.relativePath;
                 progressCb(prog);
             }
             return false;

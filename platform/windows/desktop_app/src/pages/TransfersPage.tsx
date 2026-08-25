@@ -200,7 +200,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
 
                   <div className="queue-item-right">
                     <span className={`queue-status-tag status-${item.status}`}>
-                      {item.status.toUpperCase()}
+                      {item.status === 'waiting' || item.status === 'connecting' ? 'Waiting for queued files' : item.status.toUpperCase()}
                     </span>
                   </div>
                 </div>

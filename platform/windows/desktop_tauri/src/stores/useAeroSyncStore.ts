@@ -15,10 +15,12 @@ import { getFileName } from '../utils/formatters';
 const STORAGE_KEY_SETTINGS = 'aerosync_settings_v2';
 const STORAGE_KEY_HISTORY = 'aerosync_history_v2';
 
+const isLinux = typeof navigator !== 'undefined' && /linux/i.test(navigator.userAgent);
+
 const DEFAULT_SETTINGS: SettingsState = {
   theme: 'dark',
-  downloadDirectory: 'C:\\Users\\Atul\\Downloads\\AeroSync',
-  deviceName: 'Windows PC (AeroSync)',
+  downloadDirectory: 'Downloads/AeroSync',
+  deviceName: isLinux ? 'Linux PC (AeroSync)' : 'Windows PC (AeroSync)',
   startWithWindows: false,
   notificationsEnabled: true
 };
@@ -231,12 +233,22 @@ export function useAeroSyncStore() {
     } catch {}
   }, []);
 
+  // Sync autostart status from OS on mount
+  useEffect(() => {
+    tauriBridge.getAutostart().then(isAuto => {
+      setSettings(prev => ({ ...prev, startWithWindows: isAuto }));
+    }).catch(() => {});
+  }, []);
+
   // Update Settings
   const updateSettings = useCallback((partial: Partial<SettingsState>) => {
     setSettings(prev => {
       const next = { ...prev, ...partial };
       if (partial.downloadDirectory) {
         daemonService.updateDownloadDirectory(partial.downloadDirectory);
+      }
+      if (partial.startWithWindows !== undefined) {
+        tauriBridge.setAutostart(partial.startWithWindows);
       }
       return next;
     });
@@ -256,6 +268,10 @@ export function useAeroSyncStore() {
         const rawPeers = data.peers || [];
         const filteredPeers = rawPeers
           .filter(p => p.deviceId && p.deviceId !== data.deviceId && p.ipAddress !== '127.0.0.1')
+          .map(p => ({
+            ...p,
+            deviceName: (p.deviceName || (p as any).device_name || '').trim() || `${p.platform || 'Device'} (${p.ipAddress})`
+          }))
           .filter((p, idx, arr) => arr.findIndex(x => x.deviceId === p.deviceId) === idx);
         setPeers(filteredPeers);
         setIsTransferring(data.isTransferring);
@@ -282,13 +298,13 @@ export function useAeroSyncStore() {
         }
 
         // Handle cancellation from either device
-        if (data.currentProgress && data.currentProgress.state === 7 /* CANCELLED */) {
+        if ((data.currentProgress && data.currentProgress.state === 7 /* CANCELLED */) || (data.statusMessage && data.statusMessage.toLowerCase().includes('cancelled'))) {
           if (latestTransferringRef.current) {
             setIsTransferring(false);
             latestTransferringRef.current = false;
             setSelectedPeer(null);
             setQueue(prev => prev.map(item => item.status === 'transferring' ? { ...item, status: 'cancelled' } : item));
-            setStatusMessage('Transfer cancelled by peer. Device disconnected.');
+            setStatusMessage('Transfer cancelled by peer.');
           }
         } else if (!data.isTransferring && latestTransferringRef.current) {
           setIsTransferring(false);
@@ -333,6 +349,12 @@ export function useAeroSyncStore() {
               etaSeconds: 0,
               errorCode: 0
             });
+
+            // Trigger desktop notification if enabled
+            if (settings.notificationsEnabled) {
+              tauriBridge.sendNotification('AeroSync Transfer Complete', `Received "${completedName}" successfully.`);
+            }
+
             refreshStorage();
           }
         }

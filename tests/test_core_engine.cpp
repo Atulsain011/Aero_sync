@@ -114,7 +114,35 @@ int main() {
     assert(decDataPtr[0] == 0x5E);
     std::cout << "[PASS 4/5] 4MB Chunk Envelope Framing & CRC32C Integrity" << std::endl;
 
-    // 5. Test UDP Broadcast/Multicast Peer Discovery Loopback
+    // 5. Test Beacon Device Name Parsing & Fallback Resilience
+    aerosync::PeerInfo testPeer;
+    testPeer.deviceId = "dev-pixel8";
+    testPeer.deviceName = "Pixel 8 Pro";
+    testPeer.deviceType = aerosync::DeviceType::DEVICE_ANDROID;
+    testPeer.appVersion = "1.0.0";
+    testPeer.port = 48124;
+
+    std::string serializedBeacon = aerosync::ProtocolSerializer::serializeDiscoveryBeacon(testPeer);
+    aerosync::PeerInfo parsedPeer;
+    assert(aerosync::ProtocolSerializer::deserializeDiscoveryBeacon(serializedBeacon, "192.168.1.10", parsedPeer));
+    assert(parsedPeer.deviceId == "dev-pixel8");
+    assert(parsedPeer.deviceName == "Pixel 8 Pro");
+
+    // Test camelCase JSON beacon input
+    std::string camelBeacon = "{\"deviceName\":\"Galaxy S23\",\"deviceId\":\"dev-s23\",\"platform\":\"android\",\"listeningPort\":48124}";
+    aerosync::PeerInfo parsedCamel;
+    assert(aerosync::ProtocolSerializer::deserializeDiscoveryBeacon(camelBeacon, "192.168.1.20", parsedCamel));
+    assert(parsedCamel.deviceId == "dev-s23");
+    assert(parsedCamel.deviceName == "Galaxy S23");
+
+    // Test empty device name fallback to platform & IP
+    std::string emptyNameBeacon = "{\"device_name\":\"\",\"device_id\":\"dev-anon\",\"platform\":\"windows\",\"listening_port\":48124}";
+    aerosync::PeerInfo parsedEmpty;
+    assert(aerosync::ProtocolSerializer::deserializeDiscoveryBeacon(emptyNameBeacon, "192.168.1.30", parsedEmpty));
+    assert(parsedEmpty.deviceId == "dev-anon");
+    assert(parsedEmpty.deviceName == "Windows (192.168.1.30)");
+
+    // 6. Test UDP Broadcast/Multicast Peer Discovery Loopback
     aerosync::DiscoveryEngine peerA("dev-A", "Phone-A", aerosync::DeviceType::DEVICE_ANDROID, 48124);
     aerosync::DiscoveryEngine peerB("dev-B", "PC-B", aerosync::DeviceType::DEVICE_WINDOWS, 48124);
 
@@ -134,10 +162,10 @@ int main() {
     peerB.stop();
 
     assert(peerADiscoveredB);
-    std::cout << "[PASS 5/5] UDP / mDNS Discovery Engine (dev-A discovered dev-B)" << std::endl;
+    std::cout << "[PASS 5/5] UDP / mDNS Discovery Engine & Device Name Resilience" << std::endl;
 
     std::cout << "==================================================" << std::endl;
-    std::cout << "ALL SHARED C++ CORE TESTS (5/5) PASSED (100%)!" << std::endl;
+    std::cout << "ALL SHARED C++ CORE TESTS PASSED (100%)!" << std::endl;
     std::cout << "==================================================" << std::endl;
     return 0;
 }
