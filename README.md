@@ -24,10 +24,11 @@
 | :--- | :--- | :--- | :--- |
 | **Linux (AppImage Portable)** | `AeroSync-v1.0.7-x86_64.AppImage` | [**Download Linux AppImage (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-v1.0.7-x86_64.AppImage) | `v1.0.7` |
 | **Linux (Debian / Ubuntu / Mint)** | `aerosync_1.0.7_amd64.deb` | [**Download Linux DEB Package**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/aerosync_1.0.7_amd64.deb) | `v1.0.7` |
+| **Linux (Portable Archive)** | `AeroSync-Linux-Portable.tar.gz` | [**Download Linux Portable (.tar.gz)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Linux-Portable.tar.gz) | `v1.0.7` |
 | **Windows (Installer)** | `AeroSync-Setup-v1.0.7.exe` | [**Download Windows Installer (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Setup-v1.0.7.exe) | `v1.0.7` |
 | **Windows (Portable)** | `AeroSync-Windows-Portable.zip` | [**Download Windows Portable (.zip)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Windows-Portable.zip) | `v1.0.7` |
 | **Windows (Standalone)** | `AeroSync.exe` | [**Download Windows Executable**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync.exe) | `v1.0.7` |
-| **Android 8.0+** | `AeroSync.apk` | [**Download Android APK**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/app-debug.apk) | `v1.0.7` |
+| **Android 8.0+** | `AeroSync.apk` | [**Download Android APK**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync.apk) | `v1.0.7` |
 | **All Releases** | GitHub Releases | [**Browse All Releases**](https://github.com/Atulsain011/Aero_sync/releases) | `Latest` |
 
 <br>
@@ -35,7 +36,7 @@
 [![Download Linux AppImage](https://img.shields.io/badge/Download_Linux_AppImage-AeroSync-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-v1.0.7-x86_64.AppImage)
 [![Download Linux DEB Package](https://img.shields.io/badge/Download_Linux_DEB-AeroSync-A81D33?style=for-the-badge&logo=debian&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/aerosync_1.0.7_amd64.deb)
 [![Download Windows Installer](https://img.shields.io/badge/Download_Windows_Installer-AeroSync-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Setup-v1.0.7.exe)
-[![Download Android App](https://img.shields.io/badge/Download_Android_App-AeroSync-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/app-debug.apk)
+[![Download Android App](https://img.shields.io/badge/Download_Android_App-AeroSync-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync.apk)
 
 </div>
 
@@ -265,6 +266,11 @@ The planned remote-transfer system will feature:
 2. Install package: `sudo apt install ./aerosync_1.0.7_amd64.deb` or `sudo dpkg -i aerosync_1.0.7_amd64.deb`
 3. Launch **AeroSync** directly from your Application Launcher / Desktop Menu.
 
+#### Portable Archive (.tar.gz)
+1. Download [**`AeroSync-Linux-Portable.tar.gz`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Linux-Portable.tar.gz) from GitHub Releases (`v1.0.7`).
+2. Extract the archive: `tar -xvf AeroSync-Linux-Portable.tar.gz`
+3. Launch AeroSync executable from terminal or file manager.
+
 ### Windows
 #### Recommended: Installer
 1. Download [**`AeroSync-Setup-v1.0.7.exe`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Setup-v1.0.7.exe) from GitHub Releases (`v1.0.7`).
@@ -279,7 +285,7 @@ The planned remote-transfer system will feature:
 3. Run `AeroSync.exe`.
 
 ### Android
-1. Download [**`AeroSync.apk`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/app-debug.apk).
+1. Download [**`AeroSync.apk`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync.apk).
 2. Tap the APK to install (*enable "Install unknown apps" if prompted*).
 3. Grant requested permissions (Nearby devices & storage access).
 4. Open AeroSync on both devices, discover, pair, and transfer!
