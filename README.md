@@ -25,9 +25,11 @@
 | **Linux (AppImage Portable)** | `AeroSync-v1.0.7-x86_64.AppImage` | [**Download Linux AppImage (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-v1.0.7-x86_64.AppImage) | `v1.0.7` |
 | **Linux (Debian / Ubuntu / Mint)** | `aerosync_1.0.7_amd64.deb` | [**Download Linux DEB Package**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/aerosync_1.0.7_amd64.deb) | `v1.0.7` |
 | **Linux (Portable Archive)** | `AeroSync-Linux-Portable.tar.gz` | [**Download Linux Portable (.tar.gz)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Linux-Portable.tar.gz) | `v1.0.7` |
+| **Linux (1-Click Launcher)** | `Start_AeroSync_Linux.sh` | [**Download Linux 1-Click Launcher**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/Start_AeroSync_Linux.sh) | `v1.0.7` |
 | **Windows (Installer)** | `AeroSync-Setup-v1.0.7.exe` | [**Download Windows Installer (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Setup-v1.0.7.exe) | `v1.0.7` |
 | **Windows (Portable)** | `AeroSync-Windows-Portable.zip` | [**Download Windows Portable (.zip)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Windows-Portable.zip) | `v1.0.7` |
 | **Windows (Standalone)** | `AeroSync.exe` | [**Download Windows Executable**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync.exe) | `v1.0.7` |
+| **Windows (1-Click Launcher)** | `Start_AeroSync_Desktop.bat` | [**Download Windows 1-Click Launcher**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/Start_AeroSync_Desktop.bat) | `v1.0.7` |
 | **Android (APK)** | `AeroSync.apk` | [**Download Android APK**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync.apk) | `v1.0.7` |
 | **All Releases** | GitHub Releases | [**Browse All Releases**](https://github.com/Atulsain011/Aero_sync/releases) | `Latest` |
 
