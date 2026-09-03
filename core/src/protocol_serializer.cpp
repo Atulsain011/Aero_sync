@@ -229,11 +229,21 @@ std::string ProtocolSerializer::serializeDiscoveryBeacon(const PeerInfo& peer) {
 
 bool ProtocolSerializer::deserializeDiscoveryBeacon(const std::string& data, const std::string& senderIp, PeerInfo& outPeer) {
     std::string deviceId = extractJsonString(data, "device_id");
+    if (deviceId.empty()) deviceId = extractJsonString(data, "deviceId");
+
     std::string deviceName = extractJsonString(data, "device_name");
+    if (deviceName.empty()) deviceName = extractJsonString(data, "deviceName");
+
     std::string platformStr = extractJsonString(data, "platform");
     std::string appVerStr = extractJsonString(data, "app_version");
-    int port = extractJsonInt(data, "listening_port", CONTROL_TCP_PORT);
+    if (appVerStr.empty()) appVerStr = extractJsonString(data, "appVersion");
+
+    int port = extractJsonInt(data, "listening_port", 0);
+    if (port == 0) port = extractJsonInt(data, "listeningPort", 0);
+    if (port == 0) port = extractJsonInt(data, "port", CONTROL_TCP_PORT);
+
     uint64_t timestamp = extractJsonUint64(data, "timestamp_ms", 0);
+    if (timestamp == 0) timestamp = extractJsonUint64(data, "timestampMs", 0);
 
     if (deviceId.empty()) return false;
 
@@ -492,8 +502,26 @@ static inline uint32_t computeCRC32C_Hardware(const uint8_t* data, size_t length
     }
     return static_cast<uint32_t>(crc ^ 0xFFFFFFFF);
 }
-#elif defined(__aarch64__) && (defined(__GNUC__) || defined(__clang__))
-#if defined(__ARM_FEATURE_CRC32)
+#elif defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
+#include <nmmintrin.h>
+static inline uint32_t computeCRC32C_Hardware(const uint8_t* data, size_t length) {
+    uint64_t crc = 0xFFFFFFFF;
+    const uint8_t* p = data;
+    while (length >= 8) {
+        crc = _mm_crc32_u64(crc, *reinterpret_cast<const uint64_t*>(p));
+        p += 8;
+        length -= 8;
+    }
+    while (length > 0) {
+        crc = _mm_crc32_u8(static_cast<uint32_t>(crc), *p);
+        p++;
+        length--;
+    }
+    return static_cast<uint32_t>(crc ^ 0xFFFFFFFF);
+}
+#endif
+
+#if defined(__ARM_FEATURE_CRC32) && (defined(__GNUC__) || defined(__clang__))
 static inline uint32_t computeCRC32C_ARM(const uint8_t* data, size_t length) {
     uint32_t crc = 0xFFFFFFFF;
     const uint8_t* p = data;
@@ -510,21 +538,15 @@ static inline uint32_t computeCRC32C_ARM(const uint8_t* data, size_t length) {
     return crc ^ 0xFFFFFFFF;
 }
 #endif
-#endif
 
 uint32_t ProtocolSerializer::computeCRC32C(const uint8_t* data, size_t length) {
     if (!data || length == 0) return 0;
 
-#if (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
-    #if defined(__SSE4_2__)
-        return computeCRC32C_Hardware(data, length);
-    #endif
-#elif defined(__aarch64__) && (defined(__GNUC__) || defined(__clang__))
-    #if defined(__ARM_FEATURE_CRC32)
-        return computeCRC32C_ARM(data, length);
-    #endif
-#endif
-
+#if (defined(__x86_64__) || defined(_M_X64))
+    return computeCRC32C_Hardware(data, length);
+#elif defined(__ARM_FEATURE_CRC32) && (defined(__GNUC__) || defined(__clang__))
+    return computeCRC32C_ARM(data, length);
+#else
     const auto table = getCRC32CSliceTable();
     uint32_t crc = 0xFFFFFFFF;
     const uint8_t* p = data;
@@ -560,6 +582,7 @@ uint32_t ProtocolSerializer::computeCRC32C(const uint8_t* data, size_t length) {
         crc = (crc >> 8) ^ table[0][(crc ^ (*p++)) & 0xFF];
     }
     return crc ^ 0xFFFFFFFF;
+#endif
 }
 
 } // namespace aerosync

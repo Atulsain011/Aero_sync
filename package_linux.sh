@@ -194,9 +194,14 @@ if [ -n "$MAIN_BIN" ]; then
 HERE="$(dirname "$(readlink -f "${0}")")"
 export PATH="$HERE/usr/bin:$HERE:$PATH"
 
+# Ubuntu 24.04/23.10 and Debian 12 AppArmor sandbox fix
+export WEBKIT_FORCE_SANDBOX=0
+
 # WebKitGTK Linux DMA-BUF & Compositing compatibility flags
 export WEBKIT_DISABLE_DMABUF_RENDERER=1
 export WEBKIT_DISABLE_COMPOSITING_MODE=1
+export __NV_DISABLE_EXPLICIT_SYNC=1
+export WEBKIT_USE_SINGLE_WEB_PROCESS=1
 
 # Software rendering fallback if GPU acceleration fails or is forced
 if [ "$AEROSYNC_FORCE_SOFTWARE_RENDER" = "1" ] || [[ "$*" == *"--software-render"* ]] || [[ "$*" == *"--disable-gpu"* ]]; then
@@ -306,6 +311,13 @@ if [ -n "$MAIN_BIN" ]; then
         cp "$ICON_SRC" "$PORTABLE_DIR/aerosync.png"
     fi
 
+    if [ -f "$ROOT_DIR/Start_AeroSync_Linux.sh" ]; then
+        cp "$ROOT_DIR/Start_AeroSync_Linux.sh" "$PORTABLE_DIR/Start_AeroSync_Linux.sh"
+        cp "$ROOT_DIR/Start_AeroSync_Linux.sh" "$RELEASE_DIR/Start_AeroSync_Linux.sh"
+        chmod +x "$PORTABLE_DIR/Start_AeroSync_Linux.sh" 2>/dev/null || true
+        chmod +x "$RELEASE_DIR/Start_AeroSync_Linux.sh" 2>/dev/null || true
+    fi
+
     # Create portable launcher script with WebKit2GTK compatibility and software rendering fallback
     cat <<'EOF' > "$PORTABLE_DIR/launch_aerosync.sh"
 #!/usr/bin/env bash
@@ -315,8 +327,14 @@ if [ -d "$SCRIPT_DIR/lib" ]; then
     export LD_LIBRARY_PATH="$SCRIPT_DIR/lib:$LD_LIBRARY_PATH"
 fi
 
-# WebKitGTK Linux DMA-BUF compatibility flags
+# Ubuntu 24.04/23.10 and Debian 12 AppArmor sandbox fix
+export WEBKIT_FORCE_SANDBOX=0
+
+# WebKitGTK Linux DMA-BUF & Compositing compatibility flags
 export WEBKIT_DISABLE_DMABUF_RENDERER=1
+export WEBKIT_DISABLE_COMPOSITING_MODE=1
+export __NV_DISABLE_EXPLICIT_SYNC=1
+export WEBKIT_USE_SINGLE_WEB_PROCESS=1
 
 # Software rendering fallback if GPU acceleration fails or is forced
 if [ "$AEROSYNC_FORCE_SOFTWARE_RENDER" = "1" ] || [[ "$*" == *"--software-render"* ]] || [[ "$*" == *"--disable-gpu"* ]]; then

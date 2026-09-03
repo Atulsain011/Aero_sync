@@ -32,8 +32,8 @@ namespace aerosync {
 void SocketTransport::configureHighThroughputSocket(int sockFd, size_t bufferSize) {
     socket_t s = static_cast<socket_t>(sockFd);
 
-    // Socket buffer scaling: 8 MB SO_SNDBUF and SO_RCVBUF for optimal Wi-Fi BDP saturation
-    int bufSize = static_cast<int>(bufferSize > 0 ? bufferSize : (8 * 1024 * 1024));
+    // Socket buffer scaling: 16 MB SO_SNDBUF and SO_RCVBUF for optimal Wi-Fi BDP saturation
+    int bufSize = static_cast<int>(bufferSize > 0 ? bufferSize : (16 * 1024 * 1024));
     setsockopt(s, SOL_SOCKET, SO_SNDBUF, (const char*)&bufSize, sizeof(bufSize));
     setsockopt(s, SOL_SOCKET, SO_RCVBUF, (const char*)&bufSize, sizeof(bufSize));
 

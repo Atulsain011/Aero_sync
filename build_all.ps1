@@ -15,7 +15,8 @@ if (-not (Test-Path $gradle)) {
     $gradle = "C:\Users\Atul\.gradle\wrapper\dists\gradle-8.10.2-all\7iv73wktx1xtkvlq19urqw1wm\gradle-8.10.2\bin\gradle.bat"
 }
 
-$env:PATH = "$toolBin;$env:PATH"
+$ninjaDir = Split-Path -Parent $ninja
+$env:PATH = "$ninjaDir;$toolBin;$env:PATH"
 $env:JAVA_HOME = $jdkPath
 $env:ANDROID_HOME = $sdkPath
 $env:ANDROID_NDK_HOME = $ndkPath
@@ -33,6 +34,9 @@ Write-Host "`n[1/5] Building Windows Native Core Daemon (aerosync_daemon.exe)...
     "-DCMAKE_BUILD_TYPE=Release"
 & $cmake --build "$root\build_windows"
 Copy-Item -Path "$toolBin\*.dll" -Destination "$root\build_windows" -Force -ErrorAction SilentlyContinue
+Copy-Item "$root\build_windows\aerosync_daemon.exe" "$root\platform\windows\desktop_tauri\aerosync_daemon.exe" -Force
+Copy-Item "$root\build_windows\aerosync_daemon.exe" "$root\aerosync_daemon.exe" -Force
+Copy-Item -Path "$toolBin\*.dll" -Destination "$root\platform\windows\desktop_tauri" -Force -ErrorAction SilentlyContinue
 
 # 2. Build Tauri + React + TypeScript Desktop App (AeroSync.exe)
 Write-Host "`n[2/5] Building Tauri + React + TypeScript Desktop App (AeroSync.exe)..." -ForegroundColor Yellow
@@ -98,9 +102,15 @@ if (Test-Path $targetApkSrc) {
     }
 }
 
-# Create 1-click launcher batch script in root directory
-$launcherBat = "@echo off`r`nstart `"`" `"$root\build_windows\AeroSync.exe`"`r`n"
+# Create 1-click launcher batch script in root and release directory
+$launcherBat = "@echo off`r`nsetlocal`r`nset `"SCRIPT_DIR=%~dp0`"`r`nif exist `"%SCRIPT_DIR%AeroSync.exe`" (`r`n    start `"`" `"%SCRIPT_DIR%AeroSync.exe`" %*`r`n) else if exist `"%SCRIPT_DIR%release\AeroSync.exe`" (`r`n    start `"`" `"%SCRIPT_DIR%release\AeroSync.exe`" %*`r`n) else if exist `"%SCRIPT_DIR%build_windows\AeroSync.exe`" (`r`n    start `"`" `"%SCRIPT_DIR%build_windows\AeroSync.exe`" %*`r`n) else if exist `"%SCRIPT_DIR%platform\windows\desktop_tauri\AeroSync.exe`" (`r`n    start `"`" `"%SCRIPT_DIR%platform\windows\desktop_tauri\AeroSync.exe`" %*`r`n) else (`r`n    echo [AeroSync] Error: AeroSync.exe not found in %SCRIPT_DIR%`r`n    pause`r`n)`r`n"
 Set-Content -Path "$root\Start_AeroSync_Desktop.bat" -Value $launcherBat
+if (Test-Path "$root\release") {
+    Set-Content -Path "$root\release\Start_AeroSync_Desktop.bat" -Value $launcherBat
+    if (Test-Path "$root\Start_AeroSync_Linux.sh") {
+        Copy-Item "$root\Start_AeroSync_Linux.sh" "$root\release\Start_AeroSync_Linux.sh" -Force
+    }
+}
 
 Write-Host "`n==========================================================" -ForegroundColor Green
 Write-Host " BUILD SUCCESSFUL! ALL PRODUCTION ARTIFACTS READY:" -ForegroundColor Green

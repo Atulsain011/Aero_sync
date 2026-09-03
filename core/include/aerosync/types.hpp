@@ -16,8 +16,8 @@ constexpr uint16_t CONTROL_TCP_PORT    = 48124;
 constexpr uint16_t DATA_TCP_PORT       = 48125;
 constexpr uint32_t WIRE_MAGIC          = 0x4145524F; // "AERO"
 constexpr size_t   PARALLEL_STREAMS    = 4;           // 4 parallel TCP streams
-constexpr size_t   LARGE_CHUNK_SIZE    = 1024 * 1024; // 1 MB high-throughput streaming chunk
-constexpr size_t   MAX_IN_FLIGHT_BYTES = 64 * 1024 * 1024; // 64 MB ring buffer backpressure
+constexpr size_t   LARGE_CHUNK_SIZE    = 2 * 1024 * 1024; // 2 MB high-throughput streaming chunk
+constexpr size_t   MAX_IN_FLIGHT_BYTES = 128 * 1024 * 1024; // 128 MB ring buffer backpressure
 constexpr int      PAIRING_TIMEOUT_SEC = 5;           // 5 seconds fast pairing timeout
 
 enum class DeviceType : uint8_t {

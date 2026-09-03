@@ -296,13 +296,14 @@ bool TransferEngine::sendFileBatch(int sockFd,
         std::set<uint32_t> completedChunks = loadResumeJournal(journalPath);
 
         // High-Speed Double-Buffered Async Sender Engine
-        BufferPool sendPool(8, chunkSize);
-        AsyncChunkQueue sendQueue(8);
+        const size_t POOL_SIZE = 16;
+        BufferPool sendPool(POOL_SIZE, chunkSize);
+        AsyncChunkQueue sendQueue(POOL_SIZE);
         std::atomic<bool> readerSuccess{true};
 
-        // Launch background disk reader thread to pre-read next 1MB chunk while current chunk is sending
+        // Launch background disk reader thread to pre-read next chunk while current chunk is sending
         std::thread diskReaderThread([&]() {
-            std::vector<char> fileStreamBuf(2 * 1024 * 1024);
+            std::vector<char> fileStreamBuf(4 * 1024 * 1024);
             std::ifstream file;
             file.rdbuf()->pubsetbuf(fileStreamBuf.data(), fileStreamBuf.size());
             file.open(localPath, std::ios::binary);
@@ -576,8 +577,11 @@ bool TransferEngine::receiveFileBatch(int sockFd,
         if (fd < 0) {
             return false;
         }
+#if defined(POSIX_FADV_SEQUENTIAL)
+        posix_fadvise(fd, 0, 0, POSIX_FADV_SEQUENTIAL);
+#endif
 #else
-        std::vector<char> fileStreamBuf(2 * 1024 * 1024);
+        std::vector<char> fileStreamBuf(4 * 1024 * 1024);
         std::fstream file;
         file.rdbuf()->pubsetbuf(fileStreamBuf.data(), fileStreamBuf.size());
 

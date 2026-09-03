@@ -97,6 +97,11 @@ fi
 
 chmod +x "$ROOT_DIR/release/aerosync_daemon" 2>/dev/null || true
 chmod +x "$ROOT_DIR/release/AeroSync" 2>/dev/null || true
+if [ -f "$ROOT_DIR/Start_AeroSync_Linux.sh" ]; then
+    cp "$ROOT_DIR/Start_AeroSync_Linux.sh" "$ROOT_DIR/release/Start_AeroSync_Linux.sh" 2>/dev/null || true
+    chmod +x "$ROOT_DIR/Start_AeroSync_Linux.sh" 2>/dev/null || true
+    chmod +x "$ROOT_DIR/release/Start_AeroSync_Linux.sh" 2>/dev/null || true
+fi
 if [ -f "$ROOT_DIR/release/AeroSync-v1.0.7-x86_64.AppImage" ]; then
     chmod +x "$ROOT_DIR/release/AeroSync-v1.0.7-x86_64.AppImage" 2>/dev/null || true
 fi

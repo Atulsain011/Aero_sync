@@ -4,6 +4,10 @@ project(aerosync_core CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(NOT MSVC)
+    add_compile_options(-O3)
+endif()
+
 set(CORE_SOURCES
     src/pairing_state_machine.cpp
     src/protocol_serializer.cpp

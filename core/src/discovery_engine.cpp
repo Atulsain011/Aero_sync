@@ -350,7 +350,22 @@ void DiscoveryEngine::broadcastLoop() {
             }
         }
 
-        // 2. Send mDNS multicast fallback on 224.0.0.251:5353
+        // 2. Send multicast fallback on 224.0.0.251:48123 and 239.255.48.123:48123
+        sockaddr_in mdnsPort48123{};
+        mdnsPort48123.sin_family = AF_INET;
+        mdnsPort48123.sin_port = htons(DISCOVERY_UDP_PORT);
+        inet_pton(AF_INET, "224.0.0.251", &mdnsPort48123.sin_addr);
+        sendto(sendSock, jsonPacket.c_str(), static_cast<int>(jsonPacket.length()), 0,
+               (sockaddr*)&mdnsPort48123, sizeof(mdnsPort48123));
+
+        sockaddr_in mcAddr{};
+        mcAddr.sin_family = AF_INET;
+        mcAddr.sin_port = htons(DISCOVERY_UDP_PORT);
+        inet_pton(AF_INET, DISCOVERY_MULTICAST_IP, &mcAddr.sin_addr);
+        sendto(sendSock, jsonPacket.c_str(), static_cast<int>(jsonPacket.length()), 0,
+               (sockaddr*)&mcAddr, sizeof(mcAddr));
+
+        // 3. Send standard mDNS fallback on 224.0.0.251:5353
         sendto(sendSock, jsonPacket.c_str(), static_cast<int>(jsonPacket.length()), 0,
                (sockaddr*)&mdnsAddr, sizeof(mdnsAddr));
 
@@ -427,11 +442,16 @@ void DiscoveryEngine::listenLoop() {
 
     AERO_LOG_I("[DISCOVERY_SOCKET_BOUND] Bound discovery UDP port %d successfully", DISCOVERY_UDP_PORT);
 
-    // Join local multicast group for robust hotspot discovery
+    // Join local multicast groups for robust discovery
     ip_mreq mreq{};
     inet_pton(AF_INET, DISCOVERY_MULTICAST_IP, &mreq.imr_multiaddr);
     mreq.imr_interface.s_addr = htonl(INADDR_ANY);
     setsockopt(listenSock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char*)&mreq, sizeof(mreq));
+
+    ip_mreq mdnsMreq{};
+    inet_pton(AF_INET, "224.0.0.251", &mdnsMreq.imr_multiaddr);
+    mdnsMreq.imr_interface.s_addr = htonl(INADDR_ANY);
+    setsockopt(listenSock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char*)&mdnsMreq, sizeof(mdnsMreq));
 
     m_udpSocket = static_cast<int>(listenSock);
     char buffer[2048];

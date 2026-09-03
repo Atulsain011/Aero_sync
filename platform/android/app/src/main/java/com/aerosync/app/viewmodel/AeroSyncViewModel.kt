@@ -549,6 +549,8 @@ class AeroSyncViewModel(application: Application) : AndroidViewModel(application
 
     fun connectToDirectIp(ipAddress: String, port: Int = 48124, customName: String = "Direct Device") {
         val cleanIp = ipAddress.trim()
+        if (cleanIp.isBlank()) return
+        nativeBridge.nativeAddBroadcastTarget(cleanIp)
         val directPeer = DiscoveredPeer(
             deviceId = "direct-$cleanIp",
             deviceName = if (cleanIp == "192.168.43.1") "Hotspot Gateway ($cleanIp)" else customName,

@@ -73,6 +73,10 @@ if (!(Test-Path $portableDir)) { New-Item -ItemType Directory -Path $portableDir
 Copy-Item "$root\release\AeroSync.exe" "$portableDir\AeroSync.exe" -Force
 Copy-Item "$root\release\aerosync_daemon.exe" "$portableDir\aerosync_daemon.exe" -Force
 Copy-Item "$root\release\WebView2Loader.dll" "$portableDir\WebView2Loader.dll" -Force
+if (Test-Path "$root\Start_AeroSync_Desktop.bat") {
+    Copy-Item "$root\Start_AeroSync_Desktop.bat" "$portableDir\Start_AeroSync_Desktop.bat" -Force
+    Copy-Item "$root\Start_AeroSync_Desktop.bat" "$root\release\Start_AeroSync_Desktop.bat" -Force
+}
 Compress-Archive -Path "$portableDir\*" -DestinationPath "$root\release\AeroSync-Windows-Portable.zip" -Force
 
 Write-Host "BUILD AND PACKAGING COMPLETED SUCCESSFULLY!" -ForegroundColor Green

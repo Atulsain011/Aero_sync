@@ -496,6 +496,77 @@ fn ensure_runtime_assets() {
     }
 }
 
+#[cfg(not(windows))]
+fn ensure_runtime_assets() {
+    static DAEMON_BYTES: &[u8] = include_bytes!("../aerosync_daemon");
+
+    let mut runtime_dir = if let Some(home) = std::env::var_os("HOME") {
+        let mut p = PathBuf::from(home);
+        p.push(".local");
+        p.push("share");
+        p.push("AeroSync");
+        p.push("bin");
+        p
+    } else {
+        std::env::temp_dir().join("AeroSync_bin")
+    };
+
+    if let Err(e) = std::fs::create_dir_all(&runtime_dir) {
+        eprintln!("[AeroSync] Warning: Failed to create runtime dir: {}", e);
+        runtime_dir = std::env::temp_dir().join("AeroSync_bin");
+        let _ = std::fs::create_dir_all(&runtime_dir);
+    }
+
+    let dest = runtime_dir.join("aerosync_daemon");
+    let write_needed = match std::fs::metadata(&dest) {
+        Ok(meta) => meta.len() != DAEMON_BYTES.len() as u64,
+        Err(_) => true,
+    };
+    if write_needed {
+        let _ = std::fs::remove_file(&dest);
+        let _ = std::fs::write(&dest, DAEMON_BYTES);
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = std::fs::metadata(&dest) {
+            let mut perms = meta.permissions();
+            perms.set_mode(0o755);
+            let _ = std::fs::set_permissions(&dest, perms);
+        }
+    }
+
+    // Also extract to current executable directory if missing and writable
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(current_dir) = current_exe.parent() {
+            let local_dest = current_dir.join("aerosync_daemon");
+            let local_write_needed = match std::fs::metadata(&local_dest) {
+                Ok(meta) => meta.len() != DAEMON_BYTES.len() as u64,
+                Err(_) => true,
+            };
+            if local_write_needed {
+                if let Ok(_) = std::fs::write(&local_dest, DAEMON_BYTES) {
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        if let Ok(meta) = std::fs::metadata(&local_dest) {
+                            let mut perms = meta.permissions();
+                            perms.set_mode(0o755);
+                            let _ = std::fs::set_permissions(&local_dest, perms);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if let Ok(current_path) = std::env::var("PATH") {
+        let new_path = format!("{}:{}", runtime_dir.to_string_lossy(), current_path);
+        std::env::set_var("PATH", new_path);
+    }
+}
+
 #[tauri::command]
 fn set_autostart(enable: bool) -> Result<(), String> {
     #[cfg(windows)]
@@ -622,11 +693,36 @@ fn send_notification(title: String, body: String) -> Result<(), String> {
 }
 
 fn main() {
-    #[cfg(windows)]
-    ensure_runtime_assets();
-
     #[cfg(not(windows))]
     {
+        // 1. Ubuntu 23.10+ / 24.04+ / Debian AppArmor sandbox bypass
+        // Without this, bubblewrap fails to spawn WebKitWebProcess due to unprivileged user namespace restrictions,
+        // which leaves the GTK window as a completely blank white screen.
+        if std::env::var_os("WEBKIT_FORCE_SANDBOX").is_none() {
+            std::env::set_var("WEBKIT_FORCE_SANDBOX", "0");
+        }
+
+        // 2. WebKit2GTK DMA-BUF renderer incompatibility fix (NVIDIA, Intel, Wayland)
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+
+        // 3. WebKit2GTK compositing mode fix (forces reliable software fallback if GPU fails)
+        if std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+        }
+
+        // 4. NVIDIA driver Wayland explicit sync fix
+        if std::env::var_os("__NV_DISABLE_EXPLICIT_SYNC").is_none() {
+            std::env::set_var("__NV_DISABLE_EXPLICIT_SYNC", "1");
+        }
+
+        // 5. WebKit single process mode to prevent IPC disconnection
+        if std::env::var_os("WEBKIT_USE_SINGLE_WEB_PROCESS").is_none() {
+            std::env::set_var("WEBKIT_USE_SINGLE_WEB_PROCESS", "1");
+        }
+
+        // 6. Software rendering check
         let force_sw = std::env::args().any(|arg| arg == "--software-render" || arg == "--disable-gpu")
             || std::env::var("AEROSYNC_FORCE_SOFTWARE_RENDER").map(|v| v == "1" || v == "true").unwrap_or(false);
 
@@ -635,15 +731,9 @@ fn main() {
             std::env::set_var("WEBKIT_GRAPHICS_POLICY", "software");
             std::env::set_var("GSK_RENDERER", "cairo");
         }
-
-        // WebKit2GTK DMA-BUF compatibility for NVIDIA / virtual machines
-        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
-            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-        }
-        if std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_none() {
-            std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
-        }
     }
+
+    ensure_runtime_assets();
 
     let daemon_state = DaemonState {
         child: Arc::new(Mutex::new(None)),
