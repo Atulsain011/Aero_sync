@@ -11,6 +11,7 @@
 #include <fstream>
 #include <random>
 #include <iomanip>
+#include <cstring>
 
 #ifdef _WIN32
     #include <winsock2.h>

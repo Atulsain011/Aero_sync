@@ -3,6 +3,7 @@
 #include "aerosync/connection_manager.hpp"
 #include "aerosync/protocol_serializer.hpp"
 #include <fstream>
+#include <sstream>
 #include <iostream>
 #include <chrono>
 #include <queue>
