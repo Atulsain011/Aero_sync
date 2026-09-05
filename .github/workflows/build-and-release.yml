@@ -798,7 +798,7 @@ jobs:
           echo "Real Cross-Process Peer Discovery Protocol verification PASSED (100%)."
 
           # Cleanup temporary verification directories
-          rm -rf /tmp/verify_deb /tmp/verify_appimage /tmp/aerosync_*.log /tmp/peer*.log
+          sudo rm -rf /tmp/verify_deb /tmp/verify_appimage /tmp/aerosync_*.log /tmp/peer*.log /tmp/peer*
           echo "=========================================================="
           echo " ALL 15 LINUX PIPELINE VERIFICATION GATES PASSED (100%)"
           echo "=========================================================="
