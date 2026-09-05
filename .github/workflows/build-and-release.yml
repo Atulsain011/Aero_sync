@@ -326,6 +326,7 @@ jobs:
           fi
           mkdir -p /tmp/verify_deb
           dpkg-deb -x "$deb_file" /tmp/verify_deb
+          dpkg-deb -e "$deb_file" /tmp/verify_deb/DEBIAN
 
           desktop_file="/tmp/verify_deb/usr/share/applications/aerosync.desktop"
           if [ ! -f "$desktop_file" ]; then
@@ -452,6 +453,14 @@ jobs:
       # ------------------------------------------------------------------------
       - name: 13. Verify Executable Permissions
         run: |
+          deb_file="release/aerosync_1.0.8_amd64.deb"
+          if [ ! -f "$deb_file" ]; then
+            deb_file="release/AeroSync-Linux-x86_64.deb"
+          fi
+          if [ ! -f "/tmp/verify_deb/DEBIAN/postinst" ]; then
+            mkdir -p /tmp/verify_deb/DEBIAN
+            dpkg-deb -e "$deb_file" /tmp/verify_deb/DEBIAN
+          fi
           echo "=== Checking DEB Executable Permissions ==="
           for exe_file in \
             "/tmp/verify_deb/usr/bin/aerosync" \
