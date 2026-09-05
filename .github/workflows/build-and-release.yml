@@ -913,10 +913,10 @@ jobs:
         run: |
           echo "=== 4. Verifying No Developer Dependencies Needed ==="
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0 xvfb curl iproute2
+          sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0 libayatana-appindicator3-1 xvfb curl iproute2
 
           echo "=== 3. Installing Single Release File (aerosync_1.0.8_amd64.deb) ==="
-          sudo dpkg -i clean-test-artifacts/aerosync_1.0.8_amd64.deb
+          sudo apt-get install -y ./clean-test-artifacts/aerosync_1.0.8_amd64.deb
 
           which aerosync
           [ -x /usr/bin/aerosync ] || (echo "Error: /usr/bin/aerosync missing!" >&2; exit 1)
