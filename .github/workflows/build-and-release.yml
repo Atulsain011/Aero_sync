@@ -274,8 +274,8 @@ jobs:
           fi
           appimage_size=$(stat -c %s "$appimage_file")
           echo "AppImage size: $appimage_size bytes"
-          if [ "$appimage_size" -lt 10000000 ]; then
-            echo "Error: AppImage is suspiciously small ($appimage_size bytes, expected >= 10MB)!" >&2
+          if [ "$appimage_size" -lt 5000000 ]; then
+            echo "Error: AppImage is suspiciously small ($appimage_size bytes, expected >= 5MB)!" >&2
             exit 1
           fi
 

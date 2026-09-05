@@ -10,21 +10,16 @@ export PATH="$SCRIPT_DIR:$SCRIPT_DIR/release:$SCRIPT_DIR/build_linux:$PATH"
 # Fix 1: Ubuntu 24.04/23.10 and Debian 12 AppArmor sandbox fix (prevents WebKitWebProcess crash & white display)
 export WEBKIT_FORCE_SANDBOX=0
 
-# Fix 2: WebKitGTK DMA-BUF compatibility flags for flawless rendering across all Linux distros
-export WEBKIT_DISABLE_DMABUF_RENDERER=1
-export WEBKIT_DISABLE_COMPOSITING_MODE=1
-
-# Fix 3: NVIDIA driver Wayland explicit sync fix
+# Fix 2: NVIDIA driver Wayland explicit sync fix
 export __NV_DISABLE_EXPLICIT_SYNC=1
-
-# Fix 4: Single WebProcess mode to prevent IPC disconnection
-export WEBKIT_USE_SINGLE_WEB_PROCESS=1
 
 # Software rendering fallback if GPU acceleration fails or is explicitly passed
 if [ "$AEROSYNC_FORCE_SOFTWARE_RENDER" = "1" ] || [[ "$*" == *"--software-render"* ]] || [[ "$*" == *"--disable-gpu"* ]]; then
     export LIBGL_ALWAYS_SOFTWARE=1
     export WEBKIT_GRAPHICS_POLICY=software
     export GSK_RENDERER=cairo
+    export WEBKIT_DISABLE_COMPOSITING_MODE=1
+    export WEBKIT_DISABLE_DMABUF_RENDERER=1
 fi
 
 # Auto-grant execution permissions to binaries if needed

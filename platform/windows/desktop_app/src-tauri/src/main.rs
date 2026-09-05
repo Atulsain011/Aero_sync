@@ -327,11 +327,8 @@ fn send_notification(title: String, body: String) -> Result<(), String> {
 fn main() {
     #[cfg(not(windows))]
     {
-        if std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_none() {
-            std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
-        }
-        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
-            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        if std::env::var_os("WEBKIT_FORCE_SANDBOX").is_none() {
+            std::env::set_var("WEBKIT_FORCE_SANDBOX", "0");
         }
     }
 

@@ -117,39 +117,8 @@ mkdir -p "$STAGING_LIB_DIR/webkit2gtk-4.1"
 mkdir -p "$STAGING_LIB_DIR/webkit2gtk-4.1/injected-bundle"
 mkdir -p "$STAGING_LIB_DIR/gio/modules"
 
-# Locate WebKitGTK helper processes and injected bundle
-WEBKIT_DIR=""
-for candidate in \
-    "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1" \
-    "/usr/lib64/webkit2gtk-4.1" \
-    "/usr/lib/webkit2gtk-4.1" \
-    "/usr/libexec/webkit2gtk-4.1"; do
-    if [ -d "$candidate" ] && [ -f "$candidate/WebKitWebProcess" ]; then
-        WEBKIT_DIR="$candidate"
-        break
-    fi
-done
-
-if [ -n "$WEBKIT_DIR" ]; then
-    echo "Found WebKitGTK helper dir: $WEBKIT_DIR"
-    cp "$WEBKIT_DIR/WebKitWebProcess" "$STAGING_LIB_DIR/webkit2gtk-4.1/" 2>/dev/null || true
-    cp "$WEBKIT_DIR/WebKitNetworkProcess" "$STAGING_LIB_DIR/webkit2gtk-4.1/" 2>/dev/null || true
-    if [ -f "$WEBKIT_DIR/injected-bundle/libwebkit2gtkinjectedbundle.so" ]; then
-        cp "$WEBKIT_DIR/injected-bundle/libwebkit2gtkinjectedbundle.so" "$STAGING_LIB_DIR/webkit2gtk-4.1/injected-bundle/" 2>/dev/null || true
-    fi
-fi
-
-# Locate GIO TLS module (for HTTPS in soup3)
-for gio_cand in \
-    "/usr/lib/x86_64-linux-gnu/gio/modules/libgiognutls.so" \
-    "/usr/lib64/gio/modules/libgiognutls.so" \
-    "/usr/lib/gio/modules/libgiognutls.so"; do
-    if [ -f "$gio_cand" ]; then
-        echo "Found GIO TLS module: $gio_cand"
-        cp "$gio_cand" "$STAGING_LIB_DIR/gio/modules/" 2>/dev/null || true
-        break
-    fi
-done
+# WebKitGTK helper processes (WebKitWebProcess, WebKitNetworkProcess) and GIO modules
+# are host system components and must match the host's installed WebKitGTK 4.1 runtime.
 
 # Library Exclude List: Core base system libraries and GPU/display driver interfaces
 # that MUST be resolved dynamically by the host Linux distribution.
@@ -168,12 +137,10 @@ should_exclude() {
     esac
 }
 
-# Seed libraries to bundle (WebKitGTK, JavaScriptCore, libsoup3, and their non-system deps)
-SEED_LIBS=(
-    "libwebkit2gtk-4.1.so.0"
-    "libjavascriptcoregtk-4.1.so.0"
-    "libsoup-3.0.so.0"
-)
+# Note on WebKitGTK: WebKitGTK 4.1, GTK3, GIO, Mesa, and Wayland/X11 are core host system
+# dependencies. Bundling a conflicting build-host WebKitGTK shared library causes fatal
+# ABI and IPC collisions with the host's WebKitWebProcess and GIO event loop.
+SEED_LIBS=()
 
 for seed in "${SEED_LIBS[@]}"; do
     found_path=""
@@ -539,31 +506,20 @@ fi
 
 # 3. Configure Environment for WebKitGTK & System Integration
 export PATH="$HERE/usr/bin:$HERE:$PATH"
-export LD_LIBRARY_PATH="$HERE/usr/lib:$HERE/usr/lib/webkit2gtk-4.1:$LD_LIBRARY_PATH"
-
-if [ -d "$HERE/usr/lib/webkit2gtk-4.1" ]; then
-    export WEBKIT_EXEC_PATH="$HERE/usr/lib/webkit2gtk-4.1"
-    export WEBKIT_INJECTED_BUNDLE_PATH="$HERE/usr/lib/webkit2gtk-4.1/injected-bundle"
-fi
-
-if [ -d "$HERE/usr/lib/gio/modules" ]; then
-    export GIO_MODULE_DIR="$HERE/usr/lib/gio/modules"
-fi
 
 # Ubuntu 24.04/23.10 and Debian 12 AppArmor unprivileged user namespace fix
 export WEBKIT_FORCE_SANDBOX=0
 
-# WebKitGTK Linux DMA-BUF & Compositing compatibility flags
-export WEBKIT_DISABLE_DMABUF_RENDERER=1
-export WEBKIT_DISABLE_COMPOSITING_MODE=1
+# NVIDIA driver Wayland explicit sync fix
 export __NV_DISABLE_EXPLICIT_SYNC=1
-export WEBKIT_USE_SINGLE_WEB_PROCESS=1
 
 # Software rendering fallback if GPU acceleration fails or is forced
 if [ "$AEROSYNC_FORCE_SOFTWARE_RENDER" = "1" ] || [[ "$*" == *"--software-render"* ]] || [[ "$*" == *"--disable-gpu"* ]]; then
     export LIBGL_ALWAYS_SOFTWARE=1
     export WEBKIT_GRAPHICS_POLICY=software
     export GSK_RENDERER=cairo
+    export WEBKIT_DISABLE_COMPOSITING_MODE=1
+    export WEBKIT_DISABLE_DMABUF_RENDERER=1
 fi
 
 # 4. Start C++ Daemon in Background if not active
@@ -721,18 +677,6 @@ chmod 755 "$DEB_DIR/usr/lib/aerosync/aerosync"
 cp "$DAEMON_BIN" "$DEB_DIR/usr/lib/aerosync/aerosync_daemon"
 chmod 755 "$DEB_DIR/usr/lib/aerosync/aerosync_daemon"
 
-# Copy any bundled auxiliary libraries if present
-if [ -d "$STAGING_LIB_DIR" ] && [ "$(ls -A "$STAGING_LIB_DIR" 2>/dev/null)" ]; then
-    mkdir -p "$DEB_DIR/usr/lib/aerosync/lib"
-    cp -a "$STAGING_LIB_DIR"/* "$DEB_DIR/usr/lib/aerosync/lib/" 2>/dev/null || true
-fi
-
-# Apply RPATH for /usr/lib/aerosync binaries
-if command -v patchelf >/dev/null 2>&1; then
-    patchelf --set-rpath '$ORIGIN/lib:$ORIGIN' "$DEB_DIR/usr/lib/aerosync/aerosync" 2>/dev/null || true
-    patchelf --set-rpath '$ORIGIN/lib:$ORIGIN' "$DEB_DIR/usr/lib/aerosync/aerosync_daemon" 2>/dev/null || true
-fi
-
 # Create launcher in /usr/bin/aerosync
 cat <<'EOF' > "$DEB_DIR/usr/bin/aerosync"
 #!/usr/bin/env bash
@@ -767,19 +711,19 @@ if command -v ldd >/dev/null 2>&1 && [ -f "$LIB_DIR/aerosync" ]; then
 fi
 
 export PATH="$LIB_DIR:$PATH"
-export LD_LIBRARY_PATH="$LIB_DIR:$LIB_DIR/lib:$LD_LIBRARY_PATH"
 
-# Stability & rendering compatibility flags
+# Ubuntu 24.04/23.10 and Debian 12 AppArmor unprivileged user namespace fix
 export WEBKIT_FORCE_SANDBOX=0
-export WEBKIT_DISABLE_DMABUF_RENDERER=1
-export WEBKIT_DISABLE_COMPOSITING_MODE=1
+
+# NVIDIA driver Wayland explicit sync fix
 export __NV_DISABLE_EXPLICIT_SYNC=1
-export WEBKIT_USE_SINGLE_WEB_PROCESS=1
 
 if [ "$AEROSYNC_FORCE_SOFTWARE_RENDER" = "1" ] || [[ "$*" == *"--software-render"* ]] || [[ "$*" == *"--disable-gpu"* ]]; then
     export LIBGL_ALWAYS_SOFTWARE=1
     export WEBKIT_GRAPHICS_POLICY=software
     export GSK_RENDERER=cairo
+    export WEBKIT_DISABLE_COMPOSITING_MODE=1
+    export WEBKIT_DISABLE_DMABUF_RENDERER=1
 fi
 
 # Start native daemon in background if not running

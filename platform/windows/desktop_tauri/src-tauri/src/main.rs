@@ -1012,27 +1012,12 @@ fn main() {
             std::env::set_var("WEBKIT_FORCE_SANDBOX", "0");
         }
 
-        // 2. WebKit2GTK DMA-BUF renderer incompatibility fix (NVIDIA, Intel, Wayland)
-        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
-            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-        }
-
-        // 3. WebKit2GTK compositing mode fix (forces reliable software fallback if GPU fails)
-        if std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_none() {
-            std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
-        }
-
-        // 4. NVIDIA driver Wayland explicit sync fix
+        // 2. NVIDIA driver Wayland explicit sync fix
         if std::env::var_os("__NV_DISABLE_EXPLICIT_SYNC").is_none() {
             std::env::set_var("__NV_DISABLE_EXPLICIT_SYNC", "1");
         }
 
-        // 5. WebKit single process mode to prevent IPC disconnection
-        if std::env::var_os("WEBKIT_USE_SINGLE_WEB_PROCESS").is_none() {
-            std::env::set_var("WEBKIT_USE_SINGLE_WEB_PROCESS", "1");
-        }
-
-        // 6. Software rendering check
+        // 3. Software rendering fallback (only when explicitly requested)
         let force_sw = std::env::args().any(|arg| arg == "--software-render" || arg == "--disable-gpu")
             || std::env::var("AEROSYNC_FORCE_SOFTWARE_RENDER").map(|v| v == "1" || v == "true").unwrap_or(false);
 
@@ -1040,6 +1025,8 @@ fn main() {
             std::env::set_var("LIBGL_ALWAYS_SOFTWARE", "1");
             std::env::set_var("WEBKIT_GRAPHICS_POLICY", "software");
             std::env::set_var("GSK_RENDERER", "cairo");
+            std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
         }
     }
 
