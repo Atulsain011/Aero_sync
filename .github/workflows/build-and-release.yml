@@ -237,7 +237,7 @@ jobs:
       - name: 6. Build Tauri Linux Application
         working-directory: platform/windows/desktop_tauri
         run: |
-          cargo build --release
+          cargo build --release --manifest-path src-tauri/Cargo.toml
           desktop_bin="src-tauri/target/release/aerosync-desktop"
           if [ ! -f "$desktop_bin" ]; then
             echo "Error: Tauri desktop binary not found at $desktop_bin!" >&2
@@ -860,8 +860,10 @@ jobs:
           mkdir -p artifacts
           if [ -f "platform/android/app/build/outputs/apk/release/app-release.apk" ]; then
             cp platform/android/app/build/outputs/apk/release/app-release.apk artifacts/AeroSync.apk
+            cp platform/android/app/build/outputs/apk/release/app-release.apk artifacts/AeroSync-v1.0.8.apk
           elif [ -f "platform/android/app/build/outputs/apk/release/app-release-unsigned.apk" ]; then
             cp platform/android/app/build/outputs/apk/release/app-release-unsigned.apk artifacts/AeroSync.apk
+            cp platform/android/app/build/outputs/apk/release/app-release-unsigned.apk artifacts/AeroSync-v1.0.8.apk
           else
             echo "Error: Release APK not found!" >&2
             exit 1
@@ -871,7 +873,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AeroSync-Android
-          path: artifacts/AeroSync.apk
+          path: artifacts/*
           if-no-files-found: error
 
   test-clean-machine-linux:
