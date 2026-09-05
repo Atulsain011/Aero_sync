@@ -18,10 +18,11 @@ static std::string generateRandomId() {
 
 AeroSyncApp::AeroSyncApp(const std::string& deviceId,
                          const std::string& deviceName,
-                         DeviceType deviceType)
+                         DeviceType deviceType,
+                         uint16_t transferPort)
     : m_deviceId(deviceId), m_deviceName(deviceName), m_deviceType(deviceType) {
-    m_discovery = std::make_unique<DiscoveryEngine>(m_deviceId, m_deviceName, m_deviceType);
-    m_connection = std::make_unique<ConnectionManager>();
+    m_discovery = std::make_unique<DiscoveryEngine>(m_deviceId, m_deviceName, m_deviceType, transferPort);
+    m_connection = std::make_unique<ConnectionManager>(transferPort);
 }
 
 AeroSyncApp::~AeroSyncApp() {
@@ -106,26 +107,63 @@ bool AeroSyncApp::sendFiles(const PeerInfo& targetPeer,
     manifest.senderId = m_deviceId;
     manifest.senderName = m_deviceName;
     manifest.sessionToken = m_connection->getPairingStateMachine().getSessionToken();
-    manifest.totalFiles = static_cast<uint32_t>(filePaths.size());
     manifest.chunkSize = LARGE_CHUNK_SIZE;
     manifest.streamCount = PARALLEL_STREAMS;
 
     uint64_t totalBytes = 0;
     std::vector<std::filesystem::path> localPaths;
-    for (size_t i = 0; i < filePaths.size(); ++i) {
-        std::filesystem::path p(filePaths[i]);
-        uint64_t sz = std::filesystem::exists(p) ? std::filesystem::file_size(p) : 0;
 
-        FileMetadata fm;
-        fm.fileIndex = static_cast<uint32_t>(i);
-        fm.relativePath = p.filename().string();
-        fm.fileSize = sz;
+    for (const auto& rawPathStr : filePaths) {
+        std::filesystem::path p(rawPathStr);
+        std::error_code ec;
+        if (!std::filesystem::exists(p, ec)) {
+            continue;
+        }
 
-        totalBytes += sz;
-        manifest.files.push_back(fm);
-        localPaths.push_back(p);
+        if (std::filesystem::is_directory(p, ec)) {
+            std::string rootDirName = p.filename().string();
+            if (rootDirName.empty() && p.has_parent_path()) {
+                rootDirName = p.parent_path().filename().string();
+            }
+            if (rootDirName.empty()) {
+                rootDirName = "folder";
+            }
+
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(p, std::filesystem::directory_options::skip_permission_denied, ec)) {
+                if (entry.is_regular_file(ec)) {
+                    std::filesystem::path rel = std::filesystem::relative(entry.path(), p, ec);
+                    std::string relStr = (std::filesystem::path(rootDirName) / rel).generic_string();
+
+                    uint64_t sz = entry.file_size(ec);
+                    FileMetadata fm;
+                    fm.fileIndex = static_cast<uint32_t>(manifest.files.size());
+                    fm.relativePath = relStr;
+                    fm.fileSize = sz;
+
+                    totalBytes += sz;
+                    manifest.files.push_back(fm);
+                    localPaths.push_back(entry.path());
+                }
+            }
+        } else if (std::filesystem::is_regular_file(p, ec)) {
+            uint64_t sz = std::filesystem::file_size(p, ec);
+            FileMetadata fm;
+            fm.fileIndex = static_cast<uint32_t>(manifest.files.size());
+            fm.relativePath = p.filename().generic_string();
+            fm.fileSize = sz;
+
+            totalBytes += sz;
+            manifest.files.push_back(fm);
+            localPaths.push_back(p);
+        }
     }
+
+    manifest.totalFiles = static_cast<uint32_t>(manifest.files.size());
     manifest.totalBytes = totalBytes;
+
+    if (manifest.files.empty()) {
+        return false;
+    }
 
     return m_connection->requestTransfer(targetPeer, manifest, localPaths, progressCb);
 }

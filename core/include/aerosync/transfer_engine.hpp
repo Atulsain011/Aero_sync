@@ -28,6 +28,10 @@ public:
                                 std::atomic<bool>& cancelSignal,
                                 uint64_t resumeByteOffset = 0);
 
+    // Relative path sanitization & duplicate resolution
+    static std::string sanitizeRelativePath(const std::string& rawPath);
+    static std::filesystem::path resolveNonCollidingPath(const std::filesystem::path& targetPath);
+
     // Parallel multi-stream worker routines
     static bool sendStreamChunk(int streamSockFd, const ChunkHeader& header, const uint8_t* buffer, size_t length);
     static bool receiveStreamChunk(int streamSockFd, ChunkHeader& outHeader, std::vector<uint8_t>& outBuffer);

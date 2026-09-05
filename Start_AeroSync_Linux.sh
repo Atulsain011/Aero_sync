@@ -41,6 +41,10 @@ if [ -f "$SCRIPT_DIR/AeroSync" ]; then
     AEROSYNC_BIN="$SCRIPT_DIR/AeroSync"
 elif [ -f "$SCRIPT_DIR/release/AeroSync" ]; then
     AEROSYNC_BIN="$SCRIPT_DIR/release/AeroSync"
+elif [ -f "$SCRIPT_DIR/release/AeroSync-v1.0.8-x86_64.AppImage" ]; then
+    AEROSYNC_BIN="$SCRIPT_DIR/release/AeroSync-v1.0.8-x86_64.AppImage"
+elif compgen -G "$SCRIPT_DIR/release/AeroSync-*.AppImage" > /dev/null; then
+    AEROSYNC_BIN=$(ls -t "$SCRIPT_DIR"/release/AeroSync-*.AppImage | head -n 1)
 elif [ -f "$SCRIPT_DIR/release/AeroSync-v1.0.7-x86_64.AppImage" ]; then
     AEROSYNC_BIN="$SCRIPT_DIR/release/AeroSync-v1.0.7-x86_64.AppImage"
 elif [ -f "$SCRIPT_DIR/build_linux_pkg/appimage/AeroSync.AppDir/AppRun" ]; then

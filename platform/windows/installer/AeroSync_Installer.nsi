@@ -10,7 +10,7 @@
 ; General Definitions
 ; ------------------------------------------------------------------------------
 !define PRODUCT_NAME "AeroSync"
-!define PRODUCT_VERSION "1.0.7"
+!define PRODUCT_VERSION "1.0.8"
 !define PRODUCT_PUBLISHER "AeroSync"
 !define PRODUCT_WEB_SITE "https://github.com/Atulsain011/Aero_sync"
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\AeroSync.exe"
@@ -18,7 +18,7 @@
 !define PRODUCT_UNINST_ROOT_KEY "HKCU"
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
-OutFile "..\..\..\release\AeroSync-Setup-v1.0.7.exe"
+OutFile "..\..\..\release\AeroSync-Setup-v1.0.8.exe"
 InstallDir "$LOCALAPPDATA\Programs\AeroSync"
 InstallDirRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_DIR_REGKEY}" ""
 RequestExecutionLevel user
@@ -27,14 +27,14 @@ SetCompressor zlib
 ; ------------------------------------------------------------------------------
 ; Version Information Resource (PE Header)
 ; ------------------------------------------------------------------------------
-VIProductVersion "1.0.7.0"
+VIProductVersion "1.0.8.0"
 VIAddVersionKey "ProductName" "AeroSync"
 VIAddVersionKey "Comments" "High-Speed Peer-to-Peer Local Network File Transfer"
 VIAddVersionKey "CompanyName" "AeroSync"
 VIAddVersionKey "LegalCopyright" "Copyright (C) 2026 AeroSync"
 VIAddVersionKey "FileDescription" "AeroSync Setup Installer"
-VIAddVersionKey "FileVersion" "1.0.7.0"
-VIAddVersionKey "ProductVersion" "1.0.7.0"
+VIAddVersionKey "FileVersion" "1.0.8.0"
+VIAddVersionKey "ProductVersion" "1.0.8.0"
 
 ; ------------------------------------------------------------------------------
 ; Interface Configuration & Branding

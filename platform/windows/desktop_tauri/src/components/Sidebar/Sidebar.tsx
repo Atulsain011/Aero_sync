@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Home,
   MonitorSmartphone,
@@ -6,7 +5,9 @@ import {
   Clock,
   Settings,
   HardDrive,
-  FolderOpen
+  FolderOpen,
+  Cpu,
+  RefreshCw
 } from 'lucide-react';
 import { formatBytes } from '../../utils/formatters';
 import { DiskSpace } from '../../types/aerosync';
@@ -19,6 +20,10 @@ interface SidebarProps {
   activeTransferCount: number;
   diskSpace: DiskSpace;
   downloadDirectory: string;
+  isDaemonOnline?: boolean;
+  daemonError?: string | null;
+  onRestartDaemon?: () => void;
+  isRestartingDaemon?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -27,7 +32,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   peerCount,
   activeTransferCount,
   diskSpace,
-  downloadDirectory
+  downloadDirectory,
+  isDaemonOnline = false,
+  daemonError,
+  onRestartDaemon,
+  isRestartingDaemon = false
 }) => {
   const usedBytes = Math.max(0, diskSpace.totalBytes - diskSpace.freeBytes);
   const usedPercent = diskSpace.totalBytes > 0
@@ -85,6 +94,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       <div className="sidebar-footer">
+        <div className={`sidebar-core-box ${isDaemonOnline ? 'sidebar-core-running' : 'sidebar-core-error'}`}>
+          <div className="sidebar-core-header">
+            <div className="sidebar-core-label">
+              <Cpu size={14} />
+              <span>AeroSync Core</span>
+            </div>
+            <div className={`sidebar-core-pill ${isDaemonOnline ? 'pill-running' : 'pill-not-running'}`}>
+              <span className="sidebar-core-symbol">{isDaemonOnline ? '●' : '✕'}</span>
+              <span>{isDaemonOnline ? 'Running' : 'Not running'}</span>
+            </div>
+          </div>
+          {!isDaemonOnline && (
+            <div className="sidebar-core-error-content">
+              <p className="sidebar-core-error-text">
+                {daemonError ? `${daemonError.slice(0, 75)}${daemonError.length > 75 ? '...' : ''}` : 'Daemon backend offline (127.0.0.1:48126)'}
+              </p>
+              {onRestartDaemon && (
+                <button
+                  className="sidebar-core-restart-btn"
+                  onClick={onRestartDaemon}
+                  disabled={isRestartingDaemon}
+                >
+                  <RefreshCw size={11} className={isRestartingDaemon ? 'animate-spin' : ''} />
+                  <span>{isRestartingDaemon ? 'Starting...' : 'Restart Core'}</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="storage-card">
           <div className="storage-header">
             <div className="storage-title-group">

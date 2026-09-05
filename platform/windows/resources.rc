@@ -22,12 +22,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "AeroSync"
             VALUE "FileDescription",  "AeroSync Peer-to-Peer Direct File Transfer Engine"
-            VALUE "FileVersion",      "1.0.7.0"
+            VALUE "FileVersion",      "1.0.8.0"
             VALUE "InternalName",     "aerosync"
             VALUE "LegalCopyright",   "Copyright (C) 2026 AeroSync"
             VALUE "OriginalFilename", "AeroSync.exe"
             VALUE "ProductName",      "AeroSync"
-            VALUE "ProductVersion",   "1.0.7.0"
+            VALUE "ProductVersion",   "1.0.8.0"
         END
     END
     BLOCK "VarFileInfo"

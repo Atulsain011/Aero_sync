@@ -4,10 +4,12 @@ import {
   FolderUp,
   MonitorSmartphone,
   ArrowUpDown,
-  Wifi,
+  Cpu,
   Sparkles,
   ChevronRight,
-  HardDrive
+  HardDrive,
+  Radio,
+  RefreshCw
 } from 'lucide-react';
 import { PeerInfo, TransferHistoryRecord, DiskSpace } from '../types/aerosync';
 import { formatBytes, formatTimestamp } from '../utils/formatters';
@@ -19,6 +21,9 @@ interface HomePageProps {
   diskSpace: DiskSpace;
   recentHistory: TransferHistoryRecord[];
   isDaemonOnline: boolean;
+  daemonError?: string | null;
+  onRestartDaemon?: () => void;
+  isRestartingDaemon?: boolean;
   statusMessage: string;
   onSendFiles: () => void;
   onSendFolder: () => void;
@@ -33,6 +38,9 @@ export const HomePage: React.FC<HomePageProps> = ({
   diskSpace,
   recentHistory,
   isDaemonOnline,
+  daemonError,
+  onRestartDaemon,
+  isRestartingDaemon = false,
   statusMessage,
   onSendFiles,
   onSendFolder,
@@ -109,14 +117,18 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
 
-        <div className="metric-card">
-          <div className="metric-icon-box metric-icon-green">
-            <Wifi size={20} />
+        <div className={`metric-card ${!isDaemonOnline ? 'metric-card-alert' : ''}`} onClick={() => onSelectTab('devices')}>
+          <div className={`metric-icon-box ${isDaemonOnline ? 'metric-icon-green' : 'metric-icon-red'}`}>
+            <Cpu size={20} />
           </div>
           <div className="metric-info">
-            <span className="metric-label">Network Status</span>
-            <strong className="metric-value">{isDaemonOnline ? 'Connected' : 'Offline'}</strong>
-            <span className="metric-subtext">Direct P2P LAN</span>
+            <span className="metric-label">AeroSync Core</span>
+            <strong className={`metric-value ${isDaemonOnline ? 'text-running' : 'text-stopped'}`}>
+              {isDaemonOnline ? '● Running' : '✕ Not running'}
+            </strong>
+            <span className="metric-subtext">
+              {isDaemonOnline ? 'Discovery & transfers active' : (daemonError ? 'Backend unavailable (click to fix)' : 'Core daemon offline')}
+            </span>
           </div>
         </div>
 
@@ -149,19 +161,60 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </section>
 
-      {/* Nearby Devices Quick Strip */}
+      {/* Nearby Devices Section */}
       <section className="section-block">
         <div className="section-header">
-          <h3 className="section-title">Nearby Devices</h3>
+          <div className="section-title-wrap">
+            <h3 className="section-title">Nearby Devices</h3>
+            {isDaemonOnline && (
+              <span className="discovery-searching-badge">
+                <span className="searching-pulse-dot"></span>
+                <span>Searching for AeroSync devices...</span>
+              </span>
+            )}
+          </div>
           <button className="section-link-btn" onClick={() => onSelectTab('devices')}>
             <span>View all</span>
             <ChevronRight size={14} />
           </button>
         </div>
 
-        {peers.length === 0 ? (
-          <div className="empty-strip">
-            <p>Scanning for nearby Windows and Android devices running AeroSync...</p>
+        {!isDaemonOnline ? (
+          <div className="core-backend-error-panel">
+            <div className="core-error-header">
+              <div className="core-error-badge">
+                <span className="badge-name">AeroSync Core</span>
+                <span className="badge-state state-not-running">✕ Not running</span>
+              </div>
+              {onRestartDaemon && (
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={onRestartDaemon}
+                  disabled={isRestartingDaemon}
+                >
+                  <RefreshCw size={13} className={isRestartingDaemon ? 'animate-spin' : ''} />
+                  <span>{isRestartingDaemon ? 'Starting Engine...' : 'Restart Core'}</span>
+                </button>
+              )}
+            </div>
+            <p className="core-error-desc">
+              <strong>Discovery backend is unavailable.</strong> {daemonError || 'The native AeroSync core daemon (127.0.0.1:48126) is offline. Device discovery is disabled until the core is started.'}
+            </p>
+          </div>
+        ) : peers.length === 0 ? (
+          <div className="nearby-searching-box">
+            <div className="searching-header-row">
+              <div className="searching-pulse-circle">
+                <Radio size={18} className="pulse-icon" />
+              </div>
+              <div className="searching-text-block">
+                <div className="searching-lead">Searching for AeroSync devices...</div>
+                <div className="searching-status-text">No AeroSync devices found on this network.</div>
+              </div>
+            </div>
+            <div className="searching-tip">
+              Ensure recipient devices have AeroSync open on Linux, Windows, or Android and are connected to the same Wi-Fi, Ethernet, or Mobile Hotspot subnet.
+            </div>
           </div>
         ) : (
           <div className="quick-peers-row">

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "AeroSync",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "identifier": "com.aerosync.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -34,9 +34,7 @@
     "category": "Utility",
     "shortDescription": "AeroSync Ultra High-Speed P2P Desktop Client",
     "longDescription": "AeroSync is an ultra high-speed peer-to-peer file transfer desktop application built with C++ and Tauri.",
-    "resources": [
-      "aerosync_daemon*"
-    ],
+    "resources": [],
     "icon": [
       "icons/icon.ico",
       "icons/16x16.png",
@@ -52,10 +50,10 @@
     "linux": {
       "deb": {
         "depends": [
-          "libwebkit2gtk-4.1-0 | libwebkit2gtk-4.0-37",
-          "libgtk-3-0",
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0 | libgtk-3-0t64",
           "libayatana-appindicator3-1 | libappindicator3-1",
-          "librsvg2-2",
+          "librsvg2-2 | librsvg2-2t64",
           "libssl3 | libssl1.1"
         ]
       },

@@ -85,10 +85,11 @@ struct PeerInfo {
     std::string deviceName;
     DeviceType deviceType{DeviceType::DEVICE_UNKNOWN};
     std::string platform;
-    std::string appVersion{"1.0.0"};
+    std::string appVersion{"1.0.8"};
     std::string ipAddress;
     uint16_t port{CONTROL_TCP_PORT};
     uint64_t lastSeenMs{0};
+    bool isResponse{false};
 };
 
 struct FileMetadata {

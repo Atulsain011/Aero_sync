@@ -221,8 +221,13 @@ std::string ProtocolSerializer::serializeDiscoveryBeacon(const PeerInfo& peer) {
        << "\"deviceId\":\"" << escapeJson(peer.deviceId) << "\","
        << "\"platform\":\"" << deviceTypeToString(peer.deviceType) << "\","
        << "\"app_version\":\"" << escapeJson(peer.appVersion) << "\","
+       << "\"appVersion\":\"" << escapeJson(peer.appVersion) << "\","
        << "\"listening_port\":" << peer.port << ","
-       << "\"timestamp_ms\":" << peer.lastSeenMs
+       << "\"listeningPort\":" << peer.port << ","
+       << "\"port\":" << peer.port << ","
+       << "\"timestamp_ms\":" << peer.lastSeenMs << ","
+       << "\"is_response\":" << (peer.isResponse ? "true" : "false") << ","
+       << "\"isResponse\":" << (peer.isResponse ? "true" : "false")
        << "}";
     return ss.str();
 }
@@ -259,10 +264,17 @@ bool ProtocolSerializer::deserializeDiscoveryBeacon(const std::string& data, con
         outPeer.deviceName = deviceName;
     }
 
-    outPeer.appVersion = appVerStr.empty() ? "1.0.0" : appVerStr;
+    outPeer.appVersion = appVerStr.empty() ? "1.0.8" : appVerStr;
     outPeer.ipAddress = senderIp;
     outPeer.port = static_cast<uint16_t>(port);
     outPeer.lastSeenMs = timestamp;
+
+    bool isResp = (data.find("\"is_response\":true") != std::string::npos ||
+                   data.find("\"is_response\": true") != std::string::npos ||
+                   data.find("\"isResponse\":true") != std::string::npos ||
+                   data.find("\"isResponse\": true") != std::string::npos);
+    outPeer.isResponse = isResp;
+
     return true;
 }
 

@@ -24,6 +24,9 @@ export const App: React.FC = () => {
     settings,
     diskSpace,
     isDaemonOnline,
+    isRestartingDaemon,
+    daemonError,
+    restartDaemonEngine,
     statusMessage,
     isTransferring,
     currentProgress,
@@ -78,7 +81,12 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-layout">
-      <TitleBar isDaemonOnline={isDaemonOnline} />
+      <TitleBar
+        isDaemonOnline={isDaemonOnline}
+        daemonError={daemonError}
+        onRestartDaemon={restartDaemonEngine}
+        isRestartingDaemon={isRestartingDaemon}
+      />
 
       <div className="app-workspace">
         <Sidebar
@@ -88,6 +96,10 @@ export const App: React.FC = () => {
           activeTransferCount={isTransferring ? 1 : queue.filter(q => q.status === 'waiting' || q.status === 'transferring').length}
           diskSpace={diskSpace}
           downloadDirectory={settings.downloadDirectory}
+          isDaemonOnline={isDaemonOnline}
+          daemonError={daemonError}
+          onRestartDaemon={restartDaemonEngine}
+          isRestartingDaemon={isRestartingDaemon}
         />
 
         <main className="app-main-content">
@@ -98,6 +110,9 @@ export const App: React.FC = () => {
               diskSpace={diskSpace}
               recentHistory={history}
               isDaemonOnline={isDaemonOnline}
+              daemonError={daemonError}
+              onRestartDaemon={restartDaemonEngine}
+              isRestartingDaemon={isRestartingDaemon}
               statusMessage={statusMessage}
               onSendFiles={handlePickAndSendFiles}
               onSendFolder={handlePickAndSendFolder}
@@ -114,6 +129,10 @@ export const App: React.FC = () => {
             <DevicesPage
               peers={peers}
               selectedPeer={selectedPeer}
+              isDaemonOnline={isDaemonOnline}
+              isRestartingDaemon={isRestartingDaemon}
+              daemonError={daemonError}
+              onRestartDaemon={restartDaemonEngine}
               onSelectPeer={setSelectedPeer}
               onSendFilesToPeer={handleSendFilesToPeer}
               onOpenDirectIpModal={() => setIsDirectIpModalOpen(true)}

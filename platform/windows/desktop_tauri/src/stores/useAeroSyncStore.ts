@@ -57,6 +57,8 @@ export function useAeroSyncStore() {
 
   // Telemetry & Daemon state
   const [isDaemonOnline, setIsDaemonOnline] = useState<boolean>(false);
+  const [isRestartingDaemon, setIsRestartingDaemon] = useState<boolean>(false);
+  const [daemonError, setDaemonError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>('Initializing AeroSync...');
   const [isTransferring, setIsTransferring] = useState<boolean>(false);
   const [currentProgress, setCurrentProgress] = useState<DaemonStatusResponse['currentProgress']>({
@@ -240,6 +242,30 @@ export function useAeroSyncStore() {
     }).catch(() => {});
   }, []);
 
+  // Restart daemon engine
+  const restartDaemonEngine = useCallback(async () => {
+    setIsRestartingDaemon(true);
+    setStatusMessage('Restarting AeroSync native engine...');
+    try {
+      const ok = await tauriBridge.restartDaemon();
+      if (ok) {
+        setIsDaemonOnline(true);
+        setDaemonError(null);
+        setStatusMessage('AeroSync native engine restarted.');
+      } else {
+        const st = await tauriBridge.getDaemonStatus();
+        setDaemonError(st.error || 'Failed to restart native engine. Port did not respond.');
+        setStatusMessage('Failed to restart native engine.');
+      }
+    } catch (err: any) {
+      setDaemonError(err?.message || 'Failed to communicate with desktop runtime');
+      setStatusMessage('Failed to trigger daemon restart.');
+    } finally {
+      setIsRestartingDaemon(false);
+      if (pollTriggerRef.current) pollTriggerRef.current();
+    }
+  }, []);
+
   // Update Settings
   const updateSettings = useCallback((partial: Partial<SettingsState>) => {
     setSettings(prev => {
@@ -265,6 +291,7 @@ export function useAeroSyncStore() {
         if (isCancelled) return;
 
         setIsDaemonOnline(true);
+        setDaemonError(null);
         const rawPeers = data.peers || [];
         const filteredPeers = rawPeers
           .filter(p => p.deviceId && p.deviceId !== data.deviceId && p.ipAddress !== '127.0.0.1')
@@ -370,6 +397,11 @@ export function useAeroSyncStore() {
         if (!isCancelled) {
           setIsDaemonOnline(false);
           setStatusMessage('Connecting to AeroSync native engine...');
+          tauriBridge.getDaemonStatus().then(st => {
+            if (!isCancelled && !st.port_listening) {
+              setDaemonError(st.error || (st.daemon_path ? `Daemon offline on port ${st.port} (${st.daemon_path})` : 'Daemon executable not found'));
+            }
+          }).catch(() => {});
         }
       }
 
@@ -406,6 +438,9 @@ export function useAeroSyncStore() {
     settings,
     diskSpace,
     isDaemonOnline,
+    isRestartingDaemon,
+    daemonError,
+    restartDaemonEngine,
     statusMessage,
     isTransferring,
     currentProgress,

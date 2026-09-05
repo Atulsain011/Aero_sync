@@ -22,23 +22,21 @@
 
 | Platform | Package | Download Link | Version |
 | :--- | :--- | :--- | :--- |
-| **Linux (AppImage Portable)** | `AeroSync-v1.0.7-x86_64.AppImage` | [**Download Linux AppImage (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-v1.0.7-x86_64.AppImage) | `v1.0.7` |
-| **Linux (Debian / Ubuntu / Mint)** | `aerosync_1.0.7_amd64.deb` | [**Download Linux DEB Package**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/aerosync_1.0.7_amd64.deb) | `v1.0.7` |
-| **Linux (Portable Archive)** | `AeroSync-Linux-Portable.tar.gz` | [**Download Linux Portable (.tar.gz)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Linux-Portable.tar.gz) | `v1.0.7` |
-| **Linux (1-Click Launcher)** | `Start_AeroSync_Linux.sh` | [**Download Linux 1-Click Launcher**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/Start_AeroSync_Linux.sh) | `v1.0.7` |
-| **Windows (Installer)** | `AeroSync-Setup-v1.0.7.exe` | [**Download Windows Installer (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Setup-v1.0.7.exe) | `v1.0.7` |
-| **Windows (Portable)** | `AeroSync-Windows-Portable.zip` | [**Download Windows Portable (.zip)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Windows-Portable.zip) | `v1.0.7` |
-| **Windows (Standalone)** | `AeroSync.exe` | [**Download Windows Executable**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync.exe) | `v1.0.7` |
-| **Windows (1-Click Launcher)** | `Start_AeroSync_Desktop.bat` | [**Download Windows 1-Click Launcher**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/Start_AeroSync_Desktop.bat) | `v1.0.7` |
-| **Android (APK)** | `AeroSync.apk` | [**Download Android APK**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync.apk) | `v1.0.7` |
+| **Linux — AppImage (Recommended)** | `AeroSync-Linux-x86_64.AppImage` | [**Download Linux AppImage (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/AeroSync-Linux-x86_64.AppImage) | `v1.0.8` |
+| **Linux — Debian/Ubuntu (.deb)** | `aerosync_1.0.8_amd64.deb` | [**Download Linux DEB Package**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/aerosync_1.0.8_amd64.deb) | `v1.0.8` |
+| **Windows (Installer)** | `AeroSync-Setup-v1.0.8.exe` | [**Download Windows Installer (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/AeroSync-Setup-v1.0.8.exe) | `v1.0.8` |
+| **Windows (Portable)** | `AeroSync-Windows-Portable.zip` | [**Download Windows Portable (.zip)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/AeroSync-Windows-Portable.zip) | `v1.0.8` |
+| **Windows (Standalone)** | `AeroSync.exe` | [**Download Windows Executable**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/AeroSync.exe) | `v1.0.8` |
+| **Windows (1-Click Launcher)** | `Start_AeroSync_Desktop.bat` | [**Download Windows 1-Click Launcher**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/Start_AeroSync_Desktop.bat) | `v1.0.8` |
+| **Android (APK)** | `AeroSync.apk` | [**Download Android APK**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/AeroSync.apk) | `v1.0.8` |
 | **All Releases** | GitHub Releases | [**Browse All Releases**](https://github.com/Atulsain011/Aero_sync/releases) | `Latest` |
 
 <br>
 
-[![Download Linux AppImage](https://img.shields.io/badge/Download_Linux_AppImage-AeroSync-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-v1.0.7-x86_64.AppImage)
-[![Download Linux DEB Package](https://img.shields.io/badge/Download_Linux_DEB-AeroSync-A81D33?style=for-the-badge&logo=debian&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/aerosync_1.0.7_amd64.deb)
-[![Download Windows Installer](https://img.shields.io/badge/Download_Windows_Installer-AeroSync-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Setup-v1.0.7.exe)
-[![Download Android App](https://img.shields.io/badge/Download_Android_App-AeroSync-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync.apk)
+[![Download Linux AppImage](https://img.shields.io/badge/Linux_AppImage_(Recommended)-AeroSync-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/AeroSync-Linux-x86_64.AppImage)
+[![Download Linux DEB Package](https://img.shields.io/badge/Linux_Debian%2FUbuntu_(.deb)-AeroSync-A81D33?style=for-the-badge&logo=debian&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/aerosync_1.0.8_amd64.deb)
+[![Download Windows Installer](https://img.shields.io/badge/Download_Windows_Installer-AeroSync-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/AeroSync-Setup-v1.0.8.exe)
+[![Download Android App](https://img.shields.io/badge/Download_Android_App-AeroSync-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/AeroSync.apk)
 
 </div>
 
@@ -258,36 +256,41 @@ The planned remote-transfer system will feature:
 ## 🚀 Quick Start Guide
 
 ### Linux
-#### Recommended: AppImage (Portable Container)
-1. Download [**`AeroSync-v1.0.7-x86_64.AppImage`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-v1.0.7-x86_64.AppImage) from GitHub Releases (`v1.0.7`).
-2. Make it executable: `chmod +x AeroSync-v1.0.7-x86_64.AppImage`
-3. Launch AeroSync: `./AeroSync-v1.0.7-x86_64.AppImage` or double-click in your file manager.
 
-#### Debian / Ubuntu / Mint Package (.deb)
-1. Download [**`aerosync_1.0.7_amd64.deb`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/aerosync_1.0.7_amd64.deb) from GitHub Releases (`v1.0.7`).
-2. Install package: `sudo apt install ./aerosync_1.0.7_amd64.deb` or `sudo dpkg -i aerosync_1.0.7_amd64.deb`
-3. Launch **AeroSync** directly from your Application Launcher / Desktop Menu.
+#### System Requirements
+- **Architecture**: 64-bit x86_64 (`amd64`)
+- **Supported Distributions**: Ubuntu 22.04+, Debian 12+, Fedora 38+, Linux Mint 21+, Arch Linux, Manjaro, openSUSE Leap/Tumbleweed
+- **Display Runtime**: WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`) & GTK 3 (`libgtk-3-0`)
 
-#### Portable Archive (.tar.gz)
-1. Download [**`AeroSync-Linux-Portable.tar.gz`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Linux-Portable.tar.gz) from GitHub Releases (`v1.0.7`).
-2. Extract the archive: `tar -xvf AeroSync-Linux-Portable.tar.gz`
-3. Launch AeroSync executable from terminal or file manager.
+#### Linux — AppImage (Recommended)
+Universal self-contained executable for Ubuntu, Debian, Fedora, Arch Linux, openSUSE, and other distributions:
+1. Download **`AeroSync-Linux-x86_64.AppImage`** from [GitHub Releases](https://github.com/Atulsain011/Aero_sync/releases).
+2. Double-click to launch (or right-click -> Properties -> *Allow executing file as program* if your distribution requires it).
+3. AeroSync opens, automatically starts the bundled daemon, discovers real devices on your Wi-Fi or hotspot, and is immediately ready to send and receive files!
+
+#### Linux — Debian/Ubuntu (.deb)
+Native package installer for Debian, Ubuntu, Kubuntu, and Linux Mint:
+1. Download **`aerosync_1.0.8_amd64.deb`** from [GitHub Releases](https://github.com/Atulsain011/Aero_sync/releases).
+2. Double-click the downloaded file in your browser or file manager and click **Install** in your system Software Center / App Center.
+3. Open **AeroSync** from your desktop **Application Launcher** or **Applications Menu**.
+
+*(CLI option: `sudo apt install ./aerosync_1.0.8_amd64.deb`)*
 
 ### Windows
 #### Recommended: Installer
-1. Download [**`AeroSync-Setup-v1.0.7.exe`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Setup-v1.0.7.exe) from GitHub Releases (`v1.0.7`).
+1. Download [**`AeroSync-Setup-v1.0.8.exe`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/AeroSync-Setup-v1.0.8.exe) from GitHub Releases (`v1.0.8`).
 2. Run the installer and complete setup.
 3. Launch AeroSync from the Desktop shortcut or Start Menu.
 4. Allow network access through Windows Firewall if prompted.
 5. Connect your Windows PC, Linux machine, and Android device to the same Wi-Fi or hotspot.
 
 #### Portable Version
-1. Download [**`AeroSync-Windows-Portable.zip`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Windows-Portable.zip).
+1. Download [**`AeroSync-Windows-Portable.zip`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/AeroSync-Windows-Portable.zip).
 2. Extract the ZIP archive.
 3. Run `AeroSync.exe`.
 
 ### Android
-1. Download [**`AeroSync.apk`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync.apk).
+1. Download [**`AeroSync.apk`**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/AeroSync.apk).
 2. Tap the APK to install (*enable "Install unknown apps" if prompted*).
 3. Grant requested permissions (Nearby devices & storage access).
 4. Open AeroSync on both devices, discover, pair, and transfer!
@@ -326,24 +329,30 @@ chmod +x build_linux.sh package_linux.sh
 
 Generated Linux packages will be located at:
 ```text
-release/AeroSync-v1.0.7-x86_64.AppImage   # Portable AppImage Container (Recommended)
-release/aerosync_1.0.7_amd64.deb          # Debian / Ubuntu / Mint Installer Package
+release/AeroSync-Linux-x86_64.AppImage   # Linux — AppImage (Recommended)
+release/aerosync_1.0.8_amd64.deb        # Linux — Debian/Ubuntu (.deb)
 ```
 
 #### Running & Installing on Linux
 
-- **AppImage (Portable Container - Recommended)**:
+> **Linux System Requirement**: AeroSync uses WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`) and GTK 3 for desktop rendering.
+
+- **Debian / Ubuntu / Kubuntu / Mint Package (`.deb`) — Recommended for Debian/Ubuntu**:
+  Installs AeroSync, the native daemon, menu launcher, and automatically resolves all required runtime dependencies (including `libwebkit2gtk-4.1-0`).
+  Double-click `aerosync_1.0.8_amd64.deb` to install via Ubuntu App Center or KDE Discover.
+  
+  Or via terminal:
   ```bash
-  chmod +x AeroSync-v1.0.7-x86_64.AppImage
-  ./AeroSync-v1.0.7-x86_64.AppImage
+  sudo apt install ./aerosync_1.0.8_amd64.deb
   ```
 
-- **Debian / Ubuntu / Mint Package**:
+- **AppImage (Single-File Executable Container)**:
+  Bundles the AeroSync desktop client and native C++ daemon into a genuine Type 2 ELF container. It requires `libwebkit2gtk-4.1-0` and `libgtk-3-0` on the host system.
   ```bash
-  sudo dpkg -i aerosync_1.0.7_amd64.deb
-  # or
-  sudo apt install ./aerosync_1.0.7_amd64.deb
+  chmod +x AeroSync-Linux-x86_64.AppImage
+  ./AeroSync-Linux-x86_64.AppImage
   ```
+  *(If your distribution lacks WebKitGTK 4.1, install it via `sudo apt install libwebkit2gtk-4.1-0` or your distribution package manager).*
 
 ---
 
@@ -413,7 +422,7 @@ AeroSync is designed for high-speed local-network file transfers.
 
 ## 🎨 Branding & Icons
 
-AeroSync v1.0.7 uses standardized branding across all platforms:
+AeroSync v1.0.8 uses standardized branding across all platforms:
 * **Background**: Sleek dark navy squircle (`#0F172A`)
 * **Glyph**: Vibrant glowing cyan/blue cloud with bi-directional transfer arrows
 * **Transparency**: 100% transparent corners for desktop, taskbar, start menu, and launcher icons.
@@ -423,7 +432,7 @@ AeroSync v1.0.7 uses standardized branding across all platforms:
 
 ## 🗺️ Project Roadmap
 
-### Current (v1.0.7)
+### Current (v1.0.8)
 - [x] Windows application (Tauri v2 + React)
 - [x] Linux application (AppImage container & DEB package with system launcher)
 - [x] Android application (Jetpack Compose + Material 3)

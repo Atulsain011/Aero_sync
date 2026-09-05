@@ -16,7 +16,8 @@ class AeroSyncApp {
 public:
     AeroSyncApp(const std::string& deviceId,
                 const std::string& deviceName,
-                DeviceType deviceType);
+                DeviceType deviceType,
+                uint16_t transferPort = 48124);
     ~AeroSyncApp();
 
     bool initialize();

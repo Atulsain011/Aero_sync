@@ -1,13 +1,21 @@
 import React from 'react';
-import { Minus, Square, X, Radio } from 'lucide-react';
+import { Minus, Square, X } from 'lucide-react';
 import { tauriBridge } from '../../services/tauriBridge';
 import logoImg from '../../assets/logo.png';
 
 interface TitleBarProps {
   isDaemonOnline: boolean;
+  daemonError?: string | null;
+  onRestartDaemon?: () => void;
+  isRestartingDaemon?: boolean;
 }
 
-export const TitleBar: React.FC<TitleBarProps> = ({ isDaemonOnline }) => {
+export const TitleBar: React.FC<TitleBarProps> = ({
+  isDaemonOnline,
+  daemonError,
+  onRestartDaemon,
+  isRestartingDaemon
+}) => {
   const handleDoubleClick = () => {
     tauriBridge.maximizeWindow();
   };
@@ -17,9 +25,17 @@ export const TitleBar: React.FC<TitleBarProps> = ({ isDaemonOnline }) => {
       <div className="titlebar-left" data-tauri-drag-region>
         <img src={logoImg} alt="AeroSync" className="titlebar-logo" />
         <span className="titlebar-title" data-tauri-drag-region>AeroSync</span>
-        <div className={`status-pill ${isDaemonOnline ? 'status-online' : 'status-offline'}`}>
-          <Radio className="status-icon" size={12} />
-          <span>{isDaemonOnline ? 'Ready' : 'Connecting'}</span>
+        <div
+          className={`core-titlebar-status ${isDaemonOnline ? 'core-status-running' : 'core-status-stopped'}`}
+          title={isDaemonOnline ? 'AeroSync Core is running and responding on 127.0.0.1:48126' : (daemonError ? `Error: ${daemonError}` : 'AeroSync Core is not running. Click to restart.')}
+          onClick={!isDaemonOnline && onRestartDaemon ? onRestartDaemon : undefined}
+          style={{ cursor: !isDaemonOnline ? 'pointer' : 'default' }}
+        >
+          <span className="core-titlebar-label">AeroSync Core</span>
+          <span className="core-titlebar-pill">
+            <span className="status-dot">{isDaemonOnline ? '●' : '✕'}</span>
+            <span>{isRestartingDaemon ? 'Starting...' : (isDaemonOnline ? 'Running' : 'Not running')}</span>
+          </span>
         </div>
       </div>
 

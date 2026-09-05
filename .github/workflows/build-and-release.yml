@@ -95,7 +95,7 @@ jobs:
 
           $setupExe = Get-ChildItem "platform/windows/desktop_tauri/src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
           if ($setupExe) {
-            Copy-Item $setupExe.FullName "artifacts/AeroSync-Setup-v1.0.7.exe" -Force
+            Copy-Item $setupExe.FullName "artifacts/AeroSync-Setup-v1.0.8.exe" -Force
           } else {
             Write-Error "NSIS setup executable not found!"
             exit 1
@@ -114,6 +114,10 @@ jobs:
           Compress-Archive -Path "$portableDir/*" -DestinationPath "artifacts/AeroSync-Windows-Portable.zip" -Force
           Remove-Item -Recurse -Force $portableDir
 
+          if (Test-Path "Start_AeroSync_Desktop.bat") {
+            Copy-Item "Start_AeroSync_Desktop.bat" "artifacts/Start_AeroSync_Desktop.bat" -Force
+          }
+
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -123,7 +127,7 @@ jobs:
 
   build-linux:
     name: Build Linux Desktop App (.AppImage / .deb)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -131,7 +135,7 @@ jobs:
       - name: Install Linux System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf build-essential cmake
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf build-essential cmake xvfb file curl libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libfuse2 squashfs-tools desktop-file-utils
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -147,78 +151,677 @@ jobs:
         working-directory: platform/windows/desktop_tauri
         run: npm ci
 
-      - name: Build Web Assets
+      # ------------------------------------------------------------------------
+      # 1. Build frontend
+      # ------------------------------------------------------------------------
+      - name: 1. Build Frontend
         working-directory: platform/windows/desktop_tauri
-        run: npm run build
+        run: |
+          npm run build
+          if [ ! -f "dist/index.html" ]; then
+            echo "Error: Frontend build failed, dist/index.html not generated!" >&2
+            exit 1
+          fi
+          echo "Frontend successfully built. dist/index.html ($(stat -c %s dist/index.html) bytes)."
 
-      - name: Build Linux Native Core Daemon
+      # ------------------------------------------------------------------------
+      # 2. Build Linux C++ daemon
+      # ------------------------------------------------------------------------
+      - name: 2. Build Linux C++ Daemon
         run: |
           mkdir -p build_linux
           cd build_linux
           cmake ../platform/windows -DCMAKE_BUILD_TYPE=Release
           cmake --build . -j$(nproc)
-          cp aerosync_daemon ../platform/windows/desktop_tauri/src-tauri/aerosync_daemon
 
-      - name: Build Linux AppImage & DEB Packages
+      # ------------------------------------------------------------------------
+      # 3. Verify daemon exists
+      # ------------------------------------------------------------------------
+      - name: 3. Verify Daemon Exists
+        run: |
+          daemon_path="build_linux/aerosync_daemon"
+          if [ ! -f "$daemon_path" ]; then
+            echo "Error: aerosync_daemon binary not found at $daemon_path!" >&2
+            exit 1
+          fi
+          daemon_size=$(stat -c %s "$daemon_path")
+          if [ "$daemon_size" -lt 100000 ]; then
+            echo "Error: Daemon binary is suspiciously small ($daemon_size bytes)!" >&2
+            exit 1
+          fi
+          echo "Daemon binary exists at $daemon_path ($daemon_size bytes)."
+
+      # ------------------------------------------------------------------------
+      # 4. Verify daemon architecture
+      # ------------------------------------------------------------------------
+      - name: 4. Verify Daemon Architecture
+        run: |
+          daemon_path="build_linux/aerosync_daemon"
+          chmod 755 "$daemon_path"
+          file_out=$(file "$daemon_path")
+          echo "Daemon file architecture: $file_out"
+          if ! echo "$file_out" | grep -q "ELF"; then
+            echo "Error: Daemon is NOT an ELF binary!" >&2
+            exit 1
+          fi
+          if ! echo "$file_out" | grep -q -E "x86-64|x86_64"; then
+            echo "Error: Daemon architecture is NOT x86_64!" >&2
+            exit 1
+          fi
+          if strings "$daemon_path" | grep -q -E "/system/bin/linker|liblog.so"; then
+            echo "Error: Daemon is an Android Bionic binary, not GNU/Linux x86_64!" >&2
+            exit 1
+          fi
+          echo "Daemon architecture verified: 64-bit ELF x86_64."
+
+      # ------------------------------------------------------------------------
+      # 5. Package daemon into desktop application
+      # ------------------------------------------------------------------------
+      - name: 5. Package Daemon Into Desktop Application
+        run: |
+          # Purge any Windows .exe files
+          rm -f platform/windows/desktop_tauri/src-tauri/*.exe
+          rm -f platform/windows/desktop_tauri/*.exe
+          rm -f release/*.exe
+
+          # Copy Linux daemon into Tauri directories
+          cp -f build_linux/aerosync_daemon platform/windows/desktop_tauri/src-tauri/aerosync_daemon
+          cp -f build_linux/aerosync_daemon platform/windows/desktop_tauri/aerosync_daemon
+          chmod 755 platform/windows/desktop_tauri/src-tauri/aerosync_daemon
+          chmod 755 platform/windows/desktop_tauri/aerosync_daemon
+          echo "Packaged native Linux daemon into desktop application workspace."
+
+      # ------------------------------------------------------------------------
+      # 6. Build Tauri Linux application
+      # ------------------------------------------------------------------------
+      - name: 6. Build Tauri Linux Application
         working-directory: platform/windows/desktop_tauri
-        run: npx @tauri-apps/cli build --bundles appimage,deb
+        run: |
+          cargo build --release
+          desktop_bin="src-tauri/target/release/aerosync-desktop"
+          if [ ! -f "$desktop_bin" ]; then
+            echo "Error: Tauri desktop binary not found at $desktop_bin!" >&2
+            exit 1
+          fi
+          chmod 755 "$desktop_bin"
+          file_out=$(file "$desktop_bin")
+          echo "Tauri binary information: $file_out"
+          if ! echo "$file_out" | grep -q "ELF"; then
+            echo "Error: Tauri desktop binary is NOT an ELF binary!" >&2
+            exit 1
+          fi
+          echo "Tauri Linux desktop application built successfully ($(stat -c %s "$desktop_bin") bytes)."
+
+      # ------------------------------------------------------------------------
+      # 7 & 8. Produce a REAL AppImage & Produce a proper DEB
+      # ------------------------------------------------------------------------
+      - name: 7 & 8. Produce Real AppImage & Proper DEB Package
+        run: |
+          chmod +x package_linux.sh
+          ./package_linux.sh
+
+          # 7. Verify AppImage file exists and is real Type 2 ELF AppImage
+          appimage_file="release/AeroSync-Linux-x86_64.AppImage"
+          if [ ! -f "$appimage_file" ]; then
+            echo "Error: AppImage not generated at $appimage_file!" >&2
+            exit 1
+          fi
+          appimage_type=$(file "$appimage_file")
+          echo "AppImage type: $appimage_type"
+          if ! echo "$appimage_type" | grep -q "ELF"; then
+            echo "Error: AppImage is NOT a genuine ELF binary (fake shell script detected)!" >&2
+            exit 1
+          fi
+          appimage_size=$(stat -c %s "$appimage_file")
+          echo "AppImage size: $appimage_size bytes"
+          if [ "$appimage_size" -lt 10000000 ]; then
+            echo "Error: AppImage is suspiciously small ($appimage_size bytes, expected >= 10MB)!" >&2
+            exit 1
+          fi
+
+          # 8. Verify DEB package file exists and is valid deb archive
+          deb_file="release/aerosync_1.0.8_amd64.deb"
+          if [ ! -f "$deb_file" ]; then
+            deb_file="release/AeroSync-Linux-x86_64.deb"
+          fi
+          if [ ! -f "$deb_file" ]; then
+            echo "Error: DEB package not generated at $deb_file!" >&2
+            exit 1
+          fi
+          deb_size=$(stat -c %s "$deb_file")
+          echo "DEB package size: $deb_size bytes"
+          if [ "$deb_size" -lt 2000000 ]; then
+            echo "Error: DEB package is suspiciously small ($deb_size bytes)!" >&2
+            exit 1
+          fi
+          echo "Real AppImage and proper DEB packages successfully generated."
+
+      # ------------------------------------------------------------------------
+      # 9. Verify application metadata
+      # ------------------------------------------------------------------------
+      - name: 9. Verify Application Metadata
+        run: |
+          deb_file="release/aerosync_1.0.8_amd64.deb"
+          if [ ! -f "$deb_file" ]; then
+            deb_file="release/AeroSync-Linux-x86_64.deb"
+          fi
+          deb_control=$(dpkg-deb -I "$deb_file")
+          echo "=== DEB Package Metadata ==="
+          echo "$deb_control"
+          echo "$deb_control" | grep -q '^ Package: aerosync$' || (echo "Error: Missing Package: aerosync" >&2; exit 1)
+          echo "$deb_control" | grep -q '^ Version: 1.0.8$' || (echo "Error: Missing Version: 1.0.8" >&2; exit 1)
+          echo "$deb_control" | grep -q '^ Architecture: amd64$' || (echo "Error: Missing Architecture: amd64" >&2; exit 1)
+          echo "$deb_control" | grep -q 'libwebkit2gtk-4.1-0' || (echo "Error: Missing required libwebkit2gtk-4.1-0 dependency in metadata!" >&2; exit 1)
+          echo "$deb_control" | grep -q 'libgtk-3-0' || (echo "Error: Missing required libgtk-3-0 dependency in metadata!" >&2; exit 1)
+          echo "Application package metadata verified successfully."
+
+      # ------------------------------------------------------------------------
+      # 10. Verify .desktop entry
+      # ------------------------------------------------------------------------
+      - name: 10. Verify .desktop Entry
+        run: |
+          deb_file="release/aerosync_1.0.8_amd64.deb"
+          if [ ! -f "$deb_file" ]; then
+            deb_file="release/AeroSync-Linux-x86_64.deb"
+          fi
+          mkdir -p /tmp/verify_deb
+          dpkg-deb -x "$deb_file" /tmp/verify_deb
+
+          desktop_file="/tmp/verify_deb/usr/share/applications/aerosync.desktop"
+          if [ ! -f "$desktop_file" ]; then
+            echo "Error: DEB package missing /usr/share/applications/aerosync.desktop!" >&2
+            exit 1
+          fi
+
+          echo "=== DEB .desktop File Content ==="
+          cat "$desktop_file"
+
+          # Verify all mandatory keys per specification
+          grep -q '^Name=AeroSync$' "$desktop_file" || (echo "Error: Missing Name=AeroSync" >&2; exit 1)
+          grep -q '^Exec=aerosync %U$' "$desktop_file" || (echo "Error: Missing Exec=aerosync %U" >&2; exit 1)
+          grep -q '^Icon=aerosync$' "$desktop_file" || (echo "Error: Missing Icon=aerosync" >&2; exit 1)
+          grep -q '^Terminal=false$' "$desktop_file" || (echo "Error: Missing Terminal=false" >&2; exit 1)
+          grep -q '^Type=Application$' "$desktop_file" || (echo "Error: Missing Type=Application" >&2; exit 1)
+          grep -q '^Categories=Utility;$' "$desktop_file" || (echo "Error: Missing Categories=Utility;" >&2; exit 1)
+
+          if command -v desktop-file-validate >/dev/null 2>&1; then
+            desktop-file-validate "$desktop_file"
+            echo "desktop-file-validate on DEB desktop entry passed."
+          fi
+
+          # Also check AppImage desktop file
+          mkdir -p /tmp/verify_appimage
+          cd /tmp/verify_appimage
+          "$GITHUB_WORKSPACE/release/AeroSync-Linux-x86_64.AppImage" --appimage-extract >/dev/null 2>&1
+          appimage_desktop="squashfs-root/aerosync.desktop"
+          if [ ! -f "$appimage_desktop" ]; then
+            echo "Error: AppImage missing root aerosync.desktop!" >&2
+            exit 1
+          fi
+          grep -q '^Name=AeroSync$' "$appimage_desktop" || (echo "Error: AppImage missing Name=AeroSync" >&2; exit 1)
+          grep -q '^Exec=aerosync %U$' "$appimage_desktop" || (echo "Error: AppImage missing Exec=aerosync %U" >&2; exit 1)
+          grep -q '^Icon=aerosync$' "$appimage_desktop" || (echo "Error: AppImage missing Icon=aerosync" >&2; exit 1)
+          grep -q '^Terminal=false$' "$appimage_desktop" || (echo "Error: AppImage missing Terminal=false" >&2; exit 1)
+          grep -q '^Type=Application$' "$appimage_desktop" || (echo "Error: AppImage missing Type=Application" >&2; exit 1)
+          grep -q '^Categories=Utility;$' "$appimage_desktop" || (echo "Error: AppImage missing Categories=Utility;" >&2; exit 1)
+          cd "$GITHUB_WORKSPACE"
+          echo "All .desktop specifications verified."
+
+      # ------------------------------------------------------------------------
+      # 11. Verify icon
+      # ------------------------------------------------------------------------
+      - name: 11. Verify Icon
+        run: |
+          echo "=== Verifying Icons in DEB Package ==="
+          for sz in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
+            icon_file="/tmp/verify_deb/usr/share/icons/hicolor/$sz/apps/aerosync.png"
+            if [ ! -f "$icon_file" ]; then
+              echo "Error: DEB package missing $sz icon at $icon_file!" >&2
+              exit 1
+            fi
+            if ! file "$icon_file" | grep -q "PNG image data"; then
+              echo "Error: Icon at $icon_file is not a valid PNG image!" >&2
+              exit 1
+            fi
+            sz_bytes=$(stat -c %s "$icon_file")
+            if [ "$sz_bytes" -le 0 ]; then
+              echo "Error: Icon at $icon_file is empty!" >&2
+              exit 1
+            fi
+            echo "Verified DEB icon $sz: $(file "$icon_file") ($sz_bytes bytes)"
+          done
+
+          pixmap_file="/tmp/verify_deb/usr/share/pixmaps/aerosync.png"
+          if [ ! -f "$pixmap_file" ] || ! file "$pixmap_file" | grep -q "PNG image data"; then
+            echo "Error: Missing or invalid pixmap at $pixmap_file!" >&2
+            exit 1
+          fi
+
+          echo "=== Verifying Icons in AppImage ==="
+          if [ ! -f "/tmp/verify_appimage/squashfs-root/aerosync.png" ] || ! file "/tmp/verify_appimage/squashfs-root/aerosync.png" | grep -q "PNG image data"; then
+            echo "Error: AppImage missing root aerosync.png!" >&2
+            exit 1
+          fi
+          if [ ! -f "/tmp/verify_appimage/squashfs-root/.DirIcon" ] || ! file "/tmp/verify_appimage/squashfs-root/.DirIcon" | grep -q "PNG image data"; then
+            echo "Error: AppImage missing .DirIcon thumbnail!" >&2
+            exit 1
+          fi
+          echo "All genuine AeroSync icons verified across all standard resolutions."
+
+      # ------------------------------------------------------------------------
+      # 12. Verify daemon exists inside final package
+      # ------------------------------------------------------------------------
+      - name: 12. Verify Daemon Exists Inside Final Package
+        run: |
+          echo "=== Checking Daemon in DEB ==="
+          deb_daemon="/tmp/verify_deb/usr/lib/aerosync/aerosync_daemon"
+          if [ ! -f "$deb_daemon" ]; then
+            echo "Error: aerosync_daemon not found in DEB at $deb_daemon!" >&2
+            exit 1
+          fi
+          deb_daemon_file=$(file "$deb_daemon")
+          echo "DEB daemon: $deb_daemon_file"
+          if ! echo "$deb_daemon_file" | grep -q -E "ELF.*x86-64"; then
+            echo "Error: DEB daemon is NOT a 64-bit ELF x86_64 binary!" >&2
+            exit 1
+          fi
+
+          echo "=== Checking Daemon in AppImage ==="
+          appimage_daemon="/tmp/verify_appimage/squashfs-root/usr/bin/aerosync_daemon"
+          if [ ! -f "$appimage_daemon" ]; then
+            echo "Error: aerosync_daemon not found in AppImage at $appimage_daemon!" >&2
+            exit 1
+          fi
+          appimage_daemon_file=$(file "$appimage_daemon")
+          echo "AppImage daemon: $appimage_daemon_file"
+          if ! echo "$appimage_daemon_file" | grep -q -E "ELF.*x86-64"; then
+            echo "Error: AppImage daemon is NOT a 64-bit ELF x86_64 binary!" >&2
+            exit 1
+          fi
+
+          # Ensure zero Windows .exe binaries exist in packages
+          if find /tmp/verify_deb /tmp/verify_appimage -name "*.exe" | grep -q .; then
+            echo "Error: Accidental Windows .exe binaries detected inside package:" >&2
+            find /tmp/verify_deb /tmp/verify_appimage -name "*.exe"
+            exit 1
+          fi
+          echo "Daemon confirmed present as native 64-bit ELF inside all final packages."
+
+      # ------------------------------------------------------------------------
+      # 13. Verify executable permissions
+      # ------------------------------------------------------------------------
+      - name: 13. Verify Executable Permissions
+        run: |
+          echo "=== Checking DEB Executable Permissions ==="
+          for exe_file in \
+            "/tmp/verify_deb/usr/bin/aerosync" \
+            "/tmp/verify_deb/usr/lib/aerosync/aerosync" \
+            "/tmp/verify_deb/usr/lib/aerosync/aerosync_daemon" \
+            "/tmp/verify_deb/DEBIAN/postinst" \
+            "/tmp/verify_deb/DEBIAN/postrm"; do
+            if [ ! -x "$exe_file" ]; then
+              echo "Error: $exe_file is not executable!" >&2
+              exit 1
+            fi
+            echo "Verified executable: $exe_file"
+          done
+
+          echo "=== Checking AppImage Executable Permissions ==="
+          for app_exe in \
+            "/tmp/verify_appimage/squashfs-root/AppRun" \
+            "/tmp/verify_appimage/squashfs-root/usr/bin/aerosync" \
+            "/tmp/verify_appimage/squashfs-root/usr/bin/aerosync_daemon"; do
+            if [ ! -x "$app_exe" ]; then
+              echo "Error: $app_exe is not executable!" >&2
+              exit 1
+            fi
+            echo "Verified executable: $app_exe"
+          done
+          echo "All executable permissions verified (0755)."
+
+      # ------------------------------------------------------------------------
+      # 14. Verify dynamic dependencies
+      # ------------------------------------------------------------------------
+      - name: 14. Verify Dynamic Dependencies
+        run: |
+          echo "=== Verifying Daemon Dynamic Dependencies ==="
+          deb_daemon="/tmp/verify_deb/usr/lib/aerosync/aerosync_daemon"
+          ldd_out=$(ldd "$deb_daemon")
+          echo "$ldd_out"
+          if echo "$ldd_out" | grep -q "not found"; then
+            echo "Error: Daemon has missing shared library dependencies!" >&2
+            echo "$ldd_out" | grep "not found" >&2
+            exit 1
+          fi
+
+          echo "=== Verifying Desktop Binary Dynamic Dependencies ==="
+          deb_gui="/tmp/verify_deb/usr/lib/aerosync/aerosync"
+          ldd_gui=$(ldd "$deb_gui")
+          echo "$ldd_gui"
+          if echo "$ldd_gui" | grep -q "not found"; then
+            echo "Error: Desktop application has missing shared library dependencies!" >&2
+            echo "$ldd_gui" | grep "not found" >&2
+            exit 1
+          fi
+          echo "All dynamic dependencies resolve cleanly on the host system."
+
+      # ------------------------------------------------------------------------
+      # 15. Run an automated smoke test
+      # ------------------------------------------------------------------------
+      - name: 15. Run Automated Smoke Test
+        run: |
+          echo "=========================================================="
+          echo " GATE 15: REAL LINUX RELEASE APPLICATION SMOKE TEST"
+          echo "=========================================================="
+
+          # ----------------------------------------------------------------------
+          # 15a. Verification of Shared Libraries & Dependencies (Zero Missing)
+          # ----------------------------------------------------------------------
+          echo "--- 15a. Checking Dynamic Dependencies of Release Binaries ---"
+          deb_bin="/tmp/verify_deb/usr/lib/aerosync/aerosync"
+          deb_daemon="/tmp/verify_deb/usr/lib/aerosync/aerosync_daemon"
+
+          if [ ! -f "$deb_bin" ]; then
+            echo "Error: Release GUI binary missing at $deb_bin!" >&2
+            exit 1
+          fi
+          if [ ! -f "$deb_daemon" ]; then
+            echo "Error: Release daemon binary missing at $deb_daemon!" >&2
+            exit 1
+          fi
+
+          missing_gui=$(ldd "$deb_bin" | grep "not found" || true)
+          if [ -n "$missing_gui" ]; then
+            echo "Error: Desktop application has missing shared libraries!" >&2
+            echo "$missing_gui" >&2
+            exit 1
+          fi
+
+          missing_daemon=$(ldd "$deb_daemon" | grep "not found" || true)
+          if [ -n "$missing_daemon" ]; then
+            echo "Error: Daemon binary has missing shared libraries!" >&2
+            echo "$missing_daemon" >&2
+            exit 1
+          fi
+          echo "All release binaries resolve 100% of required shared libraries."
+
+          # ----------------------------------------------------------------------
+          # 15b. Test Real Debian Package Installation & Desktop Validation
+          # ----------------------------------------------------------------------
+          echo "--- 15b. Testing Real DEB Package Installation ---"
+          deb_file="release/aerosync_1.0.8_amd64.deb"
+          if [ ! -f "$deb_file" ]; then
+            deb_file="release/AeroSync-Linux-x86_64.deb"
+          fi
+          sudo dpkg -i "$deb_file"
+
+          if [ ! -x "/usr/bin/aerosync" ]; then
+            echo "Error: /usr/bin/aerosync was not installed or is not executable!" >&2
+            exit 1
+          fi
+          if [ ! -x "/usr/lib/aerosync/aerosync_daemon" ]; then
+            echo "Error: /usr/lib/aerosync/aerosync_daemon was not installed or is not executable!" >&2
+            exit 1
+          fi
+          if [ ! -f "/usr/share/applications/aerosync.desktop" ]; then
+            echo "Error: /usr/share/applications/aerosync.desktop was not installed!" >&2
+            exit 1
+          fi
+
+          if command -v desktop-file-validate >/dev/null 2>&1; then
+            desktop-file-validate /usr/share/applications/aerosync.desktop
+            echo "Installed .desktop file validated successfully."
+          fi
+
+          # ----------------------------------------------------------------------
+          # 15c. Launch Actual Linux Release Application (Tauri GUI + Auto-Daemon)
+          # ----------------------------------------------------------------------
+          echo "--- 15c. Launching Actual Linux Release Application (Xvfb) ---"
+          # Ensure any previous background daemon is terminated before launching app
+          pkill -f "aerosync_daemon" 2>/dev/null || true
+          sleep 1
+
+          # Launch the installed /usr/bin/aerosync under virtual X server
+          xvfb-run -a -s "-screen 0 1280x800x24" /usr/bin/aerosync > /tmp/aerosync_app.log 2>&1 &
+          APP_PID=$!
+          echo "AeroSync application launched with PID: $APP_PID"
+
+          # Verify process starts
+          if ! kill -0 $APP_PID 2>/dev/null; then
+            echo "Error: AeroSync application process failed to start!" >&2
+            cat /tmp/aerosync_app.log >&2
+            exit 1
+          fi
+
+          # Wait for Tauri backend to initialize and automatically start the daemon
+          echo "Waiting for Tauri backend and daemon initialization..."
+          daemon_started=0
+          port_listening=0
+          health_ok=0
+          discovery_ok=0
+
+          for i in $(seq 1 20); do
+            # Check if application crashed
+            if ! kill -0 $APP_PID 2>/dev/null; then
+              echo "Error: AeroSync application crashed prematurely during initialization!" >&2
+              cat /tmp/aerosync_app.log >&2
+              exit 1
+            fi
+
+            # Check if daemon process was spawned
+            if pgrep -f "aerosync_daemon" >/dev/null 2>&1; then
+              daemon_started=1
+            fi
+
+            # Check if expected local TCP port 48126 is listening
+            if ss -tlnp 2>/dev/null | grep -q ":48126 " || netstat -tln 2>/dev/null | grep -q ":48126 "; then
+              port_listening=1
+            fi
+
+            # Check if discovery subsystem UDP port 48123 is listening
+            if ss -ulnp 2>/dev/null | grep -q ":48123 " || netstat -uln 2>/dev/null | grep -q ":48123 "; then
+              discovery_ok=1
+            fi
+
+            # Check if daemon responds on HTTP health check
+            if curl -s -f http://127.0.0.1:48126/api/health 2>/dev/null | grep -q '"status":"ok"'; then
+              health_ok=1
+              echo "Daemon responded to health check on attempt $i!"
+              break
+            fi
+
+            sleep 0.5
+          done
+
+          echo "Smoke test observations:"
+          echo " - Process running: $(kill -0 $APP_PID 2>/dev/null && echo 'YES' || echo 'NO')"
+          echo " - Daemon started: $(pgrep -f 'aerosync_daemon' >/dev/null && echo 'YES' || echo 'NO')"
+          echo " - Port 48126 listening: $([ $port_listening -eq 1 ] && echo 'YES' || echo 'NO')"
+          echo " - Discovery port 48123 listening: $([ $discovery_ok -eq 1 ] && echo 'YES' || echo 'NO')"
+          echo " - Daemon responded: $([ $health_ok -eq 1 ] && echo 'YES' || echo 'NO')"
+
+          if [ $daemon_started -ne 1 ]; then
+            echo "Error: AeroSync daemon was not started by the desktop application!" >&2
+            cat /tmp/aerosync_app.log >&2
+            kill -9 $APP_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          if [ $port_listening -ne 1 ]; then
+            echo "Error: Local IPC port 48126 is not listening!" >&2
+            cat /tmp/aerosync_app.log >&2
+            kill -9 $APP_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          if [ $discovery_ok -ne 1 ]; then
+            echo "Error: Discovery subsystem did not initialize UDP port 48123!" >&2
+            cat /tmp/aerosync_app.log >&2
+            kill -9 $APP_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          if [ $health_ok -ne 1 ]; then
+            echo "Error: Daemon failed to respond on http://127.0.0.1:48126/api/health!" >&2
+            cat /tmp/aerosync_app.log >&2
+            kill -9 $APP_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          # Query daemon status endpoint to verify full JSON response
+          status_json=$(curl -s http://127.0.0.1:48126/api/status)
+          echo "AeroSync Daemon status API output: $status_json"
+          if ! echo "$status_json" | grep -q '"deviceId"'; then
+            echo "Error: Daemon status API did not return valid device state JSON!" >&2
+            kill -9 $APP_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          # Gracefully terminate the running application
+          echo "Terminating application gracefully..."
+          kill -TERM $APP_PID 2>/dev/null || true
+          sleep 1
+          pkill -f "aerosync_daemon" 2>/dev/null || true
+          echo "Actual release application launch smoke test PASSED."
+
+          # ----------------------------------------------------------------------
+          # 15d. Test AppImage Execution & Headless Launch
+          # ----------------------------------------------------------------------
+          echo "--- 15d. Testing AppImage Execution & Headless Launch ---"
+          appimage="release/AeroSync-Linux-x86_64.AppImage"
+          chmod +x "$appimage"
+          "$appimage" --help
+          "$appimage" --version
+
+          # Launch AppImage under Xvfb
+          xvfb-run -a -s "-screen 0 1280x800x24" "$appimage" > /tmp/aerosync_appimage.log 2>&1 &
+          AI_PID=$!
+          sleep 2
+
+          if ! kill -0 $AI_PID 2>/dev/null; then
+            echo "Error: AppImage crashed on launch!" >&2
+            cat /tmp/aerosync_appimage.log >&2
+            exit 1
+          fi
+
+          # Confirm daemon and port are up
+          if ! curl -s -f http://127.0.0.1:48126/api/health | grep -q '"status":"ok"'; then
+            echo "Error: AppImage daemon did not respond to health check!" >&2
+            cat /tmp/aerosync_appimage.log >&2
+            kill -9 $AI_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          kill -TERM $AI_PID 2>/dev/null || true
+          sleep 1
+          pkill -f "aerosync_daemon" 2>/dev/null || true
+          echo "AppImage execution smoke test PASSED."
+
+          # ----------------------------------------------------------------------
+          # 15e. Test Real Discovery Protocol Between Two AeroSync Daemon Instances
+          # ----------------------------------------------------------------------
+          echo "--- 15e. Testing Real Cross-Process Peer Discovery Protocol (Dual Daemon) ---"
+          pkill -f "aerosync_daemon" 2>/dev/null || true
+          sleep 1
+
+          # Setup Linux network namespaces connected by a virtual ethernet pair (veth)
+          # This tests authentic cross-node discovery over UDP broadcast / multicast sockets in CI!
+          sudo ip netns add aero_peer1
+          sudo ip netns add aero_peer2
+          sudo ip link add veth1 type veth peer name veth2
+          sudo ip link set veth1 netns aero_peer1
+          sudo ip link set veth2 netns aero_peer2
+
+          sudo ip netns exec aero_peer1 ip addr add 10.200.1.1/24 dev veth1
+          sudo ip netns exec aero_peer1 ip link set veth1 up
+          sudo ip netns exec aero_peer1 ip link set lo up
+          sudo ip netns exec aero_peer1 ip route add 224.0.0.0/4 dev veth1
+
+          sudo ip netns exec aero_peer2 ip addr add 10.200.1.2/24 dev veth2
+          sudo ip netns exec aero_peer2 ip link set veth2 up
+          sudo ip netns exec aero_peer2 ip link set lo up
+          sudo ip netns exec aero_peer2 ip route add 224.0.0.0/4 dev veth2
+
+          # Start Daemon 1 in namespace aero_peer1
+          sudo ip netns exec aero_peer1 bash -c 'HOME=/tmp/peer1 AEROSYNC_DEVICE_NAME="AeroSync Linux Alpha" /usr/lib/aerosync/aerosync_daemon > /tmp/peer1.log 2>&1' &
+          PID1=$!
+
+          # Start Daemon 2 in namespace aero_peer2
+          sudo ip netns exec aero_peer2 bash -c 'HOME=/tmp/peer2 AEROSYNC_DEVICE_NAME="AeroSync Linux Beta" /usr/lib/aerosync/aerosync_daemon > /tmp/peer2.log 2>&1' &
+          PID2=$!
+
+          echo "Daemon 1 PID: $PID1 (10.200.1.1)"
+          echo "Daemon 2 PID: $PID2 (10.200.1.2)"
+
+          # Wait for discovery beacons to exchange across veth interfaces
+          discovered=0
+          for i in $(seq 1 15); do
+            peers1=$(sudo ip netns exec aero_peer1 curl -s http://127.0.0.1:48126/api/status 2>/dev/null || true)
+            peers2=$(sudo ip netns exec aero_peer2 curl -s http://127.0.0.1:48126/api/status 2>/dev/null || true)
+
+            p1_saw_p2=$(echo "$peers1" | grep -q "10.200.1.2" && echo 1 || echo 0)
+            p2_saw_p1=$(echo "$peers2" | grep -q "10.200.1.1" && echo 1 || echo 0)
+
+            if [ "$p1_saw_p2" -eq 1 ] && [ "$p2_saw_p1" -eq 1 ]; then
+              discovered=1
+              echo "Discovery successful on attempt $i!"
+              echo "Peer 1 saw Peer 2: $peers1"
+              echo "Peer 2 saw Peer 1: $peers2"
+              break
+            fi
+            sleep 1
+          done
+
+          # Terminate daemons and cleanup namespaces
+          sudo kill -TERM $PID1 $PID2 2>/dev/null || true
+          sleep 1
+          sudo ip netns del aero_peer1 2>/dev/null || true
+          sudo ip netns del aero_peer2 2>/dev/null || true
+
+          if [ $discovered -ne 1 ]; then
+            echo "Error: Discovery protocol failed! Daemon 1 and Daemon 2 did not discover each other." >&2
+            echo "Peer 1 logs:" >&2
+            cat /tmp/peer1.log >&2 || true
+            echo "Peer 2 logs:" >&2
+            cat /tmp/peer2.log >&2 || true
+            exit 1
+          fi
+          echo "Real Cross-Process Peer Discovery Protocol verification PASSED (100%)."
+
+          # Cleanup temporary verification directories
+          rm -rf /tmp/verify_deb /tmp/verify_appimage /tmp/aerosync_*.log /tmp/peer*.log
+          echo "=========================================================="
+          echo " ALL 15 LINUX PIPELINE VERIFICATION GATES PASSED (100%)"
+          echo "=========================================================="
 
       - name: Prepare Linux Release Artifacts
         run: |
           mkdir -p linux-artifacts
-          targetDir="platform/windows/desktop_tauri/src-tauri/target/release"
-          daemonBin="build_linux/aerosync_daemon"
           
-          if [ -f "$targetDir/aerosync-desktop" ]; then
-            cp "$targetDir/aerosync-desktop" linux-artifacts/AeroSync-Linux
-          fi
-          
-          appImage=$(find "$targetDir/bundle/appimage" -name "*.AppImage" 2>/dev/null | head -n 1)
-          if [ -n "$appImage" ]; then
-            cp "$appImage" linux-artifacts/AeroSync-v1.0.7-x86_64.AppImage
+          # Recommended Linux release: AeroSync-Linux-x86_64.AppImage
+          if [ -f "release/AeroSync-Linux-x86_64.AppImage" ]; then
+            cp "release/AeroSync-Linux-x86_64.AppImage" linux-artifacts/AeroSync-Linux-x86_64.AppImage
+          else
+            echo "Error: AeroSync-Linux-x86_64.AppImage not found!" >&2
+            exit 1
           fi
           
-          debFile=$(find "$targetDir/bundle/deb" -name "*.deb" 2>/dev/null | head -n 1)
-          if [ -n "$debFile" ]; then
-            cp "$debFile" linux-artifacts/aerosync_1.0.7_amd64.deb
+          # Optional Debian / Ubuntu package: aerosync_1.0.8_amd64.deb
+          if [ -f "release/aerosync_1.0.8_amd64.deb" ]; then
+            cp "release/aerosync_1.0.8_amd64.deb" linux-artifacts/aerosync_1.0.8_amd64.deb
+          elif [ -f "release/AeroSync-Linux-x86_64.deb" ]; then
+            cp "release/AeroSync-Linux-x86_64.deb" linux-artifacts/aerosync_1.0.8_amd64.deb
+          else
+            echo "Error: Debian package aerosync_1.0.8_amd64.deb not found!" >&2
+            exit 1
           fi
 
-          # Build complete Linux Portable Bundle containing GUI binary + native core daemon + launcher
-          portableDir="linux-portable-tmp/AeroSync-Linux-Portable"
-          mkdir -p "$portableDir"
-          if [ -f "$targetDir/aerosync-desktop" ]; then
-            cp "$targetDir/aerosync-desktop" "$portableDir/AeroSync"
-            chmod +x "$portableDir/AeroSync"
-          fi
-          if [ -f "$daemonBin" ]; then
-            cp "$daemonBin" "$portableDir/aerosync_daemon"
-            chmod +x "$portableDir/aerosync_daemon"
-          elif [ -f "platform/windows/desktop_tauri/src-tauri/aerosync_daemon" ]; then
-            cp "platform/windows/desktop_tauri/src-tauri/aerosync_daemon" "$portableDir/aerosync_daemon"
-            chmod +x "$portableDir/aerosync_daemon"
-          fi
-          if [ -f "platform/windows/desktop_tauri/src-tauri/icons/256x256.png" ]; then
-            cp "platform/windows/desktop_tauri/src-tauri/icons/256x256.png" "$portableDir/aerosync.png"
-          fi
-          
-          cat <<'EOF' > "$portableDir/launch_aerosync.sh"
-          #!/usr/bin/env bash
-          SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-          export PATH="$SCRIPT_DIR:$PATH"
-          export LD_LIBRARY_PATH="$SCRIPT_DIR:$SCRIPT_DIR/lib:$LD_LIBRARY_PATH"
-
-          if [ -f "$SCRIPT_DIR/aerosync_daemon" ]; then
-              chmod +x "$SCRIPT_DIR/aerosync_daemon" 2>/dev/null || true
-              "$SCRIPT_DIR/aerosync_daemon" >/dev/null 2>&1 &
-          fi
-
-          chmod +x "$SCRIPT_DIR/AeroSync" 2>/dev/null || true
-          exec "$SCRIPT_DIR/AeroSync" "$@"
-          EOF
-          chmod +x "$portableDir/launch_aerosync.sh"
-
-          tar -czf linux-artifacts/AeroSync-Linux-Portable.tar.gz -C linux-portable-tmp AeroSync-Linux-Portable
-          rm -rf linux-portable-tmp
+          # Strictly remove broken artifacts, launcher scripts, raw binaries, or incomplete archives
+          rm -f linux-artifacts/*.tar.gz
+          rm -f linux-artifacts/*.sh
+          rm -f linux-artifacts/aerosync
+          rm -f linux-artifacts/aerosync_daemon*
+          rm -f linux-artifacts/AeroSync
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
@@ -271,9 +874,229 @@ jobs:
           path: artifacts/AeroSync.apk
           if-no-files-found: error
 
+  test-clean-machine-linux:
+    name: Clean Machine Linux Verification (Ubuntu 22.04)
+    runs-on: ubuntu-22.04
+    needs: [build-linux]
+    steps:
+      - name: 1. Setup Fresh Machine & Download Release Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: AeroSync-Linux
+          path: clean-test-artifacts
+
+      - name: 2. Verify Release Files
+        run: |
+          echo "=== 1. Fresh Machine: Downloaded Release Artifacts ==="
+          ls -la clean-test-artifacts/
+          if [ ! -f "clean-test-artifacts/AeroSync-Linux-x86_64.AppImage" ]; then
+            echo "Error: AeroSync-Linux-x86_64.AppImage not found in downloaded release artifacts!" >&2
+            exit 1
+          fi
+          if [ ! -f "clean-test-artifacts/aerosync_1.0.8_amd64.deb" ]; then
+            echo "Error: aerosync_1.0.8_amd64.deb not found in downloaded release artifacts!" >&2
+            exit 1
+          fi
+
+      - name: 3 & 4. Verify No Developer Dependencies & Install Package
+        run: |
+          echo "=== 4. Verifying No Developer Dependencies Needed ==="
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0 xvfb curl iproute2
+
+          echo "=== 3. Installing Single Release File (aerosync_1.0.8_amd64.deb) ==="
+          sudo dpkg -i clean-test-artifacts/aerosync_1.0.8_amd64.deb
+
+          which aerosync
+          [ -x /usr/bin/aerosync ] || (echo "Error: /usr/bin/aerosync missing!" >&2; exit 1)
+          [ -x /usr/lib/aerosync/aerosync_daemon ] || (echo "Error: /usr/lib/aerosync/aerosync_daemon missing!" >&2; exit 1)
+          [ -f /usr/share/applications/aerosync.desktop ] || (echo "Error: .desktop entry missing!" >&2; exit 1)
+
+      - name: 5 & 6. Open AeroSync & Verify Daemon Starts Automatically
+        run: |
+          echo "=== 5. Open AeroSync Application ==="
+          pkill -f "aerosync_daemon" 2>/dev/null || true
+          pkill -f "aerosync" 2>/dev/null || true
+          sleep 1
+
+          xvfb-run -a -s "-screen 0 1280x800x24" /usr/bin/aerosync > /tmp/clean_app.log 2>&1 &
+          APP_PID=$!
+          echo "AeroSync application launched with PID: $APP_PID"
+
+          echo "=== 6. Verify Daemon Starts Automatically ==="
+          daemon_ok=0
+          for i in $(seq 1 20); do
+            if ! kill -0 $APP_PID 2>/dev/null; then
+              echo "Error: AeroSync crashed on startup!" >&2
+              cat /tmp/clean_app.log >&2
+              exit 1
+            fi
+            if curl -s -f http://127.0.0.1:48126/api/health 2>/dev/null | grep -q '"status":"ok"'; then
+              daemon_ok=1
+              echo "Daemon responded to health check on attempt $i!"
+              break
+            fi
+            sleep 0.5
+          done
+
+          if [ $daemon_ok -ne 1 ]; then
+            echo "Error: AeroSync daemon failed to start automatically!" >&2
+            cat /tmp/clean_app.log >&2
+            kill -9 $APP_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          kill -TERM $APP_PID 2>/dev/null || true
+          pkill -f "aerosync_daemon" 2>/dev/null || true
+          sleep 1
+
+      - name: 7 to 11. Connect Another Device, Nearby Devices, Pair, Send & Receive Real File
+        run: |
+          echo "=== 7. Connect Another AeroSync Device Across Virtual Subnet ==="
+          sudo ip netns add aero_node1
+          sudo ip netns add aero_node2
+          sudo ip link add veth_a type veth peer name veth_b
+          sudo ip link set veth_a netns aero_node1
+          sudo ip link set veth_b netns aero_node2
+
+          sudo ip netns exec aero_node1 ip addr add 10.200.1.1/24 dev veth_a
+          sudo ip netns exec aero_node1 ip link set veth_a up
+          sudo ip netns exec aero_node1 ip link set lo up
+          sudo ip netns exec aero_node1 ip route add 224.0.0.0/4 dev veth_a
+
+          sudo ip netns exec aero_node2 ip addr add 10.200.1.2/24 dev veth_b
+          sudo ip netns exec aero_node2 ip link set veth_b up
+          sudo ip netns exec aero_node2 ip link set lo up
+          sudo ip netns exec aero_node2 ip route add 224.0.0.0/4 dev veth_b
+
+          mkdir -p /tmp/node1_home/Downloads/AeroSync
+          mkdir -p /tmp/node2_home/Downloads/AeroSync
+
+          sudo ip netns exec aero_node1 bash -c 'HOME=/tmp/node1_home AEROSYNC_DEVICE_NAME="AeroSync Clean Ubuntu" AEROSYNC_ALLOW_LOOPBACK_DISCOVERY=1 /usr/lib/aerosync/aerosync_daemon --port 48126 --transfer-port 48124 > /tmp/node1.log 2>&1' &
+          NODE1_PID=$!
+
+          sudo ip netns exec aero_node2 bash -c 'HOME=/tmp/node2_home AEROSYNC_DEVICE_NAME="Pixel 8 Pro (Android)" AEROSYNC_DEVICE_TYPE="android" AEROSYNC_ALLOW_LOOPBACK_DISCOVERY=1 /usr/lib/aerosync/aerosync_daemon --port 48127 --transfer-port 48125 > /tmp/node2.log 2>&1' &
+          NODE2_PID=$!
+
+          sleep 2
+
+          echo "=== 8. Verify Nearby Devices Appears ==="
+          peer_found=0
+          for i in $(seq 1 20); do
+            peers_json=$(sudo ip netns exec aero_node1 curl -s http://127.0.0.1:48126/api/peers || true)
+            if echo "$peers_json" | grep -q "Pixel 8 Pro"; then
+              peer_found=1
+              echo "Nearby Devices successfully detected remote device on attempt $i:"
+              echo "$peers_json"
+              break
+            fi
+            sleep 0.5
+          done
+
+          if [ $peer_found -ne 1 ]; then
+            echo "Error: Remote device was not discovered in Nearby Devices!" >&2
+            sudo kill -9 $NODE1_PID $NODE2_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "=== 9 & 10. Pair & Send Real File (Node 1 -> Node 2) ==="
+          dd if=/dev/urandom of=/tmp/real_test_file_1.bin bs=1M count=5 2>/dev/null
+          ORIG_HASH_1=$(sha256sum /tmp/real_test_file_1.bin | awk '{print $1}')
+          echo "Original Payload 1 SHA256: $ORIG_HASH_1 (5242880 bytes)"
+
+          send_resp=$(sudo ip netns exec aero_node1 curl -s -X POST http://127.0.0.1:48126/api/transfer/send \
+            -H "Content-Type: application/json" \
+            -d '{"targetIp":"10.200.1.2","targetPort":48125,"filePaths":["/tmp/real_test_file_1.bin"]}')
+          echo "Send API Response: $send_resp"
+
+          recv_file_1="/tmp/node2_home/Downloads/AeroSync/real_test_file_1.bin"
+          file_received_1=0
+          for i in $(seq 1 30); do
+            if [ -f "$recv_file_1" ] && [ $(stat -c %s "$recv_file_1" 2>/dev/null || echo 0) -eq 5242880 ]; then
+              file_received_1=1
+              break
+            fi
+            sleep 0.5
+          done
+
+          if [ $file_received_1 -ne 1 ]; then
+            echo "Error: Node 2 failed to receive real_test_file_1.bin!" >&2
+            sudo kill -9 $NODE1_PID $NODE2_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          RECV_HASH_1=$(sha256sum "$recv_file_1" | awk '{print $1}')
+          echo "Received Payload 1 SHA256: $RECV_HASH_1"
+          if [ "$ORIG_HASH_1" != "$RECV_HASH_1" ]; then
+            echo "Error: Checksum mismatch on received file!" >&2
+            sudo kill -9 $NODE1_PID $NODE2_PID 2>/dev/null || true
+            exit 1
+          fi
+          echo "SUCCESS: Real 5MB file sent and received bit-for-bit!"
+
+          echo "=== 11. Receive Real File in Reverse Direction (Node 2 -> Node 1) ==="
+          dd if=/dev/urandom of=/tmp/real_test_file_2.bin bs=1M count=3 2>/dev/null
+          ORIG_HASH_2=$(sha256sum /tmp/real_test_file_2.bin | awk '{print $1}')
+
+          send_resp_2=$(sudo ip netns exec aero_node2 curl -s -X POST http://127.0.0.1:48127/api/transfer/send \
+            -H "Content-Type: application/json" \
+            -d '{"targetIp":"10.200.1.1","targetPort":48124,"filePaths":["/tmp/real_test_file_2.bin"]}')
+          echo "Send API Response (Node 2 -> Node 1): $send_resp_2"
+
+          recv_file_2="/tmp/node1_home/Downloads/AeroSync/real_test_file_2.bin"
+          file_received_2=0
+          for i in $(seq 1 30); do
+            if [ -f "$recv_file_2" ] && [ $(stat -c %s "$recv_file_2" 2>/dev/null || echo 0) -eq 3145728 ]; then
+              file_received_2=1
+              break
+            fi
+            sleep 0.5
+          done
+
+          if [ $file_received_2 -ne 1 ]; then
+            echo "Error: Node 1 failed to receive real_test_file_2.bin!" >&2
+            sudo kill -9 $NODE1_PID $NODE2_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          RECV_HASH_2=$(sha256sum "$recv_file_2" | awk '{print $1}')
+          echo "Received Payload 2 SHA256: $RECV_HASH_2"
+          if [ "$ORIG_HASH_2" != "$RECV_HASH_2" ]; then
+            echo "Error: Checksum mismatch on reverse received file in Node 1!" >&2
+            sudo kill -9 $NODE1_PID $NODE2_PID 2>/dev/null || true
+            exit 1
+          fi
+          echo "SUCCESS: Reverse real file transfer verified bit-for-bit (3MB)!"
+
+          sudo kill -TERM $NODE1_PID $NODE2_PID 2>/dev/null || true
+          sleep 1
+          sudo ip netns del aero_node1 2>/dev/null || true
+          sudo ip netns del aero_node2 2>/dev/null || true
+
+      - name: 12. Verify Self-Contained AppImage on Clean Machine
+        run: |
+          echo "=== 12. Testing Self-Contained AppImage on Clean Machine ==="
+          appimage="clean-test-artifacts/AeroSync-Linux-x86_64.AppImage"
+          chmod +x "$appimage"
+          "$appimage" --version
+          
+          xvfb-run -a -s "-screen 0 1280x800x24" "$appimage" > /tmp/clean_appimage.log 2>&1 &
+          AI_PID=$!
+          sleep 2
+          if ! kill -0 $AI_PID 2>/dev/null; then
+            echo "Error: AppImage failed to start on clean machine!" >&2
+            cat /tmp/clean_appimage.log >&2
+            exit 1
+          fi
+          
+          curl -s -f http://127.0.0.1:48126/api/health | grep -q '"status":"ok"' || (echo "Error: AppImage daemon offline!" >&2; exit 1)
+          kill -TERM $AI_PID 2>/dev/null || true
+          pkill -f "aerosync_daemon" 2>/dev/null || true
+          echo "AppImage verified on clean machine."
+
   publish-release:
     name: Publish Release Assets
-    needs: [build-windows, build-linux, build-android]
+    needs: [build-windows, build-linux, build-android, test-clean-machine-linux]
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && (inputs.tag_name != '' || startsWith(github.ref, 'refs/tags/v')))
     runs-on: ubuntu-latest
     steps:
@@ -304,28 +1127,30 @@ jobs:
           prerelease: ${{ inputs.prerelease || false }}
           fail_on_unmatched_files: false
           body: |
-            ## AeroSync v1.0.7 Release Assets
+            ## AeroSync v1.0.8 Release Assets
 
             High-speed peer-to-peer file transfer over local Wi-Fi and mobile hotspot. Zero cloud, 100% private.
 
             ---
 
             ### 🪟 Windows Release Assets
-            - [**Download Windows Setup Installer (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Setup-v1.0.7.exe) (`AeroSync-Setup-v1.0.7.exe`)
-            - [**Download Windows Portable Package (.zip)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Windows-Portable.zip) (`AeroSync-Windows-Portable.zip`)
-            - [**Download Standalone Windows Executable**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync.exe) (`AeroSync.exe`)
+            - [**Download Windows Setup Installer (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/AeroSync-Setup-v1.0.8.exe) (`AeroSync-Setup-v1.0.8.exe`)
+            - [**Download Windows Portable Package (.zip)**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/AeroSync-Windows-Portable.zip) (`AeroSync-Windows-Portable.zip`)
+            - [**Download Standalone Windows Executable**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/AeroSync.exe) (`AeroSync.exe`)
+            - [**Download Windows 1-Click Launcher**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/Start_AeroSync_Desktop.bat) (`Start_AeroSync_Desktop.bat`)
 
             ---
 
-            ### 🐧 Linux Release Assets
-            - [**Download Linux AppImage Portable (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-v1.0.7-x86_64.AppImage) (`AeroSync-v1.0.7-x86_64.AppImage`)
-            - [**Download Debian / Ubuntu / Mint DEB Package**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/aerosync_1.0.7_amd64.deb) (`aerosync_1.0.7_amd64.deb`)
-            - [**Download Linux Portable Archive (.tar.gz)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync-Linux-Portable.tar.gz) (`AeroSync-Linux-Portable.tar.gz`)
+            ### 🐧 Linux Downloads
+            - [**Linux — AppImage (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/AeroSync-Linux-x86_64.AppImage) (`AeroSync-Linux-x86_64.AppImage`)
+              - *Self-contained with bundled WebKitGTK and native aerosync_daemon. Double-click to launch on Ubuntu, Debian, Mint, Fedora, Arch Linux. Automatically registers AeroSync and its icon into your application menu.*
+            - [**Linux — Debian/Ubuntu (.deb)**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/aerosync_1.0.8_amd64.deb) (`aerosync_1.0.8_amd64.deb`)
+              - *Native package installer for Debian, Ubuntu, Kubuntu, and Linux Mint. Install with double-click in Software Center or via terminal with `sudo apt install ./aerosync_1.0.8_amd64.deb`.*
 
             ---
 
             ### 📱 Android Release Assets
-            - [**Download Android Mobile App (.apk)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.7/AeroSync.apk) (`AeroSync.apk`)
+            - [**Download Android Mobile App (.apk)**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/AeroSync.apk) (`AeroSync.apk`)
 
             ---
 

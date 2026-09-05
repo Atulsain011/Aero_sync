@@ -195,6 +195,11 @@ static void updateStorageAndNetwork() {
 
 static std::string buildStatusJsonResponse() {
     updateStorageAndNetwork();
+    if (g_app) {
+        auto activePeers = g_app->getPeers();
+        std::lock_guard<std::mutex> lock(g_state.mtx);
+        g_state.peers = activePeers;
+    }
     std::lock_guard<std::mutex> lock(g_state.mtx);
 
     std::ostringstream ss;
@@ -215,10 +220,20 @@ static std::string buildStatusJsonResponse() {
     ss << "  \"peers\": [\n";
     for (size_t i = 0; i < g_state.peers.size(); ++i) {
         const auto& p = g_state.peers[i];
-        std::string platformStr = (p.deviceType == aerosync::DeviceType::DEVICE_ANDROID) ? "android" : "windows";
+        std::string platformStr = "windows";
+        if (p.deviceType == aerosync::DeviceType::DEVICE_ANDROID) {
+            platformStr = "android";
+        } else if (p.deviceType == aerosync::DeviceType::DEVICE_LINUX) {
+            platformStr = "linux";
+        } else if (p.deviceType == aerosync::DeviceType::DEVICE_MACOS) {
+            platformStr = "macos";
+        } else if (p.deviceType == aerosync::DeviceType::DEVICE_IOS) {
+            platformStr = "ios";
+        }
         std::string dName = p.deviceName;
         if (dName.empty() || dName == "Unknown Device") {
-            dName = (platformStr == "android" ? "Android Device" : "Windows PC") + (" (" + p.ipAddress + ")");
+            std::string label = (platformStr == "android" ? "Android Device" : (platformStr == "linux" ? "Linux PC" : "Windows PC"));
+            dName = label + (" (" + p.ipAddress + ")");
         }
         ss << "    {\n";
         ss << "      \"deviceId\": \"" << escapeJson(p.deviceId) << "\",\n";
@@ -392,7 +407,20 @@ static void handleHttpClient(socket_t clientSock) {
             return;
         }
 
-        if (method == "GET" && (path == "/api/status" || path == "/status" || path == "/")) {
+        if (method == "GET" && (path == "/api/health" || path == "/health")) {
+            std::string json = "{\"status\":\"ok\",\"version\":\"1.0.8\",\"platform\":\""
+#ifdef _WIN32
+                "windows"
+#else
+                "linux"
+#endif
+                "\",\"deviceId\":\"" + escapeJson(g_state.deviceId) + "\"}";
+            sendHttpResponse(clientSock, 200, "application/json", json);
+            CLOSE_SOCKET(clientSock);
+            return;
+        }
+
+        if (method == "GET" && (path == "/api/status" || path == "/status" || path == "/api/peers" || path == "/peers" || path == "/")) {
             std::string json = buildStatusJsonResponse();
             sendHttpResponse(clientSock, 200, "application/json", json);
         } else if (method == "POST" && path == "/api/transfer/send") {
@@ -608,10 +636,52 @@ int main(int argc, char** argv) {
     std::error_code ecDl;
     std::filesystem::create_directories(g_state.downloadDir, ecDl);
 
+    uint16_t ipcPort = 48126;
+    const char* envPort = getenv("AEROSYNC_IPC_PORT");
+    if (envPort) {
+        int p = std::atoi(envPort);
+        if (p > 1024 && p < 65535) ipcPort = static_cast<uint16_t>(p);
+    }
+
+    uint16_t transferPort = 48124;
+    const char* envTransferPort = getenv("AEROSYNC_TRANSFER_PORT");
+    if (envTransferPort) {
+        int tp = std::atoi(envTransferPort);
+        if (tp > 1024 && tp < 65535) transferPort = static_cast<uint16_t>(tp);
+    }
+
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if ((arg == "--port" || arg == "-p") && i + 1 < argc) {
+            int p = std::atoi(argv[++i]);
+            if (p > 1024 && p < 65535) ipcPort = static_cast<uint16_t>(p);
+        } else if ((arg == "--transfer-port" || arg == "-tp") && i + 1 < argc) {
+            int tp = std::atoi(argv[++i]);
+            if (tp > 1024 && tp < 65535) transferPort = static_cast<uint16_t>(tp);
+        }
+    }
+
+    const char* envDevName = getenv("AEROSYNC_DEVICE_NAME");
+    if (envDevName && strlen(envDevName) > 0) {
+        g_state.deviceName = envDevName;
+    }
+    const char* envDevId = getenv("AEROSYNC_DEVICE_ID");
+    if (envDevId && strlen(envDevId) > 0) {
+        g_state.deviceId = envDevId;
+    }
+    const char* envDevType = getenv("AEROSYNC_DEVICE_TYPE");
+    if (envDevType) {
+        std::string dt = envDevType;
+        if (dt == "windows") devType = aerosync::DeviceType::DEVICE_WINDOWS;
+        else if (dt == "android") devType = aerosync::DeviceType::DEVICE_ANDROID;
+        else if (dt == "linux") devType = aerosync::DeviceType::DEVICE_LINUX;
+    }
+
     g_app = std::make_unique<aerosync::AeroSyncApp>(
         g_state.deviceId,
         g_state.deviceName,
-        devType
+        devType,
+        transferPort
     );
     g_app->setDownloadDirectory(g_state.downloadDir);
 
@@ -670,17 +740,35 @@ int main(int argc, char** argv) {
         }
     });
 
+    std::cout << std::unitbuf;
+    std::cerr << std::unitbuf;
+
+    std::cout << "[AeroSync] Native daemon process started (PID: "
+#ifdef _WIN32
+              << GetCurrentProcessId()
+#else
+              << getpid()
+#endif
+              << ")" << std::endl;
+    std::cout << "[AeroSync] Device name: " << g_state.deviceName << " [ID: " << g_state.deviceId << "]" << std::endl;
+    std::cout << "[AeroSync] Download directory: " << g_state.downloadDir << std::endl;
+    std::cout << "[AeroSync] IPC port: " << ipcPort << ", Transfer port: " << transferPort << std::endl;
+
     if (!g_app->initialize()) {
-        std::cerr << "Failed to initialize AeroSync C++ Core Engine!" << std::endl;
+        std::cerr << "[AeroSync] Error: Failed to initialize AeroSync C++ Core Engine! Cause: Socket bind failure or port conflict on TCP " << transferPort << " or UDP " << aerosync::DISCOVERY_UDP_PORT << "." << std::endl;
         return 1;
     }
 
-    std::cout << "AeroSync C++ Core Daemon started on 127.0.0.1:48126" << std::endl;
-
-    // Start HTTP IPC Server on 127.0.0.1:48126
+    // Start HTTP IPC Server on 127.0.0.1:ipcPort
     socket_t serverSock = socket(AF_INET, SOCK_STREAM, 0);
     if (serverSock == INVALID_SOCKET) {
-        std::cerr << "Failed to create IPC server socket" << std::endl;
+#ifdef _WIN32
+        int err = WSAGetLastError();
+        std::cerr << "[AeroSync] Error: Failed to create IPC server socket (WSA error: " << err << ")" << std::endl;
+#else
+        int err = errno;
+        std::cerr << "[AeroSync] Error: Failed to create IPC server socket (errno " << err << ": " << strerror(err) << ")" << std::endl;
+#endif
         return 1;
     }
 
@@ -689,20 +777,34 @@ int main(int argc, char** argv) {
 
     sockaddr_in serverAddr{};
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(48126);
+    serverAddr.sin_port = htons(ipcPort);
     inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
 
     if (bind(serverSock, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        std::cout << "[Daemon] Another AeroSync Core Daemon is already bound to port 48126. Exiting cleanly." << std::endl;
+#ifdef _WIN32
+        int err = WSAGetLastError();
+        std::cout << "[AeroSync] Notice: IPC port " << ipcPort << " is already bound (WSA error: " << err << "). Another instance may be active." << std::endl;
+#else
+        int err = errno;
+        std::cout << "[AeroSync] Notice: IPC port " << ipcPort << " is already bound (errno " << err << ": " << strerror(err) << "). Another instance may be active." << std::endl;
+#endif
         CLOSE_SOCKET(serverSock);
         return 0;
     }
 
     if (listen(serverSock, 32) == SOCKET_ERROR) {
-        std::cerr << "Failed to listen on IPC socket" << std::endl;
+#ifdef _WIN32
+        int err = WSAGetLastError();
+        std::cerr << "[AeroSync] Error: Failed to listen on IPC socket on port " << ipcPort << " (WSA error: " << err << ")" << std::endl;
+#else
+        int err = errno;
+        std::cerr << "[AeroSync] Error: Failed to listen on IPC socket on port " << ipcPort << " (errno " << err << ": " << strerror(err) << ")" << std::endl;
+#endif
         CLOSE_SOCKET(serverSock);
         return 1;
     }
+
+    std::cout << "[AeroSync] Daemon started successfully (IPC listening on 127.0.0.1:" << ipcPort << ")" << std::endl;
 
     while (g_running) {
         sockaddr_in clientAddr{};

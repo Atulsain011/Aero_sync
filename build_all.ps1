@@ -96,7 +96,7 @@ if (Test-Path $targetApkSrc) {
     if (-not (Test-Path "$root\release")) { New-Item -ItemType Directory -Path "$root\release" -Force }
     Copy-Item $targetApkSrc "$root\AeroSync.apk" -Force
     Copy-Item $targetApkSrc "$root\release\AeroSync.apk" -Force
-    Copy-Item $targetApkSrc "$root\release\AeroSync-v1.0.7.apk" -Force
+    Copy-Item $targetApkSrc "$root\release\AeroSync-v1.0.8.apk" -Force
     if (Test-Path $debugApkSrc) {
         Copy-Item $debugApkSrc "$root\release\app-debug.apk" -Force
     }
@@ -107,9 +107,7 @@ $launcherBat = "@echo off`r`nsetlocal`r`nset `"SCRIPT_DIR=%~dp0`"`r`nif exist `"
 Set-Content -Path "$root\Start_AeroSync_Desktop.bat" -Value $launcherBat
 if (Test-Path "$root\release") {
     Set-Content -Path "$root\release\Start_AeroSync_Desktop.bat" -Value $launcherBat
-    if (Test-Path "$root\Start_AeroSync_Linux.sh") {
-        Copy-Item "$root\Start_AeroSync_Linux.sh" "$root\release\Start_AeroSync_Linux.sh" -Force
-    }
+    # Release directory ready
 }
 
 Write-Host "`n==========================================================" -ForegroundColor Green

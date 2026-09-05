@@ -157,28 +157,72 @@ static void appendResumeJournal(const std::filesystem::path& journalPath, uint32
     }
 }
 
-static std::string sanitizeFilename(const std::string& rawPath) {
+std::string TransferEngine::sanitizeRelativePath(const std::string& rawPath) {
     std::string s = rawPath;
-    size_t lastSlash = s.find_last_of("/\\");
-    if (lastSlash != std::string::npos) {
-        s = s.substr(lastSlash + 1);
+    for (char& c : s) {
+        if (c == '\\') c = '/';
     }
-    size_t colon = s.find_last_of(':');
-    if (colon != std::string::npos) {
-        s = s.substr(colon + 1);
-    }
-    if (s.empty() || s == "." || s == "..") {
-        return "unnamed_file";
-    }
-    std::string clean;
-    for (char c : s) {
-        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|') {
-            clean += '_';
-        } else {
-            clean += c;
+
+    std::vector<std::string> parts;
+    std::stringstream ss(s);
+    std::string item;
+    while (std::getline(ss, item, '/')) {
+        size_t first = item.find_first_not_of(" \t\r\n");
+        if (first == std::string::npos) continue;
+        size_t last = item.find_last_not_of(" \t\r\n");
+        std::string trimmed = item.substr(first, last - first + 1);
+
+        if (trimmed.empty() || trimmed == "." || trimmed == "..") {
+            continue;
+        }
+
+        std::string cleanPart;
+        for (char c : trimmed) {
+            if (c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|') {
+                cleanPart += '_';
+            } else {
+                cleanPart += c;
+            }
+        }
+        if (!cleanPart.empty() && cleanPart != "." && cleanPart != "..") {
+            parts.push_back(cleanPart);
         }
     }
-    return clean;
+
+    if (parts.empty()) {
+        return "unnamed_file";
+    }
+
+    std::string result = parts[0];
+    for (size_t i = 1; i < parts.size(); ++i) {
+        result += "/" + parts[i];
+    }
+    return result;
+}
+
+std::filesystem::path TransferEngine::resolveNonCollidingPath(const std::filesystem::path& targetPath) {
+    std::error_code ec;
+    if (!std::filesystem::exists(targetPath, ec)) {
+        return targetPath;
+    }
+
+    std::filesystem::path parent = targetPath.parent_path();
+    std::string stem = targetPath.stem().string();
+    std::string ext = targetPath.extension().string();
+
+    int counter = 1;
+    while (counter < 10000) {
+        std::filesystem::path candidate = parent / (stem + " (" + std::to_string(counter) + ")" + ext);
+        if (!std::filesystem::exists(candidate, ec)) {
+            return candidate;
+        }
+        counter++;
+    }
+    return targetPath;
+}
+
+static std::string sanitizeFilename(const std::string& rawPath) {
+    return TransferEngine::sanitizeRelativePath(rawPath);
 }
 
 static inline uint64_t hton64_val(uint64_t val) {
@@ -427,9 +471,9 @@ bool TransferEngine::sendFileBatch(int sockFd,
 
             auto now = std::chrono::steady_clock::now();
             auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastReportTime).count();
-            if (elapsedMs >= 100 && progressCb) {
+            if ((elapsedMs >= 100 || packet.header.chunkIndex > 0) && progressCb) {
                 uint64_t bytesDelta = (batchBytesTransferred >= lastReportBytes) ? (batchBytesTransferred - lastReportBytes) : 0;
-                double instantSpeedBps = (bytesDelta * 1000.0) / static_cast<double>(elapsedMs);
+                double instantSpeedBps = (elapsedMs > 0) ? ((bytesDelta * 1000.0) / static_cast<double>(elapsedMs)) : (currentSmoothedSpeedBps > 0.0 ? currentSmoothedSpeedBps : 10000000.0);
                 if (currentSmoothedSpeedBps <= 0.0) {
                     currentSmoothedSpeedBps = instantSpeedBps;
                 } else {
@@ -544,6 +588,14 @@ bool TransferEngine::receiveFileBatch(int sockFd,
         std::filesystem::path finalPath = downloadDirectory / safeName;
         std::filesystem::path partPath = downloadDirectory / (safeName + ".aerosync.part");
         std::filesystem::path journalPath = downloadDirectory / (safeName + ".aerosync.journal");
+
+        // Duplicate handling: if final destination file already exists and we're not resuming an active .part file,
+        // resolve to a non-colliding path like "file (1).ext"
+        if (std::filesystem::exists(finalPath) && !std::filesystem::exists(partPath)) {
+            finalPath = resolveNonCollidingPath(finalPath);
+            partPath = finalPath.string() + ".aerosync.part";
+            journalPath = finalPath.string() + ".aerosync.journal";
+        }
 
         if (finalPath.has_parent_path()) {
             std::error_code ecDir;
@@ -720,9 +772,9 @@ bool TransferEngine::receiveFileBatch(int sockFd,
 
             auto now = std::chrono::steady_clock::now();
             auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastReportTime).count();
-            if (elapsedMs >= 100 && progressCb) {
+            if ((elapsedMs >= 100 || header.chunkIndex > 0) && progressCb) {
                 uint64_t bytesDelta = (batchBytesTransferred >= lastReportBytes) ? (batchBytesTransferred - lastReportBytes) : 0;
-                double instantSpeedBps = (bytesDelta * 1000.0) / static_cast<double>(elapsedMs);
+                double instantSpeedBps = (elapsedMs > 0) ? ((bytesDelta * 1000.0) / static_cast<double>(elapsedMs)) : (currentSmoothedSpeedBps > 0.0 ? currentSmoothedSpeedBps : 10000000.0);
                 if (currentSmoothedSpeedBps <= 0.0) {
                     currentSmoothedSpeedBps = instantSpeedBps;
                 } else {

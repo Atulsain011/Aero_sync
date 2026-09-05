@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$SCRIPT_DIR"
 
 echo "=========================================================="
-echo " AEROSYNC LINUX PRODUCTION BUILD PIPELINE (v1.0.7)"
+echo " AEROSYNC LINUX PRODUCTION BUILD PIPELINE (v1.0.8)"
 echo "=========================================================="
 
 # Check for required build tools
@@ -37,13 +37,13 @@ echo -e "\n[1/4] Building Linux Native Core Daemon (aerosync_daemon)..."
 mkdir -p "$ROOT_DIR/build_linux"
 cd "$ROOT_DIR/build_linux"
 
-# Remove non-Linux stale binaries if present
-if [ -f "$ROOT_DIR/build_linux/aerosync_daemon" ] && ! file "$ROOT_DIR/build_linux/aerosync_daemon" 2>/dev/null | grep -q "ld-linux"; then
-    rm -f "$ROOT_DIR/build_linux/aerosync_daemon"
-fi
-if [ -f "$ROOT_DIR/release/aerosync_daemon" ] && ! file "$ROOT_DIR/release/aerosync_daemon" 2>/dev/null | grep -q "ld-linux"; then
-    rm -f "$ROOT_DIR/release/aerosync_daemon"
-fi
+# Remove non-Linux stale binaries and any Windows .exe files
+rm -f "$ROOT_DIR/build_linux/aerosync_daemon"
+rm -f "$ROOT_DIR/release/aerosync_daemon"
+rm -f "$ROOT_DIR/platform/windows/desktop_tauri/aerosync_daemon"
+rm -f "$ROOT_DIR/platform/windows/desktop_tauri/src-tauri/aerosync_daemon"
+rm -f "$ROOT_DIR/platform/windows/desktop_tauri/src-tauri/"*.exe
+rm -f "$ROOT_DIR/platform/windows/desktop_tauri/"*.exe
 
 cmake "$ROOT_DIR/platform/windows" \
     -DCMAKE_BUILD_TYPE=Release \
@@ -52,10 +52,38 @@ cmake "$ROOT_DIR/platform/windows" \
 
 cmake --build . --config Release -j$(nproc 2>/dev/null || echo 2)
 
-chmod +x "$ROOT_DIR/build_linux/aerosync_daemon" 2>/dev/null || true
-cp "$ROOT_DIR/build_linux/aerosync_daemon" "$ROOT_DIR/release/aerosync_daemon" 2>/dev/null || true
-cp "$ROOT_DIR/build_linux/aerosync_daemon" "$ROOT_DIR/platform/windows/desktop_tauri/aerosync_daemon" 2>/dev/null || true
-cp "$ROOT_DIR/build_linux/aerosync_daemon" "$ROOT_DIR/platform/windows/desktop_tauri/src-tauri/aerosync_daemon" 2>/dev/null || true
+# Verify built Linux daemon architecture
+DAEMON_PATH="$ROOT_DIR/build_linux/aerosync_daemon"
+if [ ! -f "$DAEMON_PATH" ]; then
+    echo "Error: aerosync_daemon binary was not produced by CMake build!" >&2
+    exit 1
+fi
+chmod 755 "$DAEMON_PATH"
+
+echo "=== Verifying Built Linux Daemon Architecture ==="
+FILE_INFO=$(file "$DAEMON_PATH" 2>/dev/null || true)
+echo "$FILE_INFO"
+
+if ! echo "$FILE_INFO" | grep -q "ELF"; then
+    echo "Error: Built aerosync_daemon is NOT an ELF binary!" >&2
+    exit 1
+fi
+if ! echo "$FILE_INFO" | grep -q -E "x86-64|x86_64"; then
+    echo "Error: Built aerosync_daemon is NOT x86-64 architecture!" >&2
+    exit 1
+fi
+if strings "$DAEMON_PATH" 2>/dev/null | grep -q -E "/system/bin/linker|liblog.so"; then
+    echo "Error: Built aerosync_daemon is an Android binary, not a GNU/Linux desktop binary!" >&2
+    exit 1
+fi
+if command -v ldd >/dev/null 2>&1; then
+    echo "Daemon Dynamic Dependencies:"
+    ldd "$DAEMON_PATH" || true
+fi
+
+cp "$DAEMON_PATH" "$ROOT_DIR/release/aerosync_daemon"
+cp "$DAEMON_PATH" "$ROOT_DIR/platform/windows/desktop_tauri/aerosync_daemon"
+cp "$DAEMON_PATH" "$ROOT_DIR/platform/windows/desktop_tauri/src-tauri/aerosync_daemon"
 
 # 2. Build C++ Core Unit Tests & Throughput Benchmark
 echo -e "\n[2/4] Building C++ Test Suite & Benchmark Harness..."
@@ -79,41 +107,23 @@ echo -e "\n[4/4] Building Tauri Linux Release Packages (.AppImage & .deb)..."
 cd "$ROOT_DIR/platform/windows/desktop_tauri"
 
 if command -v cargo >/dev/null 2>&1 || command -v npx >/dev/null 2>&1; then
-    echo "Generating AppImage & DEB packages via Tauri CLI..."
-    npx tauri build --bundles appimage,deb 2>/dev/null || cargo tauri build --bundles appimage,deb 2>/dev/null || cargo build --release
-
-    # Copy output release artifacts
-    find "$ROOT_DIR/platform/windows/desktop_tauri/src-tauri/target/release/bundle/appimage" -name "*.AppImage" -exec cp {} "$ROOT_DIR/release/AeroSync-v1.0.7-x86_64.AppImage" \; 2>/dev/null || true
-    find "$ROOT_DIR/platform/windows/desktop_tauri/src-tauri/target/release/bundle/deb" -name "*.deb" -exec cp {} "$ROOT_DIR/release/aerosync_1.0.7_amd64.deb" \; 2>/dev/null || true
-    cp "$ROOT_DIR/platform/windows/desktop_tauri/src-tauri/target/release/aerosync-desktop" "$ROOT_DIR/release/AeroSync" 2>/dev/null || true
-else
-    echo "Note: Install Rust/Cargo and Tauri CLI to generate native Linux AppImage and DEB packages."
+    echo "Compiling Linux Tauri desktop binary..."
+    cargo build --release || npx tauri build --no-bundle || true
 fi
 
-# Run Linux packaging pipeline
+# Run self-contained Linux packaging pipeline
 if [ -f "$ROOT_DIR/package_linux.sh" ]; then
-    bash "$ROOT_DIR/package_linux.sh" || true
+    bash "$ROOT_DIR/package_linux.sh"
 fi
 
-chmod +x "$ROOT_DIR/release/aerosync_daemon" 2>/dev/null || true
-chmod +x "$ROOT_DIR/release/AeroSync" 2>/dev/null || true
-if [ -f "$ROOT_DIR/Start_AeroSync_Linux.sh" ]; then
-    cp "$ROOT_DIR/Start_AeroSync_Linux.sh" "$ROOT_DIR/release/Start_AeroSync_Linux.sh" 2>/dev/null || true
-    chmod +x "$ROOT_DIR/Start_AeroSync_Linux.sh" 2>/dev/null || true
-    chmod +x "$ROOT_DIR/release/Start_AeroSync_Linux.sh" 2>/dev/null || true
-fi
-if [ -f "$ROOT_DIR/release/AeroSync-v1.0.7-x86_64.AppImage" ]; then
-    chmod +x "$ROOT_DIR/release/AeroSync-v1.0.7-x86_64.AppImage" 2>/dev/null || true
+if [ -f "$ROOT_DIR/release/AeroSync-Linux-x86_64.AppImage" ]; then
+    chmod +x "$ROOT_DIR/release/AeroSync-Linux-x86_64.AppImage" 2>/dev/null || true
 fi
 
 echo "=========================================================="
 echo " LINUX BUILD SUCCESSFUL! RELEASE ARTIFACTS READY:"
 echo "=========================================================="
-echo " 1. Linux Core Daemon:    $ROOT_DIR/release/aerosync_daemon"
-echo " 2. Linux Executable:     $ROOT_DIR/release/AeroSync"
-echo " 3. AppImage Container:   $ROOT_DIR/release/AeroSync-v1.0.7-x86_64.AppImage"
-echo " 4. Debian DEB Package:   $ROOT_DIR/release/aerosync_1.0.7_amd64.deb"
-echo " 5. Linux Portable Tar:   $ROOT_DIR/release/AeroSync-Linux-Portable.tar.gz"
-echo " 6. Linux Test Runner:    $ROOT_DIR/build_tests_linux/test_core_engine"
-echo " 7. Linux Benchmark:      $ROOT_DIR/build_tests_linux/aerosync_benchmark"
+echo " 1. Linux — AppImage (Recommended): $ROOT_DIR/release/AeroSync-Linux-x86_64.AppImage"
+echo " 2. Linux — Debian/Ubuntu (.deb):   $ROOT_DIR/release/aerosync_1.0.8_amd64.deb"
 echo "=========================================================="
+

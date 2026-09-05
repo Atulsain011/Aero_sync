@@ -33,7 +33,9 @@ public:
 private:
     void broadcastLoop();
     void listenLoop();
+    void logNetworkInterfaces();
     void parseBeacon(const std::string& data, const std::string& senderIp);
+    void sendDirectResponse(const std::string& targetIp, uint16_t targetPort);
     uint64_t getCurrentTimeMs() const;
 
     std::string m_localDeviceId;
@@ -51,6 +53,9 @@ private:
 
     mutable std::mutex m_targetsMutex;
     std::vector<std::string> m_customTargets;
+
+    mutable std::mutex m_responseMutex;
+    std::unordered_map<std::string, uint64_t> m_lastResponseTime;
 
     std::atomic<int> m_udpSocket{-1};
 };

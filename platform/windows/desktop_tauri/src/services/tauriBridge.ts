@@ -175,5 +175,56 @@ export const tauriBridge = {
         new Notification(title, { body });
       } catch {}
     }
+  },
+
+  getDaemonStatus: async (): Promise<{
+    is_running: boolean;
+    port_listening: boolean;
+    daemon_path: string | null;
+    error: string | null;
+    log_path: string | null;
+    port: number;
+  }> => {
+    if (isTauriAvailable()) {
+      try {
+        return await invoke<{
+          is_running: boolean;
+          port_listening: boolean;
+          daemon_path: string | null;
+          error: string | null;
+          log_path: string | null;
+          port: number;
+        }>('get_daemon_status');
+      } catch (err: any) {
+        console.warn('Failed to query daemon status via Tauri:', err);
+        return {
+          is_running: false,
+          port_listening: false,
+          daemon_path: null,
+          error: err?.message || 'Failed to query daemon status via Tauri IPC',
+          log_path: null,
+          port: 48126
+        };
+      }
+    }
+    return {
+      is_running: false,
+      port_listening: false,
+      daemon_path: null,
+      error: 'Tauri IPC runtime unavailable (web preview mode)',
+      log_path: null,
+      port: 48126
+    };
+  },
+
+  restartDaemon: async (): Promise<boolean> => {
+    if (isTauriAvailable()) {
+      try {
+        return await invoke<boolean>('restart_daemon');
+      } catch (err) {
+        console.warn('Failed to restart daemon via Tauri:', err);
+      }
+    }
+    return false;
   }
 };

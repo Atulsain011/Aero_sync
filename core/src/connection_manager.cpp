@@ -25,27 +25,7 @@
 namespace aerosync {
 
 static std::string sanitizeFilename(const std::string& rawPath) {
-    std::string s = rawPath;
-    size_t lastSlash = s.find_last_of("/\\");
-    if (lastSlash != std::string::npos) {
-        s = s.substr(lastSlash + 1);
-    }
-    size_t colon = s.find_last_of(':');
-    if (colon != std::string::npos) {
-        s = s.substr(colon + 1);
-    }
-    if (s.empty() || s == "." || s == "..") {
-        return "unnamed_file";
-    }
-    std::string clean;
-    for (char c : s) {
-        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|') {
-            clean += '_';
-        } else {
-            clean += c;
-        }
-    }
-    return clean;
+    return TransferEngine::sanitizeRelativePath(rawPath);
 }
 
 struct ConsentState {
@@ -71,10 +51,12 @@ bool ConnectionManager::startServer() {
 
     m_serverSockFd = SocketTransport::createTcpServer(m_serverPort);
     if (m_serverSockFd < 0) {
+        std::cerr << "[AeroSync] Error: TCP transfer server failed to bind port " << m_serverPort << std::endl;
         m_running = false;
         return false;
     }
 
+    std::cout << "[AeroSync] Transfer server listening on 0.0.0.0:" << m_serverPort << std::endl;
     m_serverThread = std::thread(&ConnectionManager::serverLoop, this);
     return true;
 }

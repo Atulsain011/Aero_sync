@@ -67,7 +67,16 @@ void SocketTransport::configureHighThroughputSocket(int sockFd, size_t bufferSiz
 
 int SocketTransport::createTcpServer(uint16_t port) {
     socket_t listenSock = socket(AF_INET, SOCK_STREAM, 0);
-    if (listenSock == INVALID_SOCKET) return -1;
+    if (listenSock == INVALID_SOCKET) {
+#ifdef _WIN32
+        int err = WSAGetLastError();
+        fprintf(stderr, "[AeroSync] Error: Failed to create TCP server socket (WSA error: %d)\n", err);
+#else
+        int err = errno;
+        fprintf(stderr, "[AeroSync] Error: Failed to create TCP server socket (errno %d: %s)\n", err, strerror(err));
+#endif
+        return -1;
+    }
 
     int reuse = 1;
     setsockopt(listenSock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse));
@@ -78,11 +87,25 @@ int SocketTransport::createTcpServer(uint16_t port) {
     addr.sin_addr.s_addr = INADDR_ANY;
 
     if (bind(listenSock, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) {
+#ifdef _WIN32
+        int err = WSAGetLastError();
+        fprintf(stderr, "[AeroSync] Error: Failed to bind TCP server port %d (WSA error: %d). Cause: Port already in use.\n", port, err);
+#else
+        int err = errno;
+        fprintf(stderr, "[AeroSync] Error: Failed to bind TCP server port %d (errno %d: %s). Cause: Port already in use.\n", port, err, strerror(err));
+#endif
         CLOSE_SOCKET(listenSock);
         return -1;
     }
 
     if (listen(listenSock, 64) == SOCKET_ERROR) {
+#ifdef _WIN32
+        int err = WSAGetLastError();
+        fprintf(stderr, "[AeroSync] Error: Failed to listen on TCP server port %d (WSA error: %d)\n", port, err);
+#else
+        int err = errno;
+        fprintf(stderr, "[AeroSync] Error: Failed to listen on TCP server port %d (errno %d: %s)\n", port, err, strerror(err));
+#endif
         CLOSE_SOCKET(listenSock);
         return -1;
     }

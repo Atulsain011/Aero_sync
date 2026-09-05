@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=AeroSync
+GenericName=File Transfer
+Comment=Ultra High-Speed Cross-Platform Peer-to-Peer File Transfer
+Exec=aerosync %U
+Icon=aerosync
+Terminal=false
+Type=Application
+Categories=Utility;
+Keywords=P2P;File;Share;Transfer;Speed;AeroSync;
+StartupWMClass=aerosync
+MimeType=x-scheme-handler/aerosync;
