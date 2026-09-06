@@ -300,7 +300,17 @@ export function useAeroSyncStore() {
             deviceName: (p.deviceName || (p as any).device_name || '').trim() || `${p.platform || 'Device'} (${p.ipAddress})`
           }))
           .filter((p, idx, arr) => arr.findIndex(x => x.deviceId === p.deviceId) === idx);
-        setPeers(filteredPeers);
+
+        setPeers(prev => {
+          if (
+            prev.length === filteredPeers.length &&
+            prev.every((p, idx) => p.deviceId === filteredPeers[idx].deviceId && p.ipAddress === filteredPeers[idx].ipAddress && p.deviceName === filteredPeers[idx].deviceName)
+          ) {
+            return prev;
+          }
+          return filteredPeers;
+        });
+
         setIsTransferring(data.isTransferring);
         latestTransferringRef.current = data.isTransferring;
         setCurrentProgress(data.currentProgress || {
@@ -316,7 +326,6 @@ export function useAeroSyncStore() {
         });
 
         if (data.downloadDir && data.downloadDir !== settings.downloadDirectory) {
-          // Sync download directory from daemon if configured
           setSettings(prev => ({ ...prev, downloadDirectory: data.downloadDir }));
         }
 
@@ -340,18 +349,29 @@ export function useAeroSyncStore() {
         }
 
         // Handle completed transfer migration from active queue to history immediately
-        const isProgressComplete = data.currentProgress && (data.currentProgress.state === 3 /* COMPLETED */ || data.currentProgress.progressPercent >= 100);
+        // Note: TransferState in C++ is: 0=IDLE, 1=WAITING, 2=CONNECTING, 3=TRANSFERRING, 4=COMPLETED, 7=CANCELLED
+        const isProgressComplete = data.currentProgress && (
+          data.currentProgress.state === 4 /* COMPLETED */ ||
+          (data.currentProgress.progressPercent >= 100 && data.currentProgress.fileBytesTransferred > 0 && data.currentProgress.fileBytesTransferred >= data.currentProgress.fileSize)
+        );
+
         if (isProgressComplete) {
           const completedName = data.currentProgress.currentFileName || (queue[0] ? queue[0].name : '');
           if (completedName && completedName !== lastActiveFileRef.current) {
             lastActiveFileRef.current = completedName;
 
+            const matchingQueueItem = queue.find(q => q.name === completedName);
+            const isOutgoing = Boolean(matchingQueueItem && matchingQueueItem.path);
+            const sep = isLinux ? '/' : '\\';
+            const baseDir = (data.downloadDir || settings.downloadDirectory || '').replace(/[/\\]+$/, '');
+            const targetFilePath = isOutgoing ? matchingQueueItem!.path : `${baseDir}${sep}${completedName}`;
+
             const newRecord: TransferHistoryRecord = {
               id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
               fileName: completedName,
-              filePath: `${settings.downloadDirectory}\\${completedName}`,
+              filePath: targetFilePath,
               fileSize: data.currentProgress.fileSize || (queue[0] ? queue[0].size : 0),
-              direction: 'received',
+              direction: isOutgoing ? 'sent' : 'received',
               peerName: selectedPeer ? selectedPeer.deviceName : 'Peer Device',
               peerIp: selectedPeer ? selectedPeer.ipAddress : 'LAN',
               status: 'completed',
@@ -379,7 +399,8 @@ export function useAeroSyncStore() {
 
             // Trigger desktop notification if enabled
             if (settings.notificationsEnabled) {
-              tauriBridge.sendNotification('AeroSync Transfer Complete', `Received "${completedName}" successfully.`);
+              const actionLabel = isOutgoing ? 'Sent' : 'Received';
+              tauriBridge.sendNotification('AeroSync Transfer Complete', `${actionLabel} "${completedName}" successfully.`);
             }
 
             refreshStorage();
@@ -406,8 +427,8 @@ export function useAeroSyncStore() {
       }
 
       if (!isCancelled) {
-        // High responsiveness: 80ms when transferring, 250ms when idle, 80ms when connecting
-        const interval = !isDaemonOnline ? 80 : (latestTransferringRef.current ? 80 : 250);
+        // Coalesced adaptive polling: 150ms when transferring (smooth 60fps CSS interpolation), 400ms when idle, 120ms when connecting
+        const interval = !isDaemonOnline ? 120 : (latestTransferringRef.current ? 150 : 400);
         timer = window.setTimeout(poll, interval);
       }
     };

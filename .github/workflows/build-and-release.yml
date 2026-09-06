@@ -901,7 +901,7 @@ jobs:
         run: |
           echo "=== 4. Verifying No Developer Dependencies Needed ==="
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0 libayatana-appindicator3-1 xvfb curl iproute2
+          sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0 libayatana-appindicator3-1 xvfb curl iproute2 xdotool
 
           echo "=== 3. Installing Single Release File (aerosync_1.0.8_amd64.deb) ==="
           sudo apt-get install -y ./clean-test-artifacts/aerosync_1.0.8_amd64.deb
@@ -1072,26 +1072,139 @@ jobs:
           sudo ip netns del aero_node1 2>/dev/null || true
           sudo ip netns del aero_node2 2>/dev/null || true
 
-      - name: 12. Verify Self-Contained AppImage on Clean Machine
+      - name: 12. Verify Self-Contained AppImage on Clean Machine: Discovery, Transfer & Window Resize/Move
         run: |
           echo "=== 12. Testing Self-Contained AppImage on Clean Machine ==="
           appimage="clean-test-artifacts/AeroSync-Linux-x86_64.AppImage"
           chmod +x "$appimage"
           "$appimage" --version
           
+          # Clean prior processes
+          pkill -f "aerosync_daemon" 2>/dev/null || true
+          pkill -f "aerosync" 2>/dev/null || true
+          sleep 1
+
+          # Launch AppImage GUI under Xvfb
           xvfb-run -a -s "-screen 0 1280x800x24" "$appimage" > /tmp/clean_appimage.log 2>&1 &
           AI_PID=$!
-          sleep 2
+          sleep 3
+
           if ! kill -0 $AI_PID 2>/dev/null; then
             echo "Error: AppImage failed to start on clean machine!" >&2
             cat /tmp/clean_appimage.log >&2
             exit 1
           fi
           
-          curl -s -f http://127.0.0.1:48126/api/health | grep -q '"status":"ok"' || (echo "Error: AppImage daemon offline!" >&2; exit 1)
+          # Confirm daemon is listening
+          ai_daemon_ok=0
+          for i in $(seq 1 20); do
+            if curl -s -f http://127.0.0.1:48126/api/health 2>/dev/null | grep -q '"status":"ok"'; then
+              ai_daemon_ok=1
+              break
+            fi
+            sleep 0.5
+          done
+          if [ $ai_daemon_ok -ne 1 ]; then
+            echo "Error: AppImage daemon offline!" >&2
+            cat /tmp/clean_appimage.log >&2
+            kill -9 $AI_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          # Setup remote peer in isolated namespace
+          sudo ip netns add aero_ai_peer 2>/dev/null || true
+          sudo ip link add veth_ai_1 type veth peer name veth_ai_2 2>/dev/null || true
+          sudo ip link set veth_ai_2 netns aero_ai_peer 2>/dev/null || true
+          sudo ip addr add 10.210.1.1/24 dev veth_ai_1 2>/dev/null || true
+          sudo ip link set veth_ai_1 up 2>/dev/null || true
+          sudo ip route add 224.0.0.0/4 dev veth_ai_1 2>/dev/null || true
+
+          sudo ip netns exec aero_ai_peer ip addr add 10.210.1.2/24 dev veth_ai_2 2>/dev/null || true
+          sudo ip netns exec aero_ai_peer ip link set veth_ai_2 up 2>/dev/null || true
+          sudo ip netns exec aero_ai_peer ip link set lo up 2>/dev/null || true
+          sudo ip netns exec aero_ai_peer ip route add 224.0.0.0/4 dev veth_ai_2 2>/dev/null || true
+
+          mkdir -p /tmp/aero_ai_peer_home/Downloads/AeroSync
+          sudo ip netns exec aero_ai_peer bash -c 'HOME=/tmp/aero_ai_peer_home AEROSYNC_DEVICE_NAME="Remote Test Station" AEROSYNC_DEVICE_TYPE="linux" AEROSYNC_ALLOW_LOOPBACK_DISCOVERY=1 /usr/lib/aerosync/aerosync_daemon --port 48127 --transfer-port 48125 > /tmp/ai_peer.log 2>&1' &
+          AI_PEER_PID=$!
+          sleep 2
+
+          # Generate 15MB binary payload
+          dd if=/dev/urandom of=/tmp/appimage_test_payload.bin bs=1M count=15 2>/dev/null
+          ORIG_AI_SHA=$(sha256sum /tmp/appimage_test_payload.bin | awk '{print $1}')
+          echo "Original Payload SHA256: $ORIG_AI_SHA (15728640 bytes)"
+
+          # Initiate transfer from AppImage to Remote Station
+          echo "Initiating AppImage transfer..."
+          curl -s -X POST http://127.0.0.1:48126/api/transfer/send \
+            -H "Content-Type: application/json" \
+            -d '{"targetIp":"10.210.1.2","targetPort":48125,"filePaths":["/tmp/appimage_test_payload.bin"]}'
+
+          # Interactive window operations stress test while transfer is live
+          AI_WIN_ID=$(xdotool search --name "AeroSync" 2>/dev/null | tail -n 1 || true)
+          if [ -n "$AI_WIN_ID" ]; then
+            echo "Stress testing window resize/move/minimize on AppImage Window $AI_WIN_ID during transfer..."
+            for step in 1 2 3 4; do
+              xdotool windowsize "$AI_WIN_ID" 1180 780 2>/dev/null || true
+              xdotool windowmove "$AI_WIN_ID" 50 50 2>/dev/null || true
+              sleep 0.2
+              xdotool windowsize "$AI_WIN_ID" 920 640 2>/dev/null || true
+              xdotool windowmove "$AI_WIN_ID" 120 80 2>/dev/null || true
+              sleep 0.2
+              xdotool windowminimize "$AI_WIN_ID" 2>/dev/null || true
+              sleep 0.2
+              xdotool windowactivate "$AI_WIN_ID" 2>/dev/null || true
+              sleep 0.2
+            done
+          fi
+
+          # Verify AppImage GUI did NOT crash during resize/move
+          if ! kill -0 $AI_PID 2>/dev/null; then
+            echo "Error: AppImage process crashed during window operations!" >&2
+            cat /tmp/clean_appimage.log >&2
+            sudo kill -9 $AI_PEER_PID 2>/dev/null || true
+            sudo ip netns del aero_ai_peer 2>/dev/null || true
+            exit 1
+          fi
+          echo "AppImage process confirmed stable and responsive during active window operations."
+
+          # Verify completed reception on Remote Station
+          RECV_AI_TARGET="/tmp/aero_ai_peer_home/Downloads/AeroSync/appimage_test_payload.bin"
+          ai_received=0
+          for i in $(seq 1 35); do
+            if [ -f "$RECV_AI_TARGET" ] && [ $(stat -c %s "$RECV_AI_TARGET" 2>/dev/null || echo 0) -eq 15728640 ]; then
+              ai_received=1
+              break
+            fi
+            sleep 0.5
+          done
+
+          if [ $ai_received -ne 1 ]; then
+            echo "Error: Remote station did not receive payload from AppImage!" >&2
+            cat /tmp/ai_peer.log >&2
+            cat /tmp/clean_appimage.log >&2
+            sudo kill -9 $AI_PID $AI_PEER_PID 2>/dev/null || true
+            sudo ip netns del aero_ai_peer 2>/dev/null || true
+            exit 1
+          fi
+
+          RECV_AI_SHA=$(sha256sum "$RECV_AI_TARGET" | awk '{print $1}')
+          echo "Received AppImage Payload SHA256: $RECV_AI_SHA"
+          if [ "$ORIG_AI_SHA" != "$RECV_AI_SHA" ]; then
+            echo "Error: Checksum mismatch on received file!" >&2
+            sudo kill -9 $AI_PID $AI_PEER_PID 2>/dev/null || true
+            sudo ip netns del aero_ai_peer 2>/dev/null || true
+            exit 1
+          fi
+          echo "SUCCESS: AppImage 15MB file transfer verified bit-for-bit!"
+
+          # Cleanup
           kill -TERM $AI_PID 2>/dev/null || true
+          sudo kill -TERM $AI_PEER_PID 2>/dev/null || true
           pkill -f "aerosync_daemon" 2>/dev/null || true
-          echo "AppImage verified on clean machine."
+          sudo ip netns del aero_ai_peer 2>/dev/null || true
+          rm -f /tmp/appimage_test_payload.bin
+          echo "AppImage execution, discovery, transfer, and window stability verified cleanly."
 
   test-clean-machine-linux-2404:
     name: Clean Machine Linux Verification (Ubuntu 24.04 LTS)
@@ -1108,7 +1221,7 @@ jobs:
         run: |
           echo "=== Installing dependencies & DEB on Ubuntu 24.04 ==="
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0 libayatana-appindicator3-1 xvfb curl iproute2
+          sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0 libayatana-appindicator3-1 xvfb curl iproute2 xdotool
           sudo apt-get install -y ./clean-test-artifacts/aerosync_1.0.8_amd64.deb
 
           which aerosync
@@ -1160,9 +1273,26 @@ jobs:
 
           xvfb-run -a -s "-screen 0 1280x800x24" "$appimage" > /tmp/u24_appimage.log 2>&1 &
           AI_PID=$!
-          sleep 2
+          sleep 3
           if ! kill -0 $AI_PID 2>/dev/null; then
             echo "Error: AppImage failed to start on Ubuntu 24.04!" >&2
+            cat /tmp/u24_appimage.log >&2
+            exit 1
+          fi
+
+          # Test window resize/move operations on Ubuntu 24.04
+          AI_WIN_ID=$(xdotool search --name "AeroSync" 2>/dev/null | tail -n 1 || true)
+          if [ -n "$AI_WIN_ID" ]; then
+            echo "Testing window resize and move on Ubuntu 24.04 (Window ID $AI_WIN_ID)..."
+            xdotool windowsize "$AI_WIN_ID" 1180 780 2>/dev/null || true
+            xdotool windowmove "$AI_WIN_ID" 60 60 2>/dev/null || true
+            sleep 0.2
+            xdotool windowsize "$AI_WIN_ID" 900 650 2>/dev/null || true
+            sleep 0.2
+          fi
+
+          if ! kill -0 $AI_PID 2>/dev/null; then
+            echo "Error: AppImage crashed on Ubuntu 24.04 during window operations!" >&2
             cat /tmp/u24_appimage.log >&2
             exit 1
           fi

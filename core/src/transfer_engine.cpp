@@ -472,13 +472,14 @@ bool TransferEngine::sendFileBatch(int sockFd,
 
             auto now = std::chrono::steady_clock::now();
             auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastReportTime).count();
-            if ((elapsedMs >= 100 || packet.header.chunkIndex > 0) && progressCb) {
+            bool isFileEnd = (fileBytesTransferred >= fileMeta.fileSize);
+            if ((elapsedMs >= 120 || isFileEnd) && progressCb) {
                 uint64_t bytesDelta = (batchBytesTransferred >= lastReportBytes) ? (batchBytesTransferred - lastReportBytes) : 0;
-                double instantSpeedBps = (elapsedMs > 0) ? ((bytesDelta * 1000.0) / static_cast<double>(elapsedMs)) : (currentSmoothedSpeedBps > 0.0 ? currentSmoothedSpeedBps : 10000000.0);
+                double instantSpeedBps = (elapsedMs > 0) ? ((bytesDelta * 1000.0) / static_cast<double>(elapsedMs)) : currentSmoothedSpeedBps;
                 if (currentSmoothedSpeedBps <= 0.0) {
                     currentSmoothedSpeedBps = instantSpeedBps;
-                } else {
-                    currentSmoothedSpeedBps = 0.65 * currentSmoothedSpeedBps + 0.35 * instantSpeedBps;
+                } else if (instantSpeedBps > 0.0) {
+                    currentSmoothedSpeedBps = 0.80 * currentSmoothedSpeedBps + 0.20 * instantSpeedBps;
                 }
                 double remainingBytes = (manifest.totalBytes > batchBytesTransferred) ? (manifest.totalBytes - batchBytesTransferred) : 0;
                 double etaSec = currentSmoothedSpeedBps > 0 ? (remainingBytes / currentSmoothedSpeedBps) : 0.0;
@@ -773,13 +774,14 @@ bool TransferEngine::receiveFileBatch(int sockFd,
 
             auto now = std::chrono::steady_clock::now();
             auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastReportTime).count();
-            if ((elapsedMs >= 100 || header.chunkIndex > 0) && progressCb) {
+            bool isFileEnd = (fileBytesReceived >= fileMeta.fileSize);
+            if ((elapsedMs >= 120 || isFileEnd) && progressCb) {
                 uint64_t bytesDelta = (batchBytesTransferred >= lastReportBytes) ? (batchBytesTransferred - lastReportBytes) : 0;
-                double instantSpeedBps = (elapsedMs > 0) ? ((bytesDelta * 1000.0) / static_cast<double>(elapsedMs)) : (currentSmoothedSpeedBps > 0.0 ? currentSmoothedSpeedBps : 10000000.0);
+                double instantSpeedBps = (elapsedMs > 0) ? ((bytesDelta * 1000.0) / static_cast<double>(elapsedMs)) : currentSmoothedSpeedBps;
                 if (currentSmoothedSpeedBps <= 0.0) {
                     currentSmoothedSpeedBps = instantSpeedBps;
-                } else {
-                    currentSmoothedSpeedBps = 0.65 * currentSmoothedSpeedBps + 0.35 * instantSpeedBps;
+                } else if (instantSpeedBps > 0.0) {
+                    currentSmoothedSpeedBps = 0.80 * currentSmoothedSpeedBps + 0.20 * instantSpeedBps;
                 }
                 double remainingBytes = (manifest.totalBytes > batchBytesTransferred) ? (manifest.totalBytes - batchBytesTransferred) : 0;
                 double etaSec = currentSmoothedSpeedBps > 0 ? (remainingBytes / currentSmoothedSpeedBps) : 0.0;

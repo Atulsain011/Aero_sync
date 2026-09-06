@@ -408,9 +408,13 @@ fi
 
 # 3. Configure Environment for WebKitGTK & System Integration
 export PATH="$HERE/usr/bin:$HERE:$PATH"
+export XDG_DATA_DIRS="${HERE}/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 
 # Ubuntu 24.04/23.10 and Debian 12 AppArmor unprivileged user namespace fix
 export WEBKIT_FORCE_SANDBOX=0
+
+# Fix WebKitGTK DMA-BUF surface recreation crash on window resize/move
+export WEBKIT_DISABLE_DMABUF_RENDERER=1
 
 # NVIDIA driver Wayland explicit sync fix
 export __NV_DISABLE_EXPLICIT_SYNC=1
@@ -612,6 +616,9 @@ export PATH="$LIB_DIR:$PATH"
 
 # Ubuntu 24.04/23.10 and Debian 12 AppArmor unprivileged user namespace fix
 export WEBKIT_FORCE_SANDBOX=0
+
+# Fix WebKitGTK DMA-BUF surface recreation crash on window resize/move
+export WEBKIT_DISABLE_DMABUF_RENDERER=1
 
 # NVIDIA driver Wayland explicit sync fix
 export __NV_DISABLE_EXPLICIT_SYNC=1

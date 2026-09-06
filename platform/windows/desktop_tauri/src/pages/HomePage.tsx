@@ -258,8 +258,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <button
                   className="btn btn-sm btn-ghost"
                   onClick={() => tauriBridge.showInFolder(item.filePath)}
+                  title="Explore / Show in Folder"
                 >
-                  Show in Explorer
+                  Show in Folder
                 </button>
               </div>
             ))}

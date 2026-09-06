@@ -108,10 +108,10 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                     <button
                       className="btn btn-sm btn-ghost"
                       onClick={() => tauriBridge.showInFolder(record.filePath)}
-                      title="Open in Windows Explorer"
+                      title="Explore / Show in Folder"
                     >
                       <ExternalLink size={13} />
-                      <span>Explorer</span>
+                      <span>Explore</span>
                     </button>
                   </div>
                 </div>

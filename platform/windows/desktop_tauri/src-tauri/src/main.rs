@@ -509,19 +509,43 @@ fn show_in_folder(path: String) -> Result<(), String> {
     }
     #[cfg(not(windows))]
     {
-        let p = Path::new(&path);
-        if !p.exists() {
-            return Err("File path does not exist".into());
-        }
-        let target = if p.is_file() {
-            p.parent().unwrap_or(p)
+        let clean_path = path.replace('\\', "/");
+        let p = Path::new(&clean_path);
+        
+        let resolved_path = if p.exists() {
+            p.to_path_buf()
+        } else if let Ok(home) = std::env::var("HOME") {
+            let filename = p.file_name().unwrap_or_default();
+            let dl_candidate = PathBuf::from(&home).join("Downloads").join("AeroSync").join(filename);
+            if dl_candidate.exists() {
+                dl_candidate
+            } else {
+                let dl_folder = PathBuf::from(&home).join("Downloads").join("AeroSync");
+                if dl_folder.exists() {
+                    dl_folder
+                } else {
+                    let parent = p.parent().unwrap_or(p);
+                    if parent.exists() {
+                        parent.to_path_buf()
+                    } else {
+                        return Err(format!("File path '{}' does not exist", clean_path));
+                    }
+                }
+            }
         } else {
-            p
+            return Err(format!("File path '{}' does not exist", clean_path));
         };
+
+        let target = if resolved_path.is_file() {
+            resolved_path.parent().unwrap_or(&resolved_path).to_path_buf()
+        } else {
+            resolved_path
+        };
+
         Command::new("xdg-open")
-            .arg(target)
+            .arg(&target)
             .spawn()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| format!("Failed to launch xdg-open: {}", e))?;
         Ok(())
     }
 }
@@ -539,14 +563,24 @@ fn open_folder(path: String) -> Result<(), String> {
     }
     #[cfg(not(windows))]
     {
-        let p = Path::new(&path);
-        if !p.exists() {
-            return Err("Folder path does not exist".into());
-        }
+        let clean_path = path.replace('\\', "/");
+        let p = Path::new(&clean_path);
+        let target = if p.exists() {
+            p.to_path_buf()
+        } else if let Ok(home) = std::env::var("HOME") {
+            let dl = PathBuf::from(&home).join("Downloads").join("AeroSync");
+            if dl.exists() {
+                dl
+            } else {
+                return Err(format!("Folder '{}' does not exist", clean_path));
+            }
+        } else {
+            return Err(format!("Folder '{}' does not exist", clean_path));
+        };
         Command::new("xdg-open")
-            .arg(p)
+            .arg(target)
             .spawn()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| format!("Failed to launch xdg-open: {}", e))?;
         Ok(())
     }
 }
@@ -1012,12 +1046,17 @@ fn main() {
             std::env::set_var("WEBKIT_FORCE_SANDBOX", "0");
         }
 
-        // 2. NVIDIA driver Wayland explicit sync fix
+        // 2. WebKitGTK DMA-BUF renderer incompatibility fix (fixes WebKitWebProcess EGL surface recreation SIGTRAP crash during window move/resize)
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+
+        // 3. NVIDIA driver Wayland explicit sync fix
         if std::env::var_os("__NV_DISABLE_EXPLICIT_SYNC").is_none() {
             std::env::set_var("__NV_DISABLE_EXPLICIT_SYNC", "1");
         }
 
-        // 3. Software rendering fallback (only when explicitly requested)
+        // 4. Software rendering fallback (only when explicitly requested)
         let force_sw = std::env::args().any(|arg| arg == "--software-render" || arg == "--disable-gpu")
             || std::env::var("AEROSYNC_FORCE_SOFTWARE_RENDER").map(|v| v == "1" || v == "true").unwrap_or(false);
 
