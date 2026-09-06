@@ -106,114 +106,25 @@ fi
 echo "Found Icon Source:   $ICON_SRC"
 
 # ------------------------------------------------------------------------------
-# 2. Collect WebKitGTK 4.1 Shared Libraries & Helper Binaries for Bundling
+# 2. Prepare Application Binaries & Assets
 # ------------------------------------------------------------------------------
-echo -e "\n[1/3] Collecting WebKitGTK 4.1 and Runtime Dependencies..."
+echo -e "\n[1/3] Preparing native application binaries and assets..."
 
-STAGING_LIB_DIR="$ROOT_DIR/build_linux_pkg/bundled_libs"
-rm -rf "$STAGING_LIB_DIR"
-mkdir -p "$STAGING_LIB_DIR"
-mkdir -p "$STAGING_LIB_DIR/webkit2gtk-4.1"
-mkdir -p "$STAGING_LIB_DIR/webkit2gtk-4.1/injected-bundle"
-mkdir -p "$STAGING_LIB_DIR/gio/modules"
-
-# WebKitGTK helper processes (WebKitWebProcess, WebKitNetworkProcess) and GIO modules
-# are host system components and must match the host's installed WebKitGTK 4.1 runtime.
-
-# Library Exclude List: Core base system libraries and GPU/display driver interfaces
-# that MUST be resolved dynamically by the host Linux distribution.
-should_exclude() {
-    local lib="$1"
-    case "$lib" in
-        # Core standard C/POSIX runtime (must match host kernel/glibc)
-        libc.so*|libm.so*|libdl.so*|librt.so*|libpthread.so*|libresolv.so*|libutil.so*) return 0 ;;
-        ld-linux*|libnss_*|libnsl.so*) return 0 ;;
-        # GPU drivers & low-level hardware display server bindings
-        libGL.so*|libGLX.so*|libEGL.so*|libGLdispatch.so*|libOpenGL.so*) return 0 ;;
-        libdrm.so*|libgbm.so*|libvulkan.so*) return 0 ;;
-        libX11.so*|libX11-xcb.so*|libxcb*.so*|libXext.so*|libXfixes.so*|libXi.so*|libXdamage.so*|libXcomposite.so*|libXrandr.so*|libXcursor.so*|libXrender.so*|libXinerama.so*) return 0 ;;
-        libwayland-client.so*|libwayland-server.so*|libwayland-cursor.so*|libwayland-egl.so*) return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
-# Note on WebKitGTK: WebKitGTK 4.1, GTK3, GIO, Mesa, and Wayland/X11 are core host system
-# dependencies. Bundling a conflicting build-host WebKitGTK shared library causes fatal
-# ABI and IPC collisions with the host's WebKitWebProcess and GIO event loop.
-SEED_LIBS=()
-
-for seed in "${SEED_LIBS[@]}"; do
-    found_path=""
-    for search_dir in "/usr/lib/x86_64-linux-gnu" "/usr/lib64" "/usr/lib"; do
-        if [ -f "$search_dir/$seed" ]; then
-            found_path="$search_dir/$seed"
-            break
-        fi
-    done
-    if [ -n "$found_path" ]; then
-        echo "Bundling seed library: $found_path"
-        cp -L "$found_path" "$STAGING_LIB_DIR/" 2>/dev/null || true
-        # Also copy real so-name if symlinked
-        real_target=$(readlink -f "$found_path" 2>/dev/null || true)
-        if [ -n "$real_target" ] && [ -f "$real_target" ]; then
-            cp -L "$real_target" "$STAGING_LIB_DIR/" 2>/dev/null || true
-        fi
-    fi
-done
-
-# Scan dependencies of collected libraries and binaries recursively
-echo "Resolving recursive dependencies..."
-MAX_DEPTH=3
-current_depth=0
-while [ $current_depth -lt $MAX_DEPTH ]; do
-    new_found=0
-    targets=($(find "$STAGING_LIB_DIR" "$MAIN_BIN" -type f \( -name "*.so*" -o -perm /111 \) 2>/dev/null))
-    for target in "${targets[@]}"; do
-        deps=$(ldd "$target" 2>/dev/null | grep "=>" | awk '{print $3}' | grep "^/" || true)
-        for dep in $deps; do
-            base_dep=$(basename "$dep")
-            if should_exclude "$base_dep"; then
-                continue
-            fi
-            if [ ! -f "$STAGING_LIB_DIR/$base_dep" ]; then
-                cp -L "$dep" "$STAGING_LIB_DIR/$base_dep" 2>/dev/null || true
-                new_found=1
-            fi
-        done
-    done
-    if [ $new_found -eq 0 ]; then
-        break
-    fi
-    current_depth=$((current_depth + 1))
-done
-
-echo "Total bundled shared libraries: $(ls -1 "$STAGING_LIB_DIR"/*.so* 2>/dev/null | wc -l)"
-
-# Apply RPATH with patchelf if available
-if command -v patchelf >/dev/null 2>&1; then
-    echo "Applying RPATH to bundled libraries..."
-    for sofile in "$STAGING_LIB_DIR"/*.so*; do
-        if [ -f "$sofile" ] && [ ! -L "$sofile" ]; then
-            patchelf --set-rpath '$ORIGIN' "$sofile" 2>/dev/null || true
-        fi
-    done
-    if [ -f "$STAGING_LIB_DIR/webkit2gtk-4.1/WebKitWebProcess" ]; then
-        patchelf --set-rpath '$ORIGIN/..:$ORIGIN' "$STAGING_LIB_DIR/webkit2gtk-4.1/WebKitWebProcess" 2>/dev/null || true
-    fi
-    if [ -f "$STAGING_LIB_DIR/webkit2gtk-4.1/WebKitNetworkProcess" ]; then
-        patchelf --set-rpath '$ORIGIN/..:$ORIGIN' "$STAGING_LIB_DIR/webkit2gtk-4.1/WebKitNetworkProcess" 2>/dev/null || true
-    fi
+# Strip symbols to produce clean, lightweight binaries
+if command -v strip >/dev/null 2>&1; then
+    echo "Stripping unneeded debug symbols from native binaries..."
+    strip --strip-unneeded "$MAIN_BIN" 2>/dev/null || true
+    strip --strip-unneeded "$DAEMON_BIN" 2>/dev/null || true
 fi
 
 # ------------------------------------------------------------------------------
-# 3. Build Self-Contained AppImage (.AppImage)
+# 2. Build Native Linux AppImage (.AppImage)
 # ------------------------------------------------------------------------------
-echo -e "\n[2/3] Building Truly Self-Contained AppImage Container..."
+echo -e "\n[2/3] Building Native Linux AppImage Container..."
 
 APPDIR="$ROOT_DIR/build_linux_pkg/appimage/AeroSync.AppDir"
 rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/bin"
-mkdir -p "$APPDIR/usr/lib"
 mkdir -p "$APPDIR/usr/share/applications"
 mkdir -p "$APPDIR/usr/share/pixmaps"
 
@@ -224,15 +135,6 @@ chmod 755 "$APPDIR/usr/bin/aerosync"
 # Copy verified Linux daemon binary into deterministic layout
 cp "$DAEMON_BIN" "$APPDIR/usr/bin/aerosync_daemon"
 chmod 755 "$APPDIR/usr/bin/aerosync_daemon"
-
-# Copy bundled libraries into AppDir
-cp -a "$STAGING_LIB_DIR"/* "$APPDIR/usr/lib/" 2>/dev/null || true
-
-# Apply RPATH to both desktop binary and daemon
-if command -v patchelf >/dev/null 2>&1; then
-    patchelf --set-rpath '$ORIGIN/../lib:$ORIGIN' "$APPDIR/usr/bin/aerosync" 2>/dev/null || true
-    patchelf --set-rpath '$ORIGIN/../lib:$ORIGIN' "$APPDIR/usr/bin/aerosync_daemon" 2>/dev/null || true
-fi
 
 # Aggressively ensure NO Windows .exe files exist in AppDir
 find "$APPDIR" -type f -name "*.exe" -delete
@@ -522,17 +424,7 @@ if [ "$AEROSYNC_FORCE_SOFTWARE_RENDER" = "1" ] || [[ "$*" == *"--software-render
     export WEBKIT_DISABLE_DMABUF_RENDERER=1
 fi
 
-# 4. Start C++ Daemon in Background if not active
-if [ -f "$HERE/usr/bin/aerosync_daemon" ]; then
-    chmod +x "$HERE/usr/bin/aerosync_daemon" 2>/dev/null || true
-    if ! pgrep -f "aerosync_daemon" >/dev/null 2>&1; then
-        DAEMON_LOG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/AeroSync"
-        mkdir -p "$DAEMON_LOG_DIR" 2>/dev/null || true
-        "$HERE/usr/bin/aerosync_daemon" >> "$DAEMON_LOG_DIR/daemon.log" 2>&1 &
-    fi
-fi
-
-# 5. Launch Main Executable
+# 4. Launch Main Executable (Tauri automatically manages aerosync_daemon lifecycle)
 MAIN_EXEC="$HERE/usr/bin/aerosync"
 chmod +x "$MAIN_EXEC" 2>/dev/null || true
 exec "$MAIN_EXEC" "$@"
@@ -622,12 +514,18 @@ if ! build_appimage_tool; then
     exit 1
 fi
 
-# Sanity check: Ensure AppImage is a real ELF binary and exceeds minimum size
-MIN_APPIMAGE_SIZE=5000000 # 5 MB minimum
+# Sanity check: Ensure AppImage is a real ELF binary and within valid size bounds (3 MB to 30 MB)
+MIN_APPIMAGE_SIZE=3000000  # 3 MB minimum
+MAX_APPIMAGE_SIZE=30000000 # 30 MB maximum (prevents accidental system library bundling bloat)
 ACTUAL_SIZE=$(wc -c < "$APPIMAGE_OUTPUT" 2>/dev/null || stat -c %s "$APPIMAGE_OUTPUT" 2>/dev/null || echo 0)
 if [ "$ACTUAL_SIZE" -lt "$MIN_APPIMAGE_SIZE" ]; then
     echo "Error: Generated AppImage is only $ACTUAL_SIZE bytes (expected >= $MIN_APPIMAGE_SIZE bytes)!" >&2
     echo "The AppImage build was incomplete or failed." >&2
+    exit 1
+fi
+if [ "$ACTUAL_SIZE" -gt "$MAX_APPIMAGE_SIZE" ]; then
+    echo "Error: Generated AppImage is $ACTUAL_SIZE bytes (expected <= $MAX_APPIMAGE_SIZE bytes)!" >&2
+    echo "System libraries were mistakenly bundled into the AppImage!" >&2
     exit 1
 fi
 
@@ -642,9 +540,9 @@ chmod +x "$APPIMAGE_OUTPUT"
 echo "Generated Real ELF AppImage: $APPIMAGE_OUTPUT ($ACTUAL_SIZE bytes)"
 
 # ------------------------------------------------------------------------------
-# 4. Build Self-Contained Debian / Ubuntu / Kubuntu Package (.deb)
+# 3. Build Lightweight Debian / Ubuntu / Kubuntu Package (.deb)
 # ------------------------------------------------------------------------------
-echo -e "\n[3/3] Building Self-Contained Debian Package (.deb)..."
+echo -e "\n[3/3] Building Lightweight Debian Package (.deb)..."
 
 DEB_DIR="$ROOT_DIR/build_linux_pkg/deb/aerosync_${VERSION}_amd64"
 rm -rf "$DEB_DIR"
@@ -726,16 +624,7 @@ if [ "$AEROSYNC_FORCE_SOFTWARE_RENDER" = "1" ] || [[ "$*" == *"--software-render
     export WEBKIT_DISABLE_DMABUF_RENDERER=1
 fi
 
-# Start native daemon in background if not running
-if [ -f "$LIB_DIR/aerosync_daemon" ]; then
-    chmod +x "$LIB_DIR/aerosync_daemon" 2>/dev/null || true
-    if ! pgrep -f "aerosync_daemon" >/dev/null 2>&1; then
-        DAEMON_LOG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/AeroSync"
-        mkdir -p "$DAEMON_LOG_DIR" 2>/dev/null || true
-        "$LIB_DIR/aerosync_daemon" >> "$DAEMON_LOG_DIR/daemon.log" 2>&1 &
-    fi
-fi
-
+# Launch native application (Tauri automatically manages aerosync_daemon lifecycle)
 exec "$LIB_DIR/aerosync" "$@"
 EOF
 chmod 755 "$DEB_DIR/usr/bin/aerosync"
@@ -887,9 +776,20 @@ make_deb('$DEB_DIR', '$DEB_OUTPUT')
 fi
 cp -f "$DEB_OUTPUT" "$RELEASE_DIR/AeroSync-Linux-x86_64.deb" 2>/dev/null || true
 
-# ------------------------------------------------------------------------------
-# Clean Up Obsolete / Broken Release Artifacts
-# ------------------------------------------------------------------------------
+# Sanity check: Ensure DEB package is within valid size bounds (1.5 MB to 20 MB)
+MIN_DEB_SIZE=1500000  # 1.5 MB minimum
+MAX_DEB_SIZE=20000000 # 20 MB maximum (strictly rejects bloated DEBs with bundled system libraries)
+DEB_SIZE=$(wc -c < "$DEB_OUTPUT" 2>/dev/null || stat -c %s "$DEB_OUTPUT" 2>/dev/null || echo 0)
+if [ "$DEB_SIZE" -lt "$MIN_DEB_SIZE" ]; then
+    echo "Error: Generated DEB package is only $DEB_SIZE bytes (expected >= $MIN_DEB_SIZE bytes)!" >&2
+    exit 1
+fi
+if [ "$DEB_SIZE" -gt "$MAX_DEB_SIZE" ]; then
+    echo "Error: Generated DEB package is $DEB_SIZE bytes (expected <= $MAX_DEB_SIZE bytes)!" >&2
+    echo "DEB must NOT bundle system libraries! Declare dependencies in DEBIAN/control instead." >&2
+    exit 1
+fi
+echo "Verified Debian Package Size: $DEB_OUTPUT ($DEB_SIZE bytes)"
 # Strictly avoid publishing broken AppImages, raw binaries, launcher scripts, or incomplete archives
 rm -rf "$ROOT_DIR/build_linux_pkg/portable"
 rm -f "$RELEASE_DIR/AeroSync-Linux-Portable.tar.gz"

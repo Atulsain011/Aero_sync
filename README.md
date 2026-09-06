@@ -27,9 +27,11 @@
 | **Windows (Installer)** | `AeroSync-Setup-v1.0.8.exe` | [**Download Windows Installer (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/AeroSync-Setup-v1.0.8.exe) | `v1.0.8` |
 | **Windows (Portable)** | `AeroSync-Windows-Portable.zip` | [**Download Windows Portable (.zip)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/AeroSync-Windows-Portable.zip) | `v1.0.8` |
 | **Windows (Standalone)** | `AeroSync.exe` | [**Download Windows Executable**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/AeroSync.exe) | `v1.0.8` |
-| **Windows (1-Click Launcher)** | `Start_AeroSync_Desktop.bat` | [**Download Windows 1-Click Launcher**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/Start_AeroSync_Desktop.bat) | `v1.0.8` |
 | **Android (APK)** | `AeroSync.apk` | [**Download Android APK**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.8/AeroSync.apk) | `v1.0.8` |
 | **All Releases** | GitHub Releases | [**Browse All Releases**](https://github.com/Atulsain011/Aero_sync/releases) | `Latest` |
+
+> [!NOTE]
+> **Linux Runtime Requirements**: AeroSync GUI on Linux requires the WebKitGTK 4.1 runtime (`libwebkit2gtk-4.1-0`). On Debian/Ubuntu/Mint, installing our official DEB package automatically resolves dependencies: `sudo apt install ./aerosync_1.0.8_amd64.deb`.
 
 <br>
 

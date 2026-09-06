@@ -82,17 +82,6 @@ jobs:
             Write-Error "Executable not found at $sourceExe"
             exit 1
           }
-          Copy-Item $sourceExe "artifacts/AeroSync.exe" -Force
-
-          $daemonExe = "platform/windows/desktop_tauri/aerosync_daemon.exe"
-          if (Test-Path $daemonExe) {
-            Copy-Item $daemonExe "artifacts/aerosync_daemon.exe" -Force
-          }
-          $dllPath = "platform/windows/desktop_tauri/src-tauri/target/release/WebView2Loader.dll"
-          if (Test-Path $dllPath) {
-            Copy-Item $dllPath "artifacts/WebView2Loader.dll" -Force
-          }
-
           $setupExe = Get-ChildItem "platform/windows/desktop_tauri/src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
           if ($setupExe) {
             Copy-Item $setupExe.FullName "artifacts/AeroSync-Setup-v1.0.8.exe" -Force
@@ -105,18 +94,16 @@ jobs:
           $portableDir = "artifacts/AeroSync-Windows-Portable"
           New-Item -ItemType Directory -Force -Path $portableDir
           Copy-Item $sourceExe "$portableDir/AeroSync.exe" -Force
+          $daemonExe = "platform/windows/desktop_tauri/aerosync_daemon.exe"
           if (Test-Path $daemonExe) {
             Copy-Item $daemonExe "$portableDir/aerosync_daemon.exe" -Force
           }
+          $dllPath = "platform/windows/desktop_tauri/src-tauri/target/release/WebView2Loader.dll"
           if (Test-Path $dllPath) {
             Copy-Item $dllPath "$portableDir/WebView2Loader.dll" -Force
           }
           Compress-Archive -Path "$portableDir/*" -DestinationPath "artifacts/AeroSync-Windows-Portable.zip" -Force
           Remove-Item -Recurse -Force $portableDir
-
-          if (Test-Path "Start_AeroSync_Desktop.bat") {
-            Copy-Item "Start_AeroSync_Desktop.bat" "artifacts/Start_AeroSync_Desktop.bat" -Force
-          }
 
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
@@ -274,8 +261,8 @@ jobs:
           fi
           appimage_size=$(stat -c %s "$appimage_file")
           echo "AppImage size: $appimage_size bytes"
-          if [ "$appimage_size" -lt 5000000 ]; then
-            echo "Error: AppImage is suspiciously small ($appimage_size bytes, expected >= 5MB)!" >&2
+          if [ "$appimage_size" -lt 3000000 ] || [ "$appimage_size" -gt 30000000 ]; then
+            echo "Error: AppImage size $appimage_size bytes outside expected bounds (3MB - 30MB)!" >&2
             exit 1
           fi
 
@@ -290,11 +277,11 @@ jobs:
           fi
           deb_size=$(stat -c %s "$deb_file")
           echo "DEB package size: $deb_size bytes"
-          if [ "$deb_size" -lt 2000000 ]; then
-            echo "Error: DEB package is suspiciously small ($deb_size bytes)!" >&2
+          if [ "$deb_size" -lt 1500000 ] || [ "$deb_size" -gt 20000000 ]; then
+            echo "Error: DEB package size $deb_size bytes outside expected bounds (1.5MB - 20MB)!" >&2
             exit 1
           fi
-          echo "Real AppImage and proper DEB packages successfully generated."
+          echo "Real AppImage and lightweight DEB packages successfully generated."
 
       # ------------------------------------------------------------------------
       # 9. Verify application metadata
@@ -609,7 +596,7 @@ jobs:
           health_ok=0
           discovery_ok=0
 
-          for i in $(seq 1 20); do
+          for i in $(seq 1 30); do
             # Check if application crashed
             if ! kill -0 $APP_PID 2>/dev/null; then
               echo "Error: AeroSync application crashed prematurely during initialization!" >&2
@@ -635,7 +622,10 @@ jobs:
             # Check if daemon responds on HTTP health check
             if curl -s -f http://127.0.0.1:48126/api/health 2>/dev/null | grep -q '"status":"ok"'; then
               health_ok=1
-              echo "Daemon responded to health check on attempt $i!"
+            fi
+
+            if [ $daemon_started -eq 1 ] && [ $port_listening -eq 1 ] && [ $health_ok -eq 1 ]; then
+              echo "AeroSync application and daemon fully initialized on attempt $i!"
               break
             fi
 
@@ -869,10 +859,8 @@ jobs:
           mkdir -p artifacts
           if [ -f "platform/android/app/build/outputs/apk/release/app-release.apk" ]; then
             cp platform/android/app/build/outputs/apk/release/app-release.apk artifacts/AeroSync.apk
-            cp platform/android/app/build/outputs/apk/release/app-release.apk artifacts/AeroSync-v1.0.8.apk
           elif [ -f "platform/android/app/build/outputs/apk/release/app-release-unsigned.apk" ]; then
             cp platform/android/app/build/outputs/apk/release/app-release-unsigned.apk artifacts/AeroSync.apk
-            cp platform/android/app/build/outputs/apk/release/app-release-unsigned.apk artifacts/AeroSync-v1.0.8.apk
           else
             echo "Error: Release APK not found!" >&2
             exit 1
@@ -1105,9 +1093,88 @@ jobs:
           pkill -f "aerosync_daemon" 2>/dev/null || true
           echo "AppImage verified on clean machine."
 
+  test-clean-machine-linux-2404:
+    name: Clean Machine Linux Verification (Ubuntu 24.04 LTS)
+    runs-on: ubuntu-24.04
+    needs: [build-linux]
+    steps:
+      - name: 1. Setup Fresh Machine & Download Release Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: AeroSync-Linux
+          path: clean-test-artifacts
+
+      - name: 2. Install Dependencies & Native DEB Package
+        run: |
+          echo "=== Installing dependencies & DEB on Ubuntu 24.04 ==="
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0 libayatana-appindicator3-1 xvfb curl iproute2
+          sudo apt-get install -y ./clean-test-artifacts/aerosync_1.0.8_amd64.deb
+
+          which aerosync
+          [ -x /usr/bin/aerosync ] || (echo "Error: /usr/bin/aerosync missing!" >&2; exit 1)
+          [ -x /usr/lib/aerosync/aerosync_daemon ] || (echo "Error: /usr/lib/aerosync/aerosync_daemon missing!" >&2; exit 1)
+
+      - name: 3. Launch Installed DEB on Ubuntu 24.04 & Verify No SIGTRAP
+        run: |
+          echo "=== Launching installed AeroSync on Ubuntu 24.04 ==="
+          pkill -f "aerosync_daemon" 2>/dev/null || true
+          pkill -f "aerosync" 2>/dev/null || true
+          sleep 1
+
+          xvfb-run -a -s "-screen 0 1280x800x24" /usr/bin/aerosync > /tmp/u24_app.log 2>&1 &
+          APP_PID=$!
+
+          daemon_ok=0
+          for i in $(seq 1 25); do
+            if ! kill -0 $APP_PID 2>/dev/null; then
+              echo "Error: AeroSync crashed on Ubuntu 24.04 startup!" >&2
+              cat /tmp/u24_app.log >&2
+              exit 1
+            fi
+            if curl -s -f http://127.0.0.1:48126/api/health 2>/dev/null | grep -q '"status":"ok"'; then
+              daemon_ok=1
+              echo "Ubuntu 24.04: Daemon responded to health check on attempt $i!"
+              break
+            fi
+            sleep 0.5
+          done
+
+          if [ $daemon_ok -ne 1 ]; then
+            echo "Error: AeroSync daemon failed to start on Ubuntu 24.04!" >&2
+            cat /tmp/u24_app.log >&2
+            kill -9 $APP_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          kill -TERM $APP_PID 2>/dev/null || true
+          pkill -f "aerosync_daemon" 2>/dev/null || true
+          echo "DEB package execution on Ubuntu 24.04 PASSED with zero crashes."
+
+      - name: 4. Launch AppImage on Ubuntu 24.04 & Verify No SIGTRAP
+        run: |
+          echo "=== Launching AeroSync AppImage on Ubuntu 24.04 ==="
+          appimage="clean-test-artifacts/AeroSync-Linux-x86_64.AppImage"
+          chmod +x "$appimage"
+          "$appimage" --version
+
+          xvfb-run -a -s "-screen 0 1280x800x24" "$appimage" > /tmp/u24_appimage.log 2>&1 &
+          AI_PID=$!
+          sleep 2
+          if ! kill -0 $AI_PID 2>/dev/null; then
+            echo "Error: AppImage failed to start on Ubuntu 24.04!" >&2
+            cat /tmp/u24_appimage.log >&2
+            exit 1
+          fi
+
+          curl -s -f http://127.0.0.1:48126/api/health | grep -q '"status":"ok"' || (echo "Error: AppImage daemon offline on Ubuntu 24.04!" >&2; exit 1)
+          kill -TERM $AI_PID 2>/dev/null || true
+          pkill -f "aerosync_daemon" 2>/dev/null || true
+          echo "AppImage execution on Ubuntu 24.04 PASSED with zero crashes."
+
   publish-release:
     name: Publish Release Assets
-    needs: [build-windows, build-linux, build-android, test-clean-machine-linux]
+    needs: [build-windows, build-linux, build-android, test-clean-machine-linux, test-clean-machine-linux-2404]
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && (inputs.tag_name != '' || startsWith(github.ref, 'refs/tags/v')))
     runs-on: ubuntu-latest
     steps:
@@ -1129,6 +1196,17 @@ jobs:
           name: AeroSync-Android
           path: release-assets
 
+      - name: Clean Up Release Assets Directory
+        run: |
+          # Strictly publish only official distribution artifacts
+          rm -f release-assets/aerosync_daemon*
+          rm -f release-assets/Start_AeroSync_*
+          rm -f release-assets/AeroSync-v*.*.apk
+          rm -f release-assets/*.tar.gz
+          rm -f release-assets/*.sh
+          echo "Final release assets ready for publishing:"
+          ls -la release-assets/
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -1148,15 +1226,14 @@ jobs:
             - [**Download Windows Setup Installer (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/AeroSync-Setup-v1.0.8.exe) (`AeroSync-Setup-v1.0.8.exe`)
             - [**Download Windows Portable Package (.zip)**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/AeroSync-Windows-Portable.zip) (`AeroSync-Windows-Portable.zip`)
             - [**Download Standalone Windows Executable**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/AeroSync.exe) (`AeroSync.exe`)
-            - [**Download Windows 1-Click Launcher**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/Start_AeroSync_Desktop.bat) (`Start_AeroSync_Desktop.bat`)
 
             ---
 
             ### 🐧 Linux Downloads
             - [**Linux — AppImage (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/AeroSync-Linux-x86_64.AppImage) (`AeroSync-Linux-x86_64.AppImage`)
-              - *Self-contained with bundled WebKitGTK and native aerosync_daemon. Double-click to launch on Ubuntu, Debian, Mint, Fedora, Arch Linux. Automatically registers AeroSync and its icon into your application menu.*
+              - *Lightweight AppImage with embedded native core daemon. Requires WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`) on the host system. Launch with double-click or `./AeroSync-Linux-x86_64.AppImage`.*
             - [**Linux — Debian/Ubuntu (.deb)**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/aerosync_1.0.8_amd64.deb) (`aerosync_1.0.8_amd64.deb`)
-              - *Native package installer for Debian, Ubuntu, Kubuntu, and Linux Mint. Install with double-click in Software Center or via terminal with `sudo apt install ./aerosync_1.0.8_amd64.deb`.*
+              - *Native package installer for Debian, Ubuntu, and Linux Mint. Install with `sudo apt install ./aerosync_1.0.8_amd64.deb`.*
 
             ---
 
