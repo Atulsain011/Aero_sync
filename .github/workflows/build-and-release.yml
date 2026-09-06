@@ -1072,7 +1072,7 @@ jobs:
           sudo ip netns del aero_node1 2>/dev/null || true
           sudo ip netns del aero_node2 2>/dev/null || true
 
-      - name: 12. Verify Self-Contained AppImage on Clean Machine: Discovery, Transfer & Window Resize/Move
+      - name: "12. Verify Self-Contained AppImage on Clean Machine: Discovery, Transfer & Window Resize/Move"
         run: |
           echo "=== 12. Testing Self-Contained AppImage on Clean Machine ==="
           appimage="clean-test-artifacts/AeroSync-Linux-x86_64.AppImage"
