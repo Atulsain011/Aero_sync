@@ -933,8 +933,9 @@ jobs:
           if [ ! -f "$deb_pkg" ]; then
             deb_pkg=$(find clean-test-artifacts/ -maxdepth 1 -name "*.deb" | head -n 1)
           fi
-          echo "=== 3. Installing Single Release File ($deb_pkg) ==="
-          sudo apt-get install -y "$deb_pkg"
+          deb_path=$(realpath "$deb_pkg")
+          echo "=== 3. Installing Single Release File ($deb_path) ==="
+          sudo apt-get install -y "$deb_path"
 
           which aerosync
           [ -x /usr/bin/aerosync ] || (echo "Error: /usr/bin/aerosync missing!" >&2; exit 1)
@@ -1256,7 +1257,8 @@ jobs:
           if [ ! -f "$deb_pkg" ]; then
             deb_pkg=$(find clean-test-artifacts/ -maxdepth 1 -name "*.deb" | head -n 1)
           fi
-          sudo apt-get install -y "$deb_pkg"
+          deb_path=$(realpath "$deb_pkg")
+          sudo apt-get install -y "$deb_path"
 
           which aerosync
           [ -x /usr/bin/aerosync ] || (echo "Error: /usr/bin/aerosync missing!" >&2; exit 1)
