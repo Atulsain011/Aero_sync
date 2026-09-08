@@ -43,7 +43,7 @@ fi
 
 if [ -z "$DEB_PKG" ] && [ -z "$APPIMAGE_PKG" ]; then
     echo "Error: No release artifacts found in $RELEASE_DIR!" >&2
-    echo "Expected: aerosync_1.0.8_amd64.deb or AeroSync-Linux-x86_64.AppImage" >&2
+    echo "Expected: aerosync_1.0.0_amd64.deb or AeroSync-Linux-x86_64.AppImage" >&2
     exit 1
 fi
 

@@ -23,7 +23,7 @@
 | Platform | Package | Download Link | Version |
 | :--- | :--- | :--- | :--- |
 | **Linux — AppImage (Recommended)** | `AeroSync-Linux-x86_64.AppImage` | [**Download Linux AppImage (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.0/AeroSync-Linux-x86_64.AppImage) | `v1.0.0` |
-| **Linux — Debian/Ubuntu (.deb)** | `aerosync_1.0.8_amd64.deb` | [**Download Linux DEB Package**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.0/aerosync_1.0.8_amd64.deb) | `v1.0.0` |
+| **Linux — Debian/Ubuntu (.deb)** | `aerosync_1.0.0_amd64.deb` | [**Download Linux DEB Package**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.0/aerosync_1.0.0_amd64.deb) | `v1.0.0` |
 | **Windows (Installer)** | `AeroSync-Setup-v1.0.0.exe` | [**Download Windows Installer (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.0/AeroSync-Setup-v1.0.0.exe) | `v1.0.0` |
 | **Windows (Portable)** | `AeroSync-Windows-Portable.zip` | [**Download Windows Portable (.zip)**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.0/AeroSync-Windows-Portable.zip) | `v1.0.0` |
 | **Windows (Standalone)** | `AeroSync.exe` | [**Download Windows Executable**](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.0/AeroSync.exe) | `v1.0.0` |
@@ -31,12 +31,12 @@
 | **All Releases** | GitHub Releases | [**Browse All Releases**](https://github.com/Atulsain011/Aero_sync/releases) | `Latest` |
 
 > [!NOTE]
-> **Linux Runtime Requirements**: AeroSync GUI on Linux requires the WebKitGTK 4.1 runtime (`libwebkit2gtk-4.1-0`). On Debian/Ubuntu/Mint, installing our official DEB package automatically resolves dependencies: `sudo apt install ./aerosync_1.0.8_amd64.deb`.
+> **Linux Runtime Requirements**: AeroSync GUI on Linux requires the WebKitGTK 4.1 runtime (`libwebkit2gtk-4.1-0`). On Debian/Ubuntu/Mint, installing our official DEB package automatically resolves dependencies: `sudo apt install ./aerosync_1.0.0_amd64.deb`.
 
 <br>
 
 [![Download Linux AppImage](https://img.shields.io/badge/Linux_AppImage_(Recommended)-AeroSync-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.0/AeroSync-Linux-x86_64.AppImage)
-[![Download Linux DEB Package](https://img.shields.io/badge/Linux_Debian%2FUbuntu_(.deb)-AeroSync-A81D33?style=for-the-badge&logo=debian&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.0/aerosync_1.0.8_amd64.deb)
+[![Download Linux DEB Package](https://img.shields.io/badge/Linux_Debian%2FUbuntu_(.deb)-AeroSync-A81D33?style=for-the-badge&logo=debian&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.0/aerosync_1.0.0_amd64.deb)
 [![Download Windows Installer](https://img.shields.io/badge/Download_Windows_Installer-AeroSync-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.0/AeroSync-Setup-v1.0.0.exe)
 [![Download Android App](https://img.shields.io/badge/Download_Android_App-AeroSync-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Atulsain011/Aero_sync/releases/download/v1.0.0/app-debug.1.apk)
 
@@ -272,11 +272,11 @@ Universal self-contained executable for Ubuntu, Debian, Fedora, Arch Linux, open
 
 #### Linux — Debian/Ubuntu (.deb)
 Native package installer for Debian, Ubuntu, Kubuntu, and Linux Mint:
-1. Download **`aerosync_1.0.8_amd64.deb`** from [GitHub Releases](https://github.com/Atulsain011/Aero_sync/releases).
+1. Download **`aerosync_1.0.0_amd64.deb`** from [GitHub Releases](https://github.com/Atulsain011/Aero_sync/releases).
 2. Double-click the downloaded file in your browser or file manager and click **Install** in your system Software Center / App Center.
 3. Open **AeroSync** from your desktop **Application Launcher** or **Applications Menu**.
 
-*(CLI option: `sudo apt install ./aerosync_1.0.8_amd64.deb`)*
+*(CLI option: `sudo apt install ./aerosync_1.0.0_amd64.deb`)*
 
 ### Windows
 #### Recommended: Installer
@@ -332,7 +332,7 @@ chmod +x build_linux.sh package_linux.sh
 Generated Linux packages will be located at:
 ```text
 release/AeroSync-Linux-x86_64.AppImage   # Linux — AppImage (Recommended)
-release/aerosync_1.0.8_amd64.deb        # Linux — Debian/Ubuntu (.deb)
+release/aerosync_1.0.0_amd64.deb        # Linux — Debian/Ubuntu (.deb)
 ```
 
 #### Running & Installing on Linux
@@ -341,11 +341,11 @@ release/aerosync_1.0.8_amd64.deb        # Linux — Debian/Ubuntu (.deb)
 
 - **Debian / Ubuntu / Kubuntu / Mint Package (`.deb`) — Recommended for Debian/Ubuntu**:
   Installs AeroSync, the native daemon, menu launcher, and automatically resolves all required runtime dependencies (including `libwebkit2gtk-4.1-0`).
-  Double-click `aerosync_1.0.8_amd64.deb` to install via Ubuntu App Center or KDE Discover.
+  Double-click `aerosync_1.0.0_amd64.deb` to install via Ubuntu App Center or KDE Discover.
   
   Or via terminal:
   ```bash
-  sudo apt install ./aerosync_1.0.8_amd64.deb
+  sudo apt install ./aerosync_1.0.0_amd64.deb
   ```
 
 - **AppImage (Single-File Executable Container)**:

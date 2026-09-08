@@ -84,7 +84,8 @@ jobs:
           }
           $setupExe = Get-ChildItem "platform/windows/desktop_tauri/src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
           if ($setupExe) {
-            Copy-Item $setupExe.FullName "artifacts/AeroSync-Setup-v1.0.8.exe" -Force
+            Copy-Item $setupExe.FullName "artifacts/AeroSync-Setup-v1.0.0.exe" -Force
+            Copy-Item $setupExe.FullName "artifacts/AeroSync-Setup.exe" -Force
           } else {
             Write-Error "NSIS setup executable not found!"
             exit 1
@@ -267,7 +268,10 @@ jobs:
           fi
 
           # 8. Verify DEB package file exists and is valid deb archive
-          deb_file="release/aerosync_1.0.8_amd64.deb"
+          deb_file="release/aerosync_1.0.0_amd64.deb"
+          if [ ! -f "$deb_file" ]; then
+            deb_file=$(find release/ -maxdepth 1 -name "aerosync_*_amd64.deb" | head -n 1)
+          fi
           if [ ! -f "$deb_file" ]; then
             deb_file="release/AeroSync-Linux-x86_64.deb"
           fi
@@ -288,7 +292,10 @@ jobs:
       # ------------------------------------------------------------------------
       - name: 9. Verify Application Metadata
         run: |
-          deb_file="release/aerosync_1.0.8_amd64.deb"
+          deb_file="release/aerosync_1.0.0_amd64.deb"
+          if [ ! -f "$deb_file" ]; then
+            deb_file=$(find release/ -maxdepth 1 -name "aerosync_*_amd64.deb" | head -n 1)
+          fi
           if [ ! -f "$deb_file" ]; then
             deb_file="release/AeroSync-Linux-x86_64.deb"
           fi
@@ -296,7 +303,7 @@ jobs:
           echo "=== DEB Package Metadata ==="
           echo "$deb_control"
           echo "$deb_control" | grep -q '^ Package: aerosync$' || (echo "Error: Missing Package: aerosync" >&2; exit 1)
-          echo "$deb_control" | grep -q '^ Version: 1.0.8$' || (echo "Error: Missing Version: 1.0.8" >&2; exit 1)
+          echo "$deb_control" | grep -q '^ Version: 1.0.0$' || (echo "Error: Missing Version: 1.0.0" >&2; exit 1)
           echo "$deb_control" | grep -q '^ Architecture: amd64$' || (echo "Error: Missing Architecture: amd64" >&2; exit 1)
           echo "$deb_control" | grep -q 'libwebkit2gtk-4.1-0' || (echo "Error: Missing required libwebkit2gtk-4.1-0 dependency in metadata!" >&2; exit 1)
           echo "$deb_control" | grep -q 'libgtk-3-0' || (echo "Error: Missing required libgtk-3-0 dependency in metadata!" >&2; exit 1)
@@ -307,7 +314,10 @@ jobs:
       # ------------------------------------------------------------------------
       - name: 10. Verify .desktop Entry
         run: |
-          deb_file="release/aerosync_1.0.8_amd64.deb"
+          deb_file="release/aerosync_1.0.0_amd64.deb"
+          if [ ! -f "$deb_file" ]; then
+            deb_file=$(find release/ -maxdepth 1 -name "aerosync_*_amd64.deb" | head -n 1)
+          fi
           if [ ! -f "$deb_file" ]; then
             deb_file="release/AeroSync-Linux-x86_64.deb"
           fi
@@ -440,7 +450,10 @@ jobs:
       # ------------------------------------------------------------------------
       - name: 13. Verify Executable Permissions
         run: |
-          deb_file="release/aerosync_1.0.8_amd64.deb"
+          deb_file="release/aerosync_1.0.0_amd64.deb"
+          if [ ! -f "$deb_file" ]; then
+            deb_file=$(find release/ -maxdepth 1 -name "aerosync_*_amd64.deb" | head -n 1)
+          fi
           if [ ! -f "$deb_file" ]; then
             deb_file="release/AeroSync-Linux-x86_64.deb"
           fi
@@ -545,7 +558,10 @@ jobs:
           # 15b. Test Real Debian Package Installation & Desktop Validation
           # ----------------------------------------------------------------------
           echo "--- 15b. Testing Real DEB Package Installation ---"
-          deb_file="release/aerosync_1.0.8_amd64.deb"
+          deb_file="release/aerosync_1.0.0_amd64.deb"
+          if [ ! -f "$deb_file" ]; then
+            deb_file=$(find release/ -maxdepth 1 -name "aerosync_*_amd64.deb" | head -n 1)
+          fi
           if [ ! -f "$deb_file" ]; then
             deb_file="release/AeroSync-Linux-x86_64.deb"
           fi
@@ -805,13 +821,19 @@ jobs:
             exit 1
           fi
           
-          # Optional Debian / Ubuntu package: aerosync_1.0.8_amd64.deb
-          if [ -f "release/aerosync_1.0.8_amd64.deb" ]; then
-            cp "release/aerosync_1.0.8_amd64.deb" linux-artifacts/aerosync_1.0.8_amd64.deb
-          elif [ -f "release/AeroSync-Linux-x86_64.deb" ]; then
-            cp "release/AeroSync-Linux-x86_64.deb" linux-artifacts/aerosync_1.0.8_amd64.deb
+          # Debian / Ubuntu package: aerosync_1.0.0_amd64.deb
+          deb_src="release/aerosync_1.0.0_amd64.deb"
+          if [ ! -f "$deb_src" ]; then
+            deb_src=$(find release/ -maxdepth 1 -name "aerosync_*_amd64.deb" | head -n 1)
+          fi
+          if [ ! -f "$deb_src" ] && [ -f "release/AeroSync-Linux-x86_64.deb" ]; then
+            deb_src="release/AeroSync-Linux-x86_64.deb"
+          fi
+          if [ -n "$deb_src" ] && [ -f "$deb_src" ]; then
+            cp "$deb_src" linux-artifacts/aerosync_1.0.0_amd64.deb
+            cp "$deb_src" linux-artifacts/AeroSync-Linux-x86_64.deb
           else
-            echo "Error: Debian package aerosync_1.0.8_amd64.deb not found!" >&2
+            echo "Error: Debian package not found!" >&2
             exit 1
           fi
 
@@ -892,8 +914,12 @@ jobs:
             echo "Error: AeroSync-Linux-x86_64.AppImage not found in downloaded release artifacts!" >&2
             exit 1
           fi
-          if [ ! -f "clean-test-artifacts/aerosync_1.0.8_amd64.deb" ]; then
-            echo "Error: aerosync_1.0.8_amd64.deb not found in downloaded release artifacts!" >&2
+          deb_pkg="clean-test-artifacts/aerosync_1.0.0_amd64.deb"
+          if [ ! -f "$deb_pkg" ]; then
+            deb_pkg=$(find clean-test-artifacts/ -maxdepth 1 -name "*.deb" | head -n 1)
+          fi
+          if [ -z "$deb_pkg" ] || [ ! -f "$deb_pkg" ]; then
+            echo "Error: Debian package not found in downloaded release artifacts!" >&2
             exit 1
           fi
 
@@ -903,8 +929,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0 libayatana-appindicator3-1 xvfb curl iproute2 xdotool
 
-          echo "=== 3. Installing Single Release File (aerosync_1.0.8_amd64.deb) ==="
-          sudo apt-get install -y ./clean-test-artifacts/aerosync_1.0.8_amd64.deb
+          deb_pkg="clean-test-artifacts/aerosync_1.0.0_amd64.deb"
+          if [ ! -f "$deb_pkg" ]; then
+            deb_pkg=$(find clean-test-artifacts/ -maxdepth 1 -name "*.deb" | head -n 1)
+          fi
+          echo "=== 3. Installing Single Release File ($deb_pkg) ==="
+          sudo apt-get install -y "$deb_pkg"
 
           which aerosync
           [ -x /usr/bin/aerosync ] || (echo "Error: /usr/bin/aerosync missing!" >&2; exit 1)
@@ -1222,7 +1252,11 @@ jobs:
           echo "=== Installing dependencies & DEB on Ubuntu 24.04 ==="
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0 libayatana-appindicator3-1 xvfb curl iproute2 xdotool
-          sudo apt-get install -y ./clean-test-artifacts/aerosync_1.0.8_amd64.deb
+          deb_pkg="clean-test-artifacts/aerosync_1.0.0_amd64.deb"
+          if [ ! -f "$deb_pkg" ]; then
+            deb_pkg=$(find clean-test-artifacts/ -maxdepth 1 -name "*.deb" | head -n 1)
+          fi
+          sudo apt-get install -y "$deb_pkg"
 
           which aerosync
           [ -x /usr/bin/aerosync ] || (echo "Error: /usr/bin/aerosync missing!" >&2; exit 1)
@@ -1346,14 +1380,14 @@ jobs:
           prerelease: ${{ inputs.prerelease || false }}
           fail_on_unmatched_files: false
           body: |
-            ## AeroSync v1.0.8 Release Assets
+            ## AeroSync Release Assets
 
             High-speed peer-to-peer file transfer over local Wi-Fi and mobile hotspot. Zero cloud, 100% private.
 
             ---
 
             ### 🪟 Windows Release Assets
-            - [**Download Windows Setup Installer (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/AeroSync-Setup-v1.0.8.exe) (`AeroSync-Setup-v1.0.8.exe`)
+            - [**Download Windows Setup Installer (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/AeroSync-Setup-v1.0.0.exe) (`AeroSync-Setup-v1.0.0.exe`)
             - [**Download Windows Portable Package (.zip)**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/AeroSync-Windows-Portable.zip) (`AeroSync-Windows-Portable.zip`)
             - [**Download Standalone Windows Executable**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/AeroSync.exe) (`AeroSync.exe`)
 
@@ -1362,8 +1396,8 @@ jobs:
             ### 🐧 Linux Downloads
             - [**Linux — AppImage (Recommended)**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/AeroSync-Linux-x86_64.AppImage) (`AeroSync-Linux-x86_64.AppImage`)
               - *Lightweight AppImage with embedded native core daemon. Requires WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`) on the host system. Launch with double-click or `./AeroSync-Linux-x86_64.AppImage`.*
-            - [**Linux — Debian/Ubuntu (.deb)**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/aerosync_1.0.8_amd64.deb) (`aerosync_1.0.8_amd64.deb`)
-              - *Native package installer for Debian, Ubuntu, and Linux Mint. Install with `sudo apt install ./aerosync_1.0.8_amd64.deb`.*
+            - [**Linux — Debian/Ubuntu (.deb)**](https://github.com/Atulsain011/Aero_sync/releases/download/${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}/aerosync_1.0.0_amd64.deb) (`aerosync_1.0.0_amd64.deb`)
+              - *Native package installer for Debian, Ubuntu, and Linux Mint. Install with `sudo apt install ./aerosync_1.0.0_amd64.deb`.*
 
             ---
 
