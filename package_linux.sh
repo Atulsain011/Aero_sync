@@ -3,7 +3,7 @@
 # AeroSync Standalone Linux Packaging Pipeline
 # Produces:
 #   1. AeroSync-Linux-x86_64.AppImage (Linux — AppImage (Recommended))
-#   2. aerosync_1.0.8_amd64.deb      (Linux — Debian/Ubuntu (.deb))
+#   2. aerosync_1.0.0_amd64.deb      (Linux — Debian/Ubuntu (.deb))
 # ==============================================================================
 
 set -e
@@ -11,7 +11,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$SCRIPT_DIR"
 RELEASE_DIR="$ROOT_DIR/release"
-VERSION="1.0.8"
+VERSION="1.0.0"
 
 mkdir -p "$RELEASE_DIR"
 
@@ -222,7 +222,7 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
 fi
 
 if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then
-    echo "AeroSync v1.0.8"
+    echo "AeroSync v1.0.0"
     exit 0
 fi
 

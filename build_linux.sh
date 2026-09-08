@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$SCRIPT_DIR"
 
 echo "=========================================================="
-echo " AEROSYNC LINUX PRODUCTION BUILD PIPELINE (v1.0.8)"
+echo " AEROSYNC LINUX PRODUCTION BUILD PIPELINE (v1.0.0)"
 echo "=========================================================="
 
 # Check for required build tools
@@ -124,6 +124,6 @@ echo "=========================================================="
 echo " LINUX BUILD SUCCESSFUL! RELEASE ARTIFACTS READY:"
 echo "=========================================================="
 echo " 1. Linux — AppImage (Recommended): $ROOT_DIR/release/AeroSync-Linux-x86_64.AppImage"
-echo " 2. Linux — Debian/Ubuntu (.deb):   $ROOT_DIR/release/aerosync_1.0.8_amd64.deb"
+echo " 2. Linux — Debian/Ubuntu (.deb):   $ROOT_DIR/release/aerosync_1.0.0_amd64.deb"
 echo "=========================================================="
 

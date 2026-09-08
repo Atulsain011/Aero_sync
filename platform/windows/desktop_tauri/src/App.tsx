@@ -65,7 +65,7 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleConnectDirectIp = (ip: string, port: number) => {
+  const handleConnectDirectIp = async (ip: string, port: number) => {
     const directPeer: PeerInfo = {
       deviceId: `manual-${ip}`,
       deviceName: `Device (${ip})`,
@@ -76,7 +76,10 @@ export const App: React.FC = () => {
       lastSeenMs: Date.now()
     };
     setSelectedPeer(directPeer);
-    handlePickAndSendFiles();
+    const files = await tauriBridge.selectFiles();
+    if (files && files.length > 0) {
+      enqueueFiles(files, directPeer);
+    }
   };
 
   return (

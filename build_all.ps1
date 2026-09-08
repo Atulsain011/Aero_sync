@@ -88,18 +88,16 @@ try {
     Pop-Location
 }
 
-$releaseApkSrc = "$root\platform\android\app\build\outputs\apk\release\app-release.apk"
+$debug1ApkSrc = "$root\release\app-debug.1.apk"
 $debugApkSrc   = "$root\platform\android\app\build\outputs\apk\debug\app-debug.apk"
-$targetApkSrc  = if (Test-Path $debugApkSrc) { $debugApkSrc } else { $releaseApkSrc }
+$releaseApkSrc = "$root\platform\android\app\build\outputs\apk\release\app-release.apk"
+$targetApkSrc  = if (Test-Path $debug1ApkSrc) { $debug1ApkSrc } elseif (Test-Path $debugApkSrc) { $debugApkSrc } else { $releaseApkSrc }
 
 if (Test-Path $targetApkSrc) {
     if (-not (Test-Path "$root\release")) { New-Item -ItemType Directory -Path "$root\release" -Force }
     Copy-Item $targetApkSrc "$root\AeroSync.apk" -Force
     Copy-Item $targetApkSrc "$root\release\AeroSync.apk" -Force
-    Copy-Item $targetApkSrc "$root\release\AeroSync-v1.0.8.apk" -Force
-    if (Test-Path $debugApkSrc) {
-        Copy-Item $debugApkSrc "$root\release\app-debug.apk" -Force
-    }
+    Copy-Item $targetApkSrc "$root\release\AeroSync-v1.0.0.apk" -Force
 }
 
 # Create 1-click launcher batch script in root and release directory

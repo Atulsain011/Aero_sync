@@ -19,14 +19,6 @@ Copy-Item "$root\build_windows\aerosync_daemon.exe" "$root\release\aerosync_daem
 Copy-Item "$root\build_windows\aerosync_daemon.exe" "$root\platform\windows\desktop_tauri\aerosync_daemon.exe" -Force
 Copy-Item "$root\build_windows\aerosync_daemon.exe" "$root\platform\windows\desktop_tauri\src-tauri\aerosync_daemon.exe" -Force
 
-Get-ChildItem -Path "$toolBin\*.dll" | ForEach-Object {
-    Copy-Item $_.FullName "$root\build_windows\" -Force
-    Copy-Item $_.FullName "$root\release\" -Force
-    Copy-Item $_.FullName "$root\" -Force
-    Copy-Item $_.FullName "$root\platform\windows\desktop_tauri\" -Force
-    Copy-Item $_.FullName "$root\platform\windows\desktop_tauri\src-tauri\" -Force
-}
-
 Write-Host "1. Building Web Assets..." -ForegroundColor Cyan
 Push-Location "$root\platform\windows\desktop_tauri"
 try {
@@ -62,8 +54,8 @@ Write-Host "4. Building NSIS Setup Installer with Bundled WebView2Loader.dll and
 $makensisPath = "C:\Users\Atul\AppData\Local\tauri\NSIS\Bin\makensis.exe"
 if (Test-Path $makensisPath) {
     & $makensisPath "$root\platform\windows\installer\AeroSync_Installer.nsi"
-    Copy-Item "$root\release\AeroSync-Setup-v1.0.8.exe" "$root\release\AeroSync-Setup.exe" -Force
-    Write-Host "Successfully generated AeroSync-Setup-v1.0.8.exe with all runtime dependencies." -ForegroundColor Green
+    Copy-Item "$root\release\AeroSync-Setup-v1.0.0.exe" "$root\release\AeroSync-Setup.exe" -Force
+    Write-Host "Successfully generated AeroSync-Setup-v1.0.0.exe with all runtime dependencies." -ForegroundColor Green
 }
 
 Write-Host "5. Creating Windows Portable Zip..." -ForegroundColor Cyan

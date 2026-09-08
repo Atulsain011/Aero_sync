@@ -264,7 +264,7 @@ bool ProtocolSerializer::deserializeDiscoveryBeacon(const std::string& data, con
         outPeer.deviceName = deviceName;
     }
 
-    outPeer.appVersion = appVerStr.empty() ? "1.0.8" : appVerStr;
+    outPeer.appVersion = appVerStr.empty() ? "1.0.0" : appVerStr;
     outPeer.ipAddress = senderIp;
     outPeer.port = static_cast<uint16_t>(port);
     outPeer.lastSeenMs = timestamp;

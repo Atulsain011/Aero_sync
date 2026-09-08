@@ -252,7 +252,7 @@ int main() {
     linuxPeer.deviceName = "Ubuntu Laptop (Linux)";
     linuxPeer.deviceType = aerosync::DeviceType::DEVICE_LINUX;
     linuxPeer.platform = "linux";
-    linuxPeer.appVersion = "1.0.8";
+    linuxPeer.appVersion = "1.0.0";
     linuxPeer.port = 48124;
 
     aerosync::PeerInfo winPeer;
@@ -260,7 +260,7 @@ int main() {
     winPeer.deviceName = "Gaming Rig (Windows PC)";
     winPeer.deviceType = aerosync::DeviceType::DEVICE_WINDOWS;
     winPeer.platform = "windows";
-    winPeer.appVersion = "1.0.8";
+    winPeer.appVersion = "1.0.0";
     winPeer.port = 48124;
 
     aerosync::PeerInfo androidPeer;
@@ -268,7 +268,7 @@ int main() {
     androidPeer.deviceName = "Pixel 8 Pro";
     androidPeer.deviceType = aerosync::DeviceType::DEVICE_ANDROID;
     androidPeer.platform = "android";
-    androidPeer.appVersion = "1.0.8";
+    androidPeer.appVersion = "1.0.0";
     androidPeer.port = 48124;
 
     // Test 1: Linux -> Windows deserialization

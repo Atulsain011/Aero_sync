@@ -482,7 +482,7 @@ void DiscoveryEngine::broadcastLoop() {
     localPeer.deviceName = m_localDeviceName;
     localPeer.deviceType = m_localDeviceType;
     localPeer.platform = deviceTypeToString(m_localDeviceType);
-    localPeer.appVersion = "1.0.8";
+    localPeer.appVersion = "1.0.0";
     localPeer.port = m_listenPort;
 
     AERO_LOG_I("[AeroSync] Beacon loop active for device %s (%s)", m_localDeviceName.c_str(), m_localDeviceId.c_str());
@@ -727,7 +727,7 @@ void DiscoveryEngine::sendDirectResponse(const std::string& targetIp, uint16_t t
     replyPeer.deviceName = m_localDeviceName;
     replyPeer.deviceType = m_localDeviceType;
     replyPeer.platform = deviceTypeToString(m_localDeviceType);
-    replyPeer.appVersion = "1.0.8";
+    replyPeer.appVersion = "1.0.0";
     replyPeer.port = m_listenPort;
     replyPeer.lastSeenMs = now;
     replyPeer.isResponse = true;

@@ -4,8 +4,8 @@
 CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "app.manifest"
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION     1,0,6,0
-PRODUCTVERSION  1,0,6,0
+FILEVERSION     1,0,0,0
+PRODUCTVERSION  1,0,0,0
 FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
 #ifdef _DEBUG
 FILEFLAGS       VS_FF_DEBUG
@@ -22,12 +22,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "AeroSync"
             VALUE "FileDescription",  "AeroSync Peer-to-Peer Direct File Transfer Engine"
-            VALUE "FileVersion",      "1.0.8.0"
+            VALUE "FileVersion",      "1.0.0.0"
             VALUE "InternalName",     "aerosync"
             VALUE "LegalCopyright",   "Copyright (C) 2026 AeroSync"
             VALUE "OriginalFilename", "AeroSync.exe"
             VALUE "ProductName",      "AeroSync"
-            VALUE "ProductVersion",   "1.0.8.0"
+            VALUE "ProductVersion",   "1.0.0.0"
         END
     END
     BLOCK "VarFileInfo"

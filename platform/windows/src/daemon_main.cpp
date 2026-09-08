@@ -409,7 +409,7 @@ static void handleHttpClient(socket_t clientSock) {
         }
 
         if (method == "GET" && (path == "/api/health" || path == "/health")) {
-            std::string json = "{\"status\":\"ok\",\"version\":\"1.0.8\",\"platform\":\""
+            std::string json = "{\"status\":\"ok\",\"version\":\"1.0.0\",\"platform\":\""
 #ifdef _WIN32
                 "windows"
 #else

@@ -206,7 +206,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           <div className="about-spec-grid">
             <div className="about-spec-row">
               <span className="spec-name">App Version</span>
-              <span className="spec-val">v2.0.0 (Production)</span>
+              <span className="spec-val">v1.0.0 (Production)</span>
             </div>
             <div className="about-spec-row">
               <span className="spec-name">Desktop Runtime</span>

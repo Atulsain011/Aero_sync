@@ -87,6 +87,12 @@ export function useAeroSyncStore() {
   const lastActiveFileRef = useRef<string>('');
   const lastHistorySyncRef = useRef<number>(0);
   const latestTransferringRef = useRef<boolean>(false);
+  const queueRef = useRef<QueueItem[]>(queue);
+  queueRef.current = queue;
+  const selectedPeerRef = useRef<PeerInfo | null>(selectedPeer);
+  selectedPeerRef.current = selectedPeer;
+  const settingsRef = useRef<SettingsState>(settings);
+  settingsRef.current = settings;
 
   // Save history to localStorage
   useEffect(() => {
@@ -356,24 +362,27 @@ export function useAeroSyncStore() {
         );
 
         if (isProgressComplete) {
-          const completedName = data.currentProgress.currentFileName || (queue[0] ? queue[0].name : '');
+          const currentQueue = queueRef.current;
+          const currentPeer = selectedPeerRef.current;
+          const currentSettings = settingsRef.current;
+          const completedName = data.currentProgress.currentFileName || (currentQueue[0] ? currentQueue[0].name : '');
           if (completedName && completedName !== lastActiveFileRef.current) {
             lastActiveFileRef.current = completedName;
 
-            const matchingQueueItem = queue.find(q => q.name === completedName);
+            const matchingQueueItem = currentQueue.find(q => q.name === completedName);
             const isOutgoing = Boolean(matchingQueueItem && matchingQueueItem.path);
             const sep = isLinux ? '/' : '\\';
-            const baseDir = (data.downloadDir || settings.downloadDirectory || '').replace(/[/\\]+$/, '');
+            const baseDir = (data.downloadDir || currentSettings.downloadDirectory || '').replace(/[/\\]+$/, '');
             const targetFilePath = isOutgoing ? matchingQueueItem!.path : `${baseDir}${sep}${completedName}`;
 
             const newRecord: TransferHistoryRecord = {
               id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
               fileName: completedName,
               filePath: targetFilePath,
-              fileSize: data.currentProgress.fileSize || (queue[0] ? queue[0].size : 0),
+              fileSize: data.currentProgress.fileSize || (currentQueue[0] ? currentQueue[0].size : 0),
               direction: isOutgoing ? 'sent' : 'received',
-              peerName: selectedPeer ? selectedPeer.deviceName : 'Peer Device',
-              peerIp: selectedPeer ? selectedPeer.ipAddress : 'LAN',
+              peerName: currentPeer ? currentPeer.deviceName : 'Peer Device',
+              peerIp: currentPeer ? currentPeer.ipAddress : 'LAN',
               status: 'completed',
               speedAvgMbSec: data.currentProgress.speedBytesPerSec / (1024 * 1024),
               timestampMs: Date.now()
@@ -398,7 +407,7 @@ export function useAeroSyncStore() {
             });
 
             // Trigger desktop notification if enabled
-            if (settings.notificationsEnabled) {
+            if (currentSettings.notificationsEnabled) {
               const actionLabel = isOutgoing ? 'Sent' : 'Received';
               tauriBridge.sendNotification('AeroSync Transfer Complete', `${actionLabel} "${completedName}" successfully.`);
             }

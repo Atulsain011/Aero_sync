@@ -29,7 +29,9 @@ echo "=========================================================="
 DEB_PKG=""
 APPIMAGE_PKG=""
 
-if [ -f "$RELEASE_DIR/aerosync_1.0.8_amd64.deb" ]; then
+if [ -f "$RELEASE_DIR/aerosync_1.0.0_amd64.deb" ]; then
+    DEB_PKG="$RELEASE_DIR/aerosync_1.0.0_amd64.deb"
+elif [ -f "$RELEASE_DIR/aerosync_1.0.8_amd64.deb" ]; then
     DEB_PKG="$RELEASE_DIR/aerosync_1.0.8_amd64.deb"
 elif [ -f "$RELEASE_DIR/AeroSync-Linux-x86_64.deb" ]; then
     DEB_PKG="$RELEASE_DIR/AeroSync-Linux-x86_64.deb"
